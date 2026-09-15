@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v12';
+const SW_VERSION = 'serbisyonow-pwa-v13';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 

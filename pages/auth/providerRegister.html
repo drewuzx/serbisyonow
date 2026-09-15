@@ -176,7 +176,7 @@
     </div>
   </footer>
 
-  <script src="../../shared/js/app.js?v=20260610-register-success2"></script>
+  <script src="../../shared/js/app.js?v=20260915-google-role"></script>
   <script>
     const AUTH_API_BASE = SN.utils.apiBase();
     const PROVIDER_REGISTER_SUCCESS_KEY = 'sn_provider_register_success';
@@ -462,9 +462,21 @@
 
       const warning = document.getElementById('step-1-warning');
       if (warning) {
-        warning.textContent = 'Gmail verified. Complete the remaining details, documents, and skill assessment.';
+        warning.textContent = 'Gmail verified. Checking if this account already exists...';
         warning.classList.add('show');
       }
+
+      redirectExistingGoogleProvider(profile)
+        .then(() => {
+          if (warning?.textContent?.includes('Checking')) {
+            warning.textContent = 'New Gmail verified. Complete this provider application once; future Gmail logins go straight to your provider dashboard.';
+          }
+        })
+        .catch(() => {
+          if (warning) {
+            warning.textContent = 'New Gmail verified. Complete this provider application once; future Gmail logins go straight to your provider dashboard.';
+          }
+        });
     }
 
     function saveProviderApplication(data) {
@@ -483,6 +495,34 @@
         const label = input.files.length > 1 ? `${input.files.length} files selected` : input.files[0].name;
         document.getElementById(labelId).textContent = label;
         document.getElementById(boxId).classList.add('uploaded');
+      }
+    }
+
+    async function redirectExistingGoogleProvider(profile) {
+      const warning = document.getElementById('step-1-warning');
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/google/account-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'provider',
+          email: profile.email,
+          googleSub: profile.googleSub || '',
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (warning && data.message) {
+          warning.textContent = data.message;
+          warning.classList.add('show');
+        }
+        return;
+      }
+
+      if (data.action === 'login' && data.user && data.redirect) {
+        localStorage.removeItem('sn_google_prefill_provider');
+        localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+        window.location.replace(data.redirect);
       }
     }
 
@@ -554,6 +594,6 @@
       }
     });
   </script>
-  <script src="/shared/js/pwa-register.js"></script>
+  <script src="/shared/js/pwa-register.js?v=20260915-google-role"></script>
 </body>
 </html>

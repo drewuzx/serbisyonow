@@ -210,6 +210,34 @@ function handleUpload(input, labelId, boxId) {
   }
 }
 
+async function redirectExistingGoogleCustomer(profile) {
+  const warning = document.getElementById('step-1-warning');
+  const response = await fetch(`${AUTH_API_BASE}/api/auth/google/account-status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      role: 'customer',
+      email: profile.email,
+      googleSub: profile.googleSub || '',
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (warning && data.message) {
+      warning.textContent = data.message;
+      warning.classList.add('show');
+    }
+    return;
+  }
+
+  if (data.action === 'login' && data.user && data.redirect) {
+    localStorage.removeItem('sn_google_prefill_customer');
+    localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
+    window.location.replace(data.redirect);
+  }
+}
+
 function submitRegister(e) {
   e.preventDefault();
   if (!validateStep2()) return;
@@ -302,9 +330,21 @@ function applyGooglePrefill() {
 
   const warning = document.getElementById('step-1-warning');
   if (warning) {
-    warning.textContent = 'Gmail verified. Complete the remaining details to continue verification.';
+    warning.textContent = 'Gmail verified. Checking if this account already exists...';
     warning.classList.add('show');
   }
+
+  redirectExistingGoogleCustomer(profile)
+    .then(() => {
+      if (warning?.textContent?.includes('Checking')) {
+        warning.textContent = 'New Gmail verified. Complete these details once; after approval, future Gmail logins go straight to your customer dashboard.';
+      }
+    })
+    .catch(() => {
+      if (warning) {
+        warning.textContent = 'New Gmail verified. Complete these details once; after approval, future Gmail logins go straight to your customer dashboard.';
+      }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

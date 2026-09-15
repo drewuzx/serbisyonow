@@ -1087,6 +1087,42 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
   });
 }));
 
+app.post('/api/auth/google/account-status', asyncRoute(async (req, res) => {
+  requireFields(req.body, ['role', 'email']);
+  const role = String(req.body.role || '').toLowerCase() === 'provider' ? 'provider' : 'customer';
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const googleSub = String(req.body.googleSub || '').trim();
+  const matchClause = googleSub
+    ? '(google_sub = $1 OR lower(email) = lower($2::text))'
+    : 'lower(email) = lower($1::text)';
+  const matchParams = googleSub ? [googleSub, email] : [email];
+
+  const [customer, provider] = await Promise.all([
+    db.query(`SELECT * FROM customers WHERE ${matchClause} LIMIT 1`, matchParams),
+    db.query(`SELECT * FROM providers WHERE ${matchClause} LIMIT 1`, matchParams),
+  ]);
+
+  const requestedAccount = role === 'provider' ? provider.rows[0] : customer.rows[0];
+  if (requestedAccount) {
+    return res.json({
+      action: 'login',
+      role,
+      redirect: googleDashboardPath(role),
+      user: role === 'provider' ? providerRow(requestedAccount) : customerRow(requestedAccount),
+    });
+  }
+
+  const otherRole = role === 'provider' ? 'customer' : 'provider';
+  const otherAccountExists = role === 'provider' ? customer.rowCount : provider.rowCount;
+  if (otherAccountExists) {
+    return res.status(409).json({
+      message: `This Gmail is registered as a ${otherRole}. Please use ${otherRole} Google login.`,
+    });
+  }
+
+  res.json({ action: 'register', role });
+}));
+
 app.post('/api/auth/customer/register', upload.fields([
   { name: 'idFront', maxCount: 1 },
   { name: 'idBack', maxCount: 1 },
