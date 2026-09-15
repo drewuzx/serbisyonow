@@ -245,12 +245,13 @@ const SN = {
 
   // ── Helpers ──────────────────────────────────────────────────
   utils: {
-    apiBase: () => (
-      window.SN_API_BASE ||
-      ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:3000'
-        : `http://${window.location.hostname}:3000`)
-    ),
+    apiBase: () => {
+      if (window.SN_API_BASE) return window.SN_API_BASE;
+      const { protocol, hostname, port, origin } = window.location;
+      const host = hostname === '127.0.0.1' ? 'localhost' : hostname;
+      if (protocol === 'file:' || port === '5500') return `http://${host}:3000`;
+      return origin;
+    },
     isValidEmail: (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e),
     isValidPhone:  (p) => /^(\+63|0)[0-9]{10}$/.test(p.replace(/\s/g, '')),
     formatDate: (d) => new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }),
@@ -261,6 +262,8 @@ const SN = {
     }
   }
 };
+
+window.SN = SN;
 
 // ── Auto-init on DOM Ready ───────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {

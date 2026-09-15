@@ -2,9 +2,11 @@
   if (window.snFloatingChat || window.__snFloatingChatBooting) return;
   window.__snFloatingChatBooting = true;
 
-  const API_BASE = window.SN_API_BASE || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:3000'
-    : `http://${window.location.hostname}:3000`);
+  const API_BASE = window.SN_API_BASE || window.SN?.utils?.apiBase?.() || (
+    (window.location.protocol === 'file:' || window.location.port === '5500')
+      ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000`
+      : window.location.origin
+  );
 
   const CHAT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z"/></svg>';
 

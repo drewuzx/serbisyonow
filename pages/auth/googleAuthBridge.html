@@ -119,7 +119,15 @@
   </main>
 
   <script>
-    const AUTH_API_BASE = (window.SN_API_BASE || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:3000' : `http://${window.location.hostname}:3000`));
+    function getAuthApiBase() {
+      if (window.SN_API_BASE) return window.SN_API_BASE;
+      const { protocol, hostname, port, origin } = window.location;
+      const host = hostname === '127.0.0.1' ? 'localhost' : hostname;
+      if (protocol === 'file:' || port === '5500') return `http://${host}:3000`;
+      return origin;
+    }
+
+    const AUTH_API_BASE = getAuthApiBase();
 
     function setMessage(title, message, state = 'error') {
       document.body.classList.toggle('is-error', state === 'error');
@@ -177,6 +185,6 @@
       setMessage('Google Login Failed', 'Cannot reach the auth server. Please make sure it is running.', 'error');
     });
   </script>
-  <script src="/shared/js/pwa-register.js"></script>
+  <script src="/shared/js/pwa-register.js?v=20260915-api"></script>
 </body>
 </html>

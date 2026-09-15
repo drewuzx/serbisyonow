@@ -6,7 +6,7 @@ function getCurrentCustomer() {
  } catch { return null; }
 }
 
-const BOOKING_API_BASE = (window.SN_API_BASE || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:3000' : `http://${window.location.hostname}:3000`));
+const BOOKING_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
 let bookingDeviceCoords = null;
 let bookingProviderServices = [];
 

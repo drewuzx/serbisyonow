@@ -12,14 +12,16 @@ const crypto = require('crypto');
 const db = require('./db');
 
 const app = express();
+app.set('trust proxy', true);
+
 const PORT = Number(process.env.PORT || 3000);
 const rootDir = path.resolve(__dirname, '..');
 const uploadDir = path.join(rootDir, 'uploads');
-const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://127.0.0.1:5500';
-const apiBaseUrl = process.env.API_PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+const configuredFrontendBaseUrl = cleanBaseUrl(process.env.FRONTEND_BASE_URL);
+const configuredApiBaseUrl = cleanBaseUrl(process.env.API_PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL);
+const frontendBaseUrl = configuredFrontendBaseUrl || 'http://127.0.0.1:5500';
 const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI || `${apiBaseUrl}/api/auth/google/callback`;
 const googleAuthTickets = new Map();
 
 for (const dir of [
@@ -85,6 +87,21 @@ function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
 
+function cleanBaseUrl(value) {
+  return String(value || '').trim().replace(/\/+$/, '');
+}
+
+function publicBaseUrl(req) {
+  const host = req.get('host');
+  if (!host) return configuredApiBaseUrl || `http://localhost:${PORT}`;
+  return `${req.protocol}://${host}`;
+}
+
+function requestGoogleRedirectUri(req) {
+  return cleanBaseUrl(process.env.GOOGLE_REDIRECT_URI)
+    || `${configuredApiBaseUrl || publicBaseUrl(req)}/api/auth/google/callback`;
+}
+
 function requireFields(source, fields) {
   for (const field of fields) {
     if (!String(source[field] || '').trim()) {
@@ -124,7 +141,7 @@ function requestFrontendBase(req) {
     const parsed = new URL(candidate);
     return parsed.origin;
   } catch {
-    return frontendBaseUrl;
+    return configuredFrontendBaseUrl || publicBaseUrl(req);
   }
 }
 
@@ -968,6 +985,7 @@ app.get('/api/auth/google/start', (req, res) => {
     return res.redirect(`${requestFrontendBaseUrl}/pages/auth/googleAuthBridge.html?error=google_not_configured&role=${role}`);
   }
 
+  const googleRedirectUri = requestGoogleRedirectUri(req);
   const state = Buffer.from(JSON.stringify({
     role,
     frontendBaseUrl: requestFrontendBaseUrl,
@@ -986,7 +1004,7 @@ app.get('/api/auth/google/start', (req, res) => {
 
 app.get('/api/auth/google/callback', asyncRoute(async (req, res) => {
   const code = String(req.query.code || '');
-  if (!code) return res.redirect(`${frontendBaseUrl}/pages/auth/googleAuthBridge.html?error=missing_code`);
+  if (!code) return res.redirect(`${configuredFrontendBaseUrl || publicBaseUrl(req)}/pages/auth/googleAuthBridge.html?error=missing_code`);
 
   let state = {};
   try {
@@ -995,7 +1013,8 @@ app.get('/api/auth/google/callback', asyncRoute(async (req, res) => {
     state = {};
   }
   const role = state.role === 'provider' ? 'provider' : 'customer';
-  const callbackFrontendBaseUrl = state.frontendBaseUrl || frontendBaseUrl;
+  const callbackFrontendBaseUrl = state.frontendBaseUrl || configuredFrontendBaseUrl || publicBaseUrl(req);
+  const googleRedirectUri = requestGoogleRedirectUri(req);
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
