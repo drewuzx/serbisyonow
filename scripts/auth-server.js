@@ -1071,21 +1071,11 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
     });
   }
 
-  if (customer.rowCount) {
-    return res.json({
-      action: 'login',
-      role: 'customer',
-      redirect: googleDashboardPath('customer'),
-      user: customerRow(customer.rows[0]),
-    });
-  }
-
-  if (provider.rowCount) {
-    return res.json({
-      action: 'login',
-      role: 'provider',
-      redirect: googleDashboardPath('provider'),
-      user: providerRow(provider.rows[0]),
+  const otherRole = role === 'provider' ? 'customer' : 'provider';
+  const otherAccountExists = role === 'provider' ? customer.rowCount : provider.rowCount;
+  if (otherAccountExists) {
+    return res.status(409).json({
+      message: `This Gmail is registered as a ${otherRole}. Please use ${otherRole} Google login.`,
     });
   }
 
