@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booking Requests - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="../provider.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+  <div class="sn-shell sn-shell--provider">
+    <div class="sn-overlay" id="sn-overlay"></div>
+    <aside class="sn-sidebar" id="sn-sidebar">
+      <div class="sn-brand">
+        <div class="sn-logo"><img src="../../../image_logo/main_logo.svg" alt="SerbisyoNow logo" /></div>
+        <div class="sn-brand-name">SerbisyoNow</div>
+        <button class="sn-hamburger sn-hamburger--brand" id="sn-hamburger" type="button"><span></span><span></span><span></span></button>
+      </div>
+      <div class="sn-user-greeting">
+        <div class="sn-avatar-lg"></div>
+        <div>
+          <div class="sn-greeting-label">Welcome,</div>
+          <div class="sn-greeting-name" id="sn-user-name">Service Provider</div>
+          <div class="sn-greeting-loc" id="sn-user-status">Provider status</div>
+        </div>
+      </div>
+      <nav class="sn-nav">
+        <a class="sn-nav-item" href="../dashboard/dashboard.html"><span class="sn-ico">&#127968;</span><span>Dashboard</span></a>
+        <a class="sn-nav-item" href="../profile/profile.html"><span class="sn-ico">&#128100;</span><span>Profile</span></a>
+        <a class="sn-nav-item" href="../services/services.html"><span class="sn-ico">&#128736;</span><span>Services</span></a>
+        <a class="sn-nav-item active" href="./requests.html"><span class="sn-ico">&#128197;</span><span>Requests</span></a>
+        <a class="sn-nav-item" href="../schedule/schedule.html"><span class="sn-ico">&#128198;</span><span>Schedule</span></a>
+        <a class="sn-nav-item" href="../inbox/inbox.html"><span class="sn-ico">&#128229;</span><span>Inbox</span></a>
+        <a class="sn-nav-item" href="../assessment/assessment.html"><span class="sn-ico">&#9989;</span><span>Assessment</span></a>
+        <a class="sn-nav-item" href="../reviews/reviews.html"><span class="sn-ico">&#11088;</span><span>Reviews</span></a>
+        <a class="sn-nav-item" href="../history/history.html"><span class="sn-ico">&#128344;</span><span>History</span></a>
+        <div class="sn-nav-sep"></div>
+        <button class="sn-nav-item sn-nav-item--danger" id="sn-logout" type="button"><span class="sn-ico">&#128682;</span><span>Logout</span></button>
+      </nav>
+    </aside>
+    <main class="sn-main">
+      <header class="sn-topbar">
+        <button class="sn-hamburger sn-hamburger--top" id="sn-hamburger-top" type="button"><span></span><span></span><span></span></button>
+        <div class="sn-topbar-search"><input type="search" placeholder="Search booking requests..." /></div>
+      </header>
+      <section class="sn-hero">
+        <div class="sn-hero-text">
+          <p class="sn-hero-eyebrow">Booking Request Page</p>
+          <p style="color:white;margin:0">Approve or decline incoming customer requests and view service locations.</p>
+        </div>
+      </section>
+      <section class="sn-panel">
+        <h2>Booking Requests</h2>
+        <p>Loading customer bookings...</p>
+      </section>
+    </main>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../provider.js"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

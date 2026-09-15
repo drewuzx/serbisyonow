@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Service Page - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="../provider.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+  <div class="sn-shell sn-shell--provider">
+    <div class="sn-overlay" id="sn-overlay"></div>
+    <aside class="sn-sidebar" id="sn-sidebar">
+      <div class="sn-brand"><div class="sn-logo"><img src="../../../image_logo/main_logo.svg" alt="SerbisyoNow logo" /></div><div class="sn-brand-name">SerbisyoNow</div><button class="sn-hamburger sn-hamburger--brand" id="sn-hamburger" type="button"><span></span><span></span><span></span></button></div>
+      <nav class="sn-nav"></nav>
+    </aside>
+    <main class="sn-main">
+      <header class="sn-topbar"><button class="sn-hamburger sn-hamburger--top" id="sn-hamburger-top" type="button"><span></span><span></span><span></span></button><div class="sn-topbar-search"><input type="search" placeholder="Search" /></div><div class="sn-topbar-right"><button class="sn-icon-btn">Msg</button><button class="sn-icon-btn">Bell</button></div></header>
+      <section class="sn-panel">
+        <div class="sn-section-head"><h2>Services</h2><button class="btn btn-primary">+ Add Services</button></div>
+        <article class="sn-provider-service-card">
+          <div class="sn-actions-row"><button class="btn btn-outline">Edit Service</button><button class="btn btn-danger">Remove Service</button></div>
+          <h3>Leak Detection & Repair <span class="sn-status-pill accepted">Skilled Verified</span></h3>
+          <p>Plumbing Service - Identifying and fixing leaks in pipes, faucets, or fixtures.</p>
+          <strong style="display:block;text-align:right;color:#005cab">Price: PHP 500 - PHP 1000+</strong>
+          <div class="sn-provider-payment-row"><span>Payment Options</span><label><input type="checkbox"> Cash</label><label><input type="checkbox"> Gcash</label><label><input type="checkbox"> Other</label><span style="margin-left:auto">On / Off Service:</span><span class="sn-provider-toggle"></span></div>
+        </article>
+        <article class="sn-provider-service-card">
+          <div class="sn-actions-row"><button class="btn btn-outline">Edit Service</button><button class="btn btn-danger">Remove Service</button></div>
+          <h3>Drain Cleaning and Unclogging <span class="sn-status-pill accepted">Skilled Verified</span></h3>
+          <p>Plumbing Service - Removes blockages from sinks, showers, and pipes for smooth water flow.</p>
+          <strong style="display:block;text-align:right;color:#005cab">Price: PHP 1500 - PHP 5000+</strong>
+          <div class="sn-provider-payment-row"><span>Payment Options</span><label><input type="checkbox"> Cash</label><label><input type="checkbox"> Gcash</label><label><input type="checkbox"> Other</label><span style="margin-left:auto">On / Off Service:</span><span class="sn-provider-toggle"></span></div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="../provider.js"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

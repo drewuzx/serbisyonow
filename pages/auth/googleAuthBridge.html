@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Google Login - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../../shared/css/variables.css"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css"/>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+  <style>
+    body.google-bridge-page {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(244, 130, 10, 0.12), transparent 28%),
+        radial-gradient(circle at 82% 12%, rgba(43, 85, 204, 0.14), transparent 32%),
+        #edf4ff;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+    }
+
+    .google-bridge-card {
+      width: min(100%, 460px);
+      border: 1.5px solid rgba(149, 164, 186, 0.35);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 24px 56px rgba(31, 55, 88, 0.18);
+      padding: 36px 34px 32px;
+      text-align: center;
+    }
+
+    .google-bridge-card .auth-logo {
+      margin-bottom: 22px;
+    }
+
+    .bridge-status-icon {
+      width: 64px;
+      height: 64px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      background: var(--blue-pale);
+      color: var(--blue-main);
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      font-weight: 900;
+    }
+
+    .google-bridge-page.is-error .bridge-status-icon {
+      background: #fff1d6;
+      color: var(--orange);
+    }
+
+    .google-bridge-page.is-success .bridge-status-icon {
+      background: var(--success-bg);
+      color: #15803d;
+    }
+
+    .google-bridge-card h1 {
+      margin: 0 0 10px;
+      color: var(--blue-dark);
+      font-family: var(--font-heading);
+      font-size: clamp(1.65rem, 4vw, 2.05rem);
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .google-bridge-card p {
+      max-width: 340px;
+      margin: 0 auto 24px;
+      color: var(--text-muted);
+      font-size: 0.98rem;
+      line-height: 1.55;
+    }
+
+    .google-bridge-card .btn {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      border-radius: 14px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 520px) {
+      body.google-bridge-page {
+        padding: 16px;
+      }
+
+      .google-bridge-card {
+        padding: 28px 20px 24px;
+        border-radius: 20px;
+      }
+    }
+  </style>
+</head>
+<body class="google-bridge-page">
+  <main class="google-bridge-card">
+    <div class="auth-logo">
+      <div class="nav-logo-icon-login"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+      <div class="auth-logo-text"><span class="part1">Serbisyo</span><span class="part2">Now</span></div>
+    </div>
+    <div class="bridge-status-icon" id="bridge-status-icon">...</div>
+    <h1 id="bridge-title">Connecting Gmail...</h1>
+    <p id="bridge-message">Please wait while we verify your Google account.</p>
+    <a class="btn btn-outline btn-full" href="loginChoice.html">Back to Login Options</a>
+  </main>
+
+  <script>
+    const AUTH_API_BASE = (window.SN_API_BASE || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:3000' : `http://${window.location.hostname}:3000`));
+
+    function setMessage(title, message, state = 'error') {
+      document.body.classList.toggle('is-error', state === 'error');
+      document.body.classList.toggle('is-success', state === 'success');
+      document.getElementById('bridge-status-icon').textContent = state === 'success' ? '✓' : state === 'loading' ? '...' : '!';
+      document.getElementById('bridge-title').textContent = title;
+      document.getElementById('bridge-message').textContent = message;
+    }
+
+    async function completeGoogleLogin() {
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+      const ticket = params.get('ticket');
+      const role = params.get('role') === 'provider' ? 'provider' : 'customer';
+
+      if (error) {
+        const message = error === 'google_not_configured'
+          ? 'Google login needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the .env file.'
+          : 'Please try again or use email and password login.';
+        setMessage('Google Login Failed', message, 'error');
+        return;
+      }
+      if (!ticket) {
+        setMessage('Google Login Expired', 'Please restart the Gmail login flow.', 'error');
+        return;
+      }
+
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/google/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage('Google Login Failed', data.message || 'Please try again.', 'error');
+        return;
+      }
+
+      if (data.action === 'login') {
+        const loginRole = data.role === 'provider' ? 'provider' : 'customer';
+        localStorage.removeItem(`sn_google_prefill_${loginRole}`);
+        localStorage.setItem(loginRole === 'provider' ? 'sn_provider_user' : 'sn_customer_user', JSON.stringify(data.user));
+        window.location.href = `../..${data.redirect}`;
+        return;
+      }
+
+      localStorage.setItem(`sn_google_prefill_${role}`, JSON.stringify(data.profile));
+      setMessage('Continue Registration', 'No account is registered with this Gmail yet. Complete the required details next. No password is needed for Gmail sign-up.', 'success');
+      setTimeout(() => {
+        window.location.href = `${data.redirect}?google=1`;
+      }, 600);
+    }
+
+    completeGoogleLogin().catch(() => {
+      setMessage('Google Login Failed', 'Cannot reach the auth server. Please make sure it is running.', 'error');
+    });
+  </script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

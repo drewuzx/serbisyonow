@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - User Verification</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="../../../shared/css/modals.css" />
+  <link rel="stylesheet" href="../admin-module.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+  <main class="admin-wrap">
+    <header class="admin-header shell">
+      <div class="admin-brand">
+        <p class="eyebrow">ADMIN PORTAL</p>
+        <h1>User Management Dashboard</h1>
+        <p>Review new accounts, check uploaded IDs, and approve verified users.</p>
+      </div>
+      <div class="admin-header-actions">
+        <button id="refresh-btn" class="btn btn-light">Refresh Data</button>
+      </div>
+    </header>
+
+    <nav class="admin-module-nav">
+      <a href="../dashboard/dashboard.html">Dashboard</a>
+      <a class="active" href="./user-management.html">Users</a>
+      <a href="../provider-verification/provider-verification.html">Provider Verification</a>
+      <a href="../categories/categories.html">Categories</a>
+      <a href="../reports/reports.html">Reports</a>
+      <a href="../feedback/feedback.html">Feedback</a>
+    </nav>
+
+    <section class="metrics-grid">
+      <article class="metric-card">
+        <p>Pending Verification</p>
+        <h2 id="metric-pending">0</h2>
+      </article>
+      <article class="metric-card">
+        <p>Verified Users</p>
+        <h2 id="metric-verified">0</h2>
+      </article>
+      <article class="metric-card">
+        <p>Total Registered</p>
+        <h2 id="metric-total">0</h2>
+      </article>
+      <article class="metric-card">
+        <p>Registered Today</p>
+        <h2 id="metric-today">0</h2>
+      </article>
+    </section>
+
+    <section class="admin-panel">
+      <div class="admin-panel-head">
+        <h2>User Accounts</h2>
+        <span id="pending-count" class="pill">0 shown</span>
+      </div>
+
+      <div class="admin-controls">
+        <input id="search-input" type="search" class="form-control" placeholder="Search by name, email, contact..." />
+        <select id="status-filter" class="form-control">
+          <option value="pending">Pending</option>
+          <option value="verified">Verified</option>
+          <option value="rejected">Declined</option>
+          <option value="all">All</option>
+        </select>
+        <select id="role-filter" class="form-control">
+          <option value="all">All</option>
+          <option value="customer">Customers</option>
+          <option value="provider">Providers</option>
+        </select>
+      </div>
+
+      <div id="table-wrap" class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User type</th>
+              <th>Full name</th>
+              <th>Email</th>
+              <th>Contact</th>
+              <th>Account detail</th>
+              <th>Uploaded IDs</th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="pending-table-body"></tbody>
+        </table>
+      </div>
+
+      <div id="empty-state" class="empty-state" hidden>No users match the current filters.</div>
+    </section>
+  </main>
+
+  <div id="decline-modal" class="sn-modal sn-modal--danger" hidden>
+    <div class="sn-modal-card">
+      <button type="button" class="sn-modal-close" id="decline-close-btn" aria-label="Close">✕</button>
+      <div class="sn-modal-icon sn-modal-icon--danger">🚫</div>
+      <h3 class="sn-modal-title">Decline Registration</h3>
+      <p class="sn-modal-body">Are you sure you want to decline this account registration? The user may resubmit their documents after updating their details.</p>
+      <div class="sn-modal-actions">
+        <button type="button" id="decline-cancel-btn" class="btn btn-outline">Cancel</button>
+        <button type="button" id="decline-confirm-btn" class="btn btn-danger">Decline</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../../shared/js/app.js"></script>
+  <script src="user-management.js"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+﻿@import url("../dashboard/dashboard.css");
+
+.sn-provider-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 340px;
+  gap: 18px;
+}
+
+.sn-detail-panel {
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+}
+
+aside.sn-detail-panel {
+  background: #f8f9fb;
+}
+
+.sn-detail-panel h2,
+.sn-detail-panel h3 {
+  margin: 0 0 10px;
+  color: var(--blue-dark);
+  font-family: var(--font-heading);
+}
+
+.sn-detail-panel p {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.sn-detail-panel .btn {
+  padding: 10px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.sn-detail-panel .btn-primary {
+  background: var(--blue);
+  color: white;
+  border-color: var(--blue);
+}
+
+.sn-detail-panel .btn-primary:hover {
+  background: var(--blue-dark);
+}
+
+.sn-detail-panel .btn-outline {
+  background: transparent;
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+.sn-detail-panel .btn-outline:hover {
+  background: rgba(188, 203, 236, 0.05);
+}
+
+.sn-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.sn-profile-summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex: 1;
+}
+
+.sn-profile-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.sn-profile-location {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.sn-profile-photo {
+  width: 94px;
+  height: 94px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #93c5fd, #2563eb);
+  flex: 0 0 auto;
+}
+
+.sn-rate-card {
+  min-width: 170px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff7ed;
+  border: 1px solid #f5cc9a;
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.sn-rate-label {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sn-rate-card strong {
+  color: var(--blue-dark);
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sn-rate-card small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.sn-profile-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.sn-profile-section {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.sn-profile-section h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.92rem;
+}
+
+.sn-profile-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  display: grid;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+.sn-rating-line {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sn-actions-row {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sn-actions-row a.btn {
+  padding: 14px 16px !important;
+  border-radius: 8px !important;
+  text-decoration: none;
+  display: block !important;
+  text-align: center;
+  transition: all 0.2s ease;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  width: 100%;
+  box-sizing: border-box;
+  border: 2px solid transparent !important;
+}
+
+.sn-actions-row a.btn-primary {
+  background: var(--gradient-blue) !important;
+  color: white !important;
+  border-color: var(--blue) !important;
+}
+
+.sn-locked .sn-provider-detail .sn-actions-row a.btn-primary {
+  background: var(--blue-main) !important;
+  color: white !important;
+  opacity: 1 !important;
+}
+
+.sn-actions-row a.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.sn-actions-row a.btn-outline {
+  background: white !important;
+  color: var(--blue-main) !important;
+  border: 2px solid var(--blue-main) !important;
+}
+
+.sn-actions-row a.btn-outline:hover {
+  background: var(--blue-pale) !important;
+}
+
+.sn-service-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sn-service-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--bg-input);
+}
+
+@media (max-width: 960px) {
+  .sn-provider-detail { grid-template-columns: 1fr; }
+  .sn-detail-header { flex-direction: column; align-items: stretch; }
+  .sn-rate-card { text-align: left; }
+}

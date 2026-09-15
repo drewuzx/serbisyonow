@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reports and Analytics - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="../admin-module.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+  <main class="admin-wrap">
+    <header class="admin-header shell"><div class="admin-brand"><p class="eyebrow">ADMIN REPORTS</p><h1>Reports and Analytics Page</h1><p>Analytics generated from customer and provider database records.</p></div><div class="admin-header-actions"><button class="btn btn-light">Export Report</button></div></header>
+    <nav class="admin-module-nav"><a href="../dashboard/dashboard.html">Dashboard</a><a href="../user-management/user-management.html">Users</a><a href="../provider-verification/provider-verification.html">Provider Verification</a><a href="../categories/categories.html">Categories</a><a class="active" href="./reports.html">Reports</a><a href="../feedback/feedback.html">Feedback</a></nav>
+    <section class="admin-grid"><article class="admin-card"><h3>User Summary</h3><div class="admin-list" id="user-summary"></div></article><article class="admin-card"><h3>Popular Categories</h3><div class="admin-chart" id="category-summary"></div></article><article class="admin-card"><h3>Provider Records</h3><div class="admin-list" id="top-providers"></div></article></section>
+  </main>
+  <script src="../admin-data.js"></script>
+  <script>
+    adminGet('/api/admin/reports').then(({ userSummary, categorySummary, topProviders }) => {
+      document.getElementById('user-summary').innerHTML = userSummary.map(item => {
+        const status = adminVerificationStatus(item.status);
+        return `<div class="admin-list-item"><div><strong>${adminEscape(item.role)}</strong><span>${status.label}</span></div><span class="pill">${item.count}</span></div>`;
+      }).join('') || '<div class="admin-list-item"><strong>No users yet</strong></div>';
+      const max = Math.max(...categorySummary.map(item => Number(item.count)), 1);
+      document.getElementById('category-summary').innerHTML = (categorySummary.length ? categorySummary : [{ name: 'No provider categories yet', count: 0 }]).map(item => `<div class="admin-chart-row"><span>${adminEscape(item.name)}</span><div class="admin-chart-track"><div class="admin-chart-fill" style="width:${Math.round((Number(item.count) / max) * 100)}%"></div></div><strong>${item.count}</strong></div>`).join('');
+      document.getElementById('top-providers').innerHTML = topProviders.map(provider => {
+        const status = adminVerificationStatus(provider.verification_status);
+        return `<div class="admin-list-item"><div><strong>${adminEscape(provider.full_name)}</strong><span>${adminEscape(provider.category || '-')} - ${adminEscape(provider.service || '-')}</span></div><span class="status-badge ${status.className}">${status.label}</span></div>`;
+      }).join('') || '<div class="admin-list-item"><strong>No providers yet</strong></div>';
+    });
+  </script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

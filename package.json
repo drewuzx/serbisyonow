@@ -1,0 +1,22 @@
+{
+  "name": "serbisyonow-postgres",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SerbisyoNow static frontend with PostgreSQL-backed auth APIs.",
+  "main": "scripts/auth-server.js",
+  "scripts": {
+    "start": "node scripts/auth-server.js",
+    "init-db": "node scripts/init-db.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1"
+  }
+}

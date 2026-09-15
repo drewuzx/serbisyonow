@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SerbisyoNow - Customer Register</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../../shared/css/variables.css"/>
+  <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260610-register-success2"/>
+  <link rel="stylesheet" href="../landing/landing.css"/>
+  <style>
+    @media (max-width: 920px) { .hero-login { grid-template-columns: 1fr; gap: 24px; } .hero-login-left { text-align: center; } .hero-login-left p { margin: 0 auto; } }
+    @media (max-width: 768px) { .hero { padding-top: 12px; } .hero-login { margin-top: 20px; } .hero-login-left .hero-title { font-size: clamp(1.6rem, 7vw, 2.1rem); } .hero-login-left .hero-sub { letter-spacing: 0.08em; font-size: 0.82rem; } .sn-topbar-inner { flex-wrap: wrap; gap: 10px; } .sn-topbar-actions .btn { width: 100%; } }
+    @media (max-width: 480px) { .hero-login { gap: 16px; margin-top: 12px; } .hero .container { padding-inline: 12px; } .hero-login-left p { font-size: 0.92rem; line-height: 1.55; } }
+  </style>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body class="provider-register-page customer-register-page">
+  <header class="sn-topbar no-search">
+    <div class="container sn-topbar-inner">
+      <a class="sn-topbar-brand" href="../landing/index.html">
+        <div class="sn-topbar-logo"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+        <span class="sn-topbar-title"><span>Serbisyo</span><span>Now</span></span>
+      </a>
+      <div class="sn-topbar-right">
+        <div class="sn-topbar-actions">
+          <a href="loginChoice.html" class="btn btn-outline btn-sm">Login Options</a>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main class="hero auth-flow-shell">
+    <div class="container hero-content">
+        <section class="auth-card wide provider-flow-card customer-flow-card">
+          <div id="step-1" class="auth-step">
+            <div class="provider-brand-intro">
+              <div class="auth-logo">
+                <div class="nav-logo-icon-login"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+                <div class="auth-logo-text"><span class="part1">Serbisyo</span><span class="part2">Now</span></div>
+              </div>
+              <a href="loginChoice.html" class="back-btn provider-back-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                Back to Login Options
+              </a>
+            </div>
+            <div class="auth-heading compact"><h1>Connect with Service Providers</h1><p>Create an account to start booking local services.</p></div>
+            <div class="step-indicator"><div class="step-dot active">1</div><div class="step-line"></div><div class="step-dot">2</div></div>
+            <div id="step-1-warning" class="auth-warning"></div>
+            <div id="form-step1" autocomplete="off">
+              <div class="form-grid provider-form-grid">
+                <div class="form-group"><label>Full Name</label><input class="form-control" type="text" id="fullname" placeholder="Enter your full name" required/></div>
+                <div class="form-group"><label>Gender</label><select class="form-control" id="gender" required><option value="" disabled selected>Select</option><option>Male</option><option>Female</option><option>Prefer not to say</option></select></div>
+                <div class="form-group"><label>Contact Number</label><input class="form-control" type="tel" id="contact" placeholder="+63 9XX XXX XXXX" required/></div>
+                <div class="form-group"><label>Date of Birth</label><input class="form-control" type="date" id="dob" required/></div>
+                <div class="form-group"><label>Email Address</label><input class="form-control" type="email" id="email" placeholder="Enter your email address" autocomplete="email" required/></div>
+                <div class="form-group"><label>Create password</label><div class="input-wrap"><input class="form-control" type="password" id="password" placeholder="Enter password" autocomplete="new-password" required/><button type="button" class="toggle-pw" aria-label="Toggle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
+                <div class="form-group"><label>Confirm password</label><div class="input-wrap"><input class="form-control" type="password" id="confirm-password" placeholder="Confirm password" autocomplete="new-password" required/><button type="button" class="toggle-pw" aria-label="Toggle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
+              </div>
+              <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" onclick="goStep(event,2)">Next<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></button></div>
+            </div>
+            <p class="auth-footer">Already a member? <a href="customerLogin.html">Login</a></p>
+          </div>
+          <div id="step-2" class="auth-step" style="display:none">
+            <button type="button" class="flow-back-icon" onclick="goBack(1)" aria-label="Back">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            </button>
+            <div class="auth-heading compact"><h1>Verify your identity</h1><p>Complete verification to proceed.</p></div>
+            <div class="step-indicator"><div class="step-dot done">1</div><div class="step-line done"></div><div class="step-dot active">2</div></div>
+            <div id="step-2-warning" class="auth-warning"></div>
+            <div id="form-step2" autocomplete="off">
+              <div class="provider-verification-grid customer-verification-grid">
+                <div class="form-group"><label>Select ID Type</label><select class="form-control" id="id-type" required><option value="" disabled selected>Choose an ID type</option><option>PhilSys (National ID)</option><option>Driver's License</option><option>Passport</option><option>SSS / GSIS ID</option><option>Voter's ID</option><option>Postal ID</option></select></div>
+                <div class="form-group"><label>Address</label><input class="form-control" type="text" id="id-address" placeholder="Enter your address or location" required/></div>
+                <div class="form-group form-full"><label>Upload Front of ID</label><label class="upload-box" id="upload-front-label"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="front-label-text">Upload Front of ID</span><input type="file" id="id-front" accept="image/*,.pdf" required onchange="handleUpload(this,'front-label-text','upload-front-label')"/></label></div>
+                <div class="form-group form-full"><label>Upload Back of ID</label><label class="upload-box" id="upload-back-label"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="back-label-text">Upload Back of ID</span><input type="file" id="id-back" accept="image/*,.pdf" required onchange="handleUpload(this,'back-label-text','upload-back-label')"/></label></div>
+              </div>
+              <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" id="submit-btn" onclick="submitRegister(event)">Submit</button></div>
+            </div>
+            <p class="auth-footer">Already a member? <a href="customerLogin.html">Login</a></p>
+          </div>
+          <div id="customer-success" class="auth-step submitted-step" style="display:none">
+            <div class="submitted-card">
+              <div class="submitted-check"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <h1>Customer Application Submitted!</h1>
+              <p>Thank you for signing up. Your customer account and ID details were received and are now waiting for admin review.</p>
+              <strong>Customer Verification: Pending</strong>
+              <span>Account Status: Under Review</span>
+              <a class="btn btn-primary btn-full" href="customerLogin.html">Go to Customer Login <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></a>
+              <button type="button" class="btn btn-outline btn-full" onclick="goBack(1)">Edit Profile</button>
+            </div>
+          </div>
+        </section>
+      </div>
+  </main>
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="#" class="nav-brand">
+          <div class="nav-logo-icon">
+            <img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo">
+          </div>
+          <span class="nav-logo-text"><span style="color:#fff">Serbisyo</span><span>Now</span></span>
+        </a>
+        <p>A local service marketplace in Angeles City that connects customers with skilled service providers for home and personal services.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#">Home</a></li>
+          <li><a href="#services">Services</a></li>
+          <li><a href="#how-it-works">How SerbisyoNow works?</a></li>
+          <li><a href="#">Different Opportunities</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="#">Health Care</a></li>
+          <li><a href="#">Education</a></li>
+          <li><a href="#">Courses</a></li>
+          <li><a href="#">Assistance</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>For Users</h4>
+        <ul>
+          <li><a href="#">Address</a></li>
+          <li><a href="#">Contact #</a></li>
+          <li><a href="#">Email info</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>© 2026 SerbisyoNow. All rights reserved.</span>
+        <div>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Services</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <script src="../../shared/js/app.js?v=20260610-register-success2"></script>
+  <script src="../../shared/js/customerRegister.js?v=20260610-register-success2"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

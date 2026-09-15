@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Category Management - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="../admin-module.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+  <main class="admin-wrap">
+    <header class="admin-header shell"><div class="admin-brand"><p class="eyebrow">ADMIN CATEGORIES</p><h1>Category Management Page</h1><p>Service categories loaded from the database.</p></div><div class="admin-header-actions"><button class="btn btn-light" id="add-category-toggle" type="button">Add Category</button></div></header>
+    <nav class="admin-module-nav"><a href="../dashboard/dashboard.html">Dashboard</a><a href="../user-management/user-management.html">Users</a><a href="../provider-verification/provider-verification.html">Provider Verification</a><a class="active" href="./categories.html">Categories</a><a href="../reports/reports.html">Reports</a><a href="../feedback/feedback.html">Feedback</a></nav>
+    <section class="admin-panel admin-category-form" id="category-form-panel" hidden>
+      <div class="admin-panel-head">
+        <h2>Add Category</h2>
+        <span class="pill">Manual entry</span>
+      </div>
+      <form class="admin-inline-form" id="category-form" novalidate>
+        <input class="form-control" id="category-name" name="name" type="text" placeholder="Category name" required />
+        <input class="form-control" id="category-description" name="description" type="text" placeholder="Description" />
+        <input class="form-control" id="category-services" name="services" type="text" placeholder="Services, comma separated" />
+        <button class="btn btn-primary" id="save-category-btn" type="submit">Save Category</button>
+      </form>
+      <p class="admin-form-message" id="category-message" hidden></p>
+    </section>
+    <section class="admin-grid" id="category-list"></section>
+  </main>
+  <script src="../admin-data.js"></script>
+  <script>
+    const categoryList = document.getElementById('category-list');
+    const formPanel = document.getElementById('category-form-panel');
+    const form = document.getElementById('category-form');
+    const message = document.getElementById('category-message');
+    const saveButton = document.getElementById('save-category-btn');
+
+    function setCategoryMessage(text, type = 'info') {
+      message.textContent = text;
+      message.className = `admin-form-message ${type}`;
+      message.hidden = !text;
+    }
+
+    function renderCategories(categories) {
+      categoryList.innerHTML = categories.map(category => {
+        const isActive = category.is_active && Number(category.provider_count || 0) > 0;
+        const services = Array.isArray(category.services) && category.services.length ? category.services.join(', ') : 'No services listed yet';
+        return `
+          <article class="admin-card">
+            <h3>${adminEscape(category.name)}</h3>
+            <p>${adminEscape(category.description || 'No description yet.')}</p>
+            <p>${adminEscape(services)}</p>
+            <div class="admin-actions">
+              <span class="status-badge ${isActive ? 'verified' : 'rejected'}">${isActive ? 'Active' : 'Inactive'}</span>
+              <span class="pill">${Number(category.provider_count || 0)} provider(s)</span>
+            </div>
+          </article>
+        `;
+      }).join('') || '<article class="admin-card"><h3>No categories yet</h3><p>Add your first service category.</p></article>';
+    }
+
+    async function loadCategories() {
+      try {
+        const { categories } = await adminGet('/api/admin/categories');
+        renderCategories(categories);
+      } catch (error) {
+        categoryList.innerHTML = `<article class="admin-card"><h3>${adminEscape(error.message)}</h3></article>`;
+      }
+    }
+
+    document.getElementById('add-category-toggle').addEventListener('click', () => {
+      formPanel.hidden = !formPanel.hidden;
+      if (!formPanel.hidden) document.getElementById('category-name').focus();
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setCategoryMessage('');
+      const payload = {
+        name: document.getElementById('category-name').value.trim(),
+        description: document.getElementById('category-description').value.trim(),
+        services: document.getElementById('category-services').value.trim(),
+      };
+      if (!payload.name) {
+        setCategoryMessage('Category name is required.', 'error');
+        return;
+      }
+
+      saveButton.disabled = true;
+      saveButton.textContent = 'Saving...';
+      try {
+        await adminSend('/api/admin/categories', { method: 'POST', body: payload });
+        form.reset();
+        setCategoryMessage('Category saved.', 'success');
+        await loadCategories();
+      } catch (error) {
+        setCategoryMessage(error.message, 'error');
+      } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Category';
+      }
+    });
+
+    loadCategories();
+  </script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

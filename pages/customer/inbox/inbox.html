@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0;url=../dashboard/dashboard.html#messages" />
+  <title>Messages - SerbisyoNow</title>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const peer = params.get('provider_id') || '';
+    window.location.replace('../dashboard/dashboard.html' + (peer ? '#messages=' + encodeURIComponent(peer) : '#messages'));
+  </script>
+</head>
+<body>
+  <p>Opening messages...</p>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SerbisyoNow - Admin Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../../shared/css/variables.css"/>
+  <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css"/>
+  <link rel="stylesheet" href="../landing/landing.css"/>
+  <style>
+    @media (max-width: 920px) { .hero-login { grid-template-columns: 1fr; gap: 24px; } .hero-login-left { text-align: center; } .hero-login-left p { margin: 0 auto; } }
+    @media (max-width: 768px) { .hero { padding-top: 12px; } .hero-login { margin-top: 20px; } .hero-login-left .hero-title { font-size: clamp(1.6rem, 7vw, 2.1rem); } .hero-login-left .hero-sub { letter-spacing: 0.08em; font-size: 0.82rem; } .sn-topbar-inner { flex-wrap: wrap; gap: 10px; } .sn-topbar-actions .btn { width: 100%; } }
+    @media (max-width: 480px) { .hero-login { gap: 16px; margin-top: 12px; } .hero .container { padding-inline: 12px; } .hero-login-left p { font-size: 0.92rem; line-height: 1.55; } }
+  </style>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+  <header class="sn-topbar no-search">
+    <div class="container sn-topbar-inner">
+      <a class="sn-topbar-brand" href="../landing/index.html">
+        <div class="sn-topbar-logo"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+        <span class="sn-topbar-title"><span>Serbisyo</span><span>Now</span></span>
+      </a>
+      <div class="sn-topbar-right">
+        <div class="sn-topbar-actions">
+          <a href="loginChoice.html" class="btn btn-outline btn-sm">Login Options</a>
+        </div>
+      </div>
+    </div>
+  </header>
+  <section class="hero">
+    <div class="container hero-content">
+        <div class="auth-card">
+          <div class="auth-logo">
+            <div class="nav-logo-icon-login"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+            <div class="auth-logo-text"><span class="part1">Serbisyo</span><span class="part2">Now</span></div>
+          </div>
+          <a href="loginChoice.html" class="back-btn" style="display:inline-flex;margin-bottom:12px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Back to Login Options
+          </a>
+          <div class="auth-heading"><h1>Admin Login</h1><p>Enter your admin credentials to continue.</p></div>
+          <form class="admin-form" onsubmit="adminLogin(event)" novalidate>
+            <div class="form-group"><label>Username</label><input class="form-control" type="text" id="username" placeholder="Username" autocomplete="username" required/></div>
+            <div class="form-group"><label>Password</label><div class="input-wrap"><input class="form-control" type="password" id="password" placeholder="Password" required/><button type="button" class="toggle-pw" aria-label="Toggle password" onclick="toggleAdminPw()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div><a href="#" class="forgot">Forgot Password?</a></div>
+            <button type="submit" id="login-btn" class="btn btn-primary btn-full btn-lg">Login</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="#" class="nav-brand">
+          <div class="nav-logo-icon">
+            <img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo">
+          </div>
+          <span class="nav-logo-text"><span style="color:#fff">Serbisyo</span><span>Now</span></span>
+        </a>
+        <p>A local service marketplace in Angeles City that connects customers with skilled service providers for home and personal services.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#">Home</a></li>
+          <li><a href="#services">Services</a></li>
+          <li><a href="#how-it-works">How SerbisyoNow works?</a></li>
+          <li><a href="#">Different Opportunities</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="#">Health Care</a></li>
+          <li><a href="#">Education</a></li>
+          <li><a href="#">Courses</a></li>
+          <li><a href="#">Assistance</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>For Users</h4>
+        <ul>
+          <li><a href="#">Address</a></li>
+          <li><a href="#">Contact #</a></li>
+          <li><a href="#">Email info</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>© 2026 SerbisyoNow. All rights reserved.</span>
+        <div>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Services</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <script src="../../shared/js/app.js"></script>
+  <script>
+    const AUTH_API_BASE = SN.utils.apiBase();
+
+    function clearFieldError(field) {
+      if (!field) return;
+      field.classList.remove('error');
+      field.closest('.form-group')?.querySelector('.field-error')?.remove();
+    }
+
+    function showFieldError(field, message) {
+      if (!field) return;
+      field.classList.add('error');
+      const group = field.closest('.form-group');
+      if (!group) return;
+      let error = group.querySelector('.field-error');
+      if (!error) {
+        error = document.createElement('span');
+        error.className = 'field-error';
+        group.appendChild(error);
+      }
+      error.textContent = message;
+    }
+
+    function clearFormErrors() {
+      const form = document.querySelector('.admin-form');
+      if (!form) return;
+      form.querySelectorAll('.field-error').forEach((err) => err.remove());
+      form.querySelectorAll('.form-control').forEach((field) => field.classList.remove('error'));
+    }
+
+    async function adminApiRequest(path, payload) {
+      const response = await fetch(`${AUTH_API_BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'Request failed.');
+      return data;
+    }
+
+    function adminLogin(e) {
+      e.preventDefault();
+      const usernameField = document.getElementById('username');
+      const passwordField = document.getElementById('password');
+      const username = usernameField.value.trim();
+      const password = passwordField.value;
+      const btn = document.getElementById('login-btn');
+
+      clearFormErrors();
+      let valid = true;
+
+      if (!username) {
+        showFieldError(usernameField, 'Please enter your username.');
+        valid = false;
+      }
+
+      if (!password) {
+        showFieldError(passwordField, 'Please enter your password.');
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      btn.textContent = 'Logging in...'; btn.disabled = true;
+      adminApiRequest('/api/auth/admin/login', { username, password })
+        .then((data) => {
+          localStorage.setItem('sn_admin_user', JSON.stringify(data.user));
+          SN.toast.success('Admin login successful!');
+          setTimeout(() => window.location.href = '../admin/dashboard/dashboard.html', 700);
+        })
+        .catch((error) => {
+          SN.toast.error(error.message || 'Login failed.');
+        })
+        .finally(() => {
+          btn.textContent = 'Login';
+          btn.disabled = false;
+        });
+    }
+    function toggleAdminPw() {
+      const inp = document.getElementById('password');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const usernameField = document.getElementById('username');
+      const passwordField = document.getElementById('password');
+      usernameField?.addEventListener('input', () => clearFieldError(usernameField));
+      passwordField?.addEventListener('input', () => clearFieldError(passwordField));
+    });
+  </script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

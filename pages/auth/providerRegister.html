@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SerbisyoNow - Provider Register</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../../shared/css/variables.css"/>
+  <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260610-register-success2"/>
+  <link rel="stylesheet" href="../landing/landing.css"/>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#1a3a8f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body class="provider-register-page">
+  <header class="sn-topbar no-search">
+    <div class="container sn-topbar-inner">
+      <a class="sn-topbar-brand" href="../landing/index.html">
+        <div class="sn-topbar-logo"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+        <span class="sn-topbar-title"><span>Serbisyo</span><span>Now</span></span>
+      </a>
+      <div class="sn-topbar-right">
+        <div class="sn-topbar-actions">
+          <a href="loginChoice.html" class="btn btn-outline btn-sm">Login Options</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="hero auth-flow-shell">
+    <div class="container hero-content">
+    <section class="auth-card wide provider-flow-card">
+      <div id="step-1" class="auth-step">
+        <div class="provider-brand-intro">
+          <div class="auth-logo">
+            <div class="nav-logo-icon-login"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+            <div class="auth-logo-text"><span class="part1">Serbisyo</span><span class="part2">Now</span></div>
+          </div>
+          <a href="loginChoice.html" class="back-btn provider-back-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Back to Login Options
+          </a>
+        </div>
+        <div class="auth-heading compact">
+          <h1>Join as a service provider</h1>
+          <p>Enter your information to proceed</p>
+        </div>
+        <div class="step-indicator"><div class="step-dot active">1</div><div class="step-line"></div><div class="step-dot">2</div><div class="step-line"></div><div class="step-dot">3</div></div>
+        <div id="step-1-warning" class="auth-warning"></div>
+        <div id="form-s1" autocomplete="off">
+          <div class="form-grid provider-form-grid">
+            <div class="form-group"><label>Full Name</label><input class="form-control" id="fullname" type="text" placeholder="Enter your Full Name" required/></div>
+            <div class="form-group"><label>Address</label><input class="form-control" id="address" type="text" placeholder="Enter your Address or Location" required/></div>
+            <div class="form-group"><label>Gender</label><select class="form-control" id="gender" required><option value="" disabled selected>Select</option><option>Male</option><option>Female</option><option>Prefer not to say</option></select></div>
+            <div class="form-group"><label>Contact Number</label><input class="form-control" id="contact" type="tel" placeholder="Enter your Contact Number" required/></div>
+            <div class="form-group"><label>Date of Birth</label><input class="form-control" id="dob" type="date" required/></div>
+            <div class="form-group"><label>Email Address</label><input class="form-control" id="email" type="email" placeholder="Enter your Email Address" autocomplete="email" required/></div>
+            <div class="form-group"><label>Create password</label><input class="form-control" id="password" type="password" placeholder="Enter password" autocomplete="new-password" required/></div>
+            <div class="form-group"><label>Confirm password</label><input class="form-control" id="confirm-pw" type="password" placeholder="Confirm password" autocomplete="new-password" required/></div>
+          </div>
+          <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" onclick="nextStep(event,2)">Next<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></button></div>
+        </div>
+        <p class="auth-footer">Already a member? <a href="providerLogin.html">Login</a></p>
+      </div>
+
+      <div id="step-2" class="auth-step" style="display:none">
+        <button type="button" class="flow-back-icon" onclick="showStep(1)" aria-label="Back">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="auth-heading compact">
+          <h1>Become a Verified Service provider</h1>
+          <p>Complete your profile verification.</p>
+        </div>
+        <div class="step-indicator"><div class="step-dot done">1</div><div class="step-line done"></div><div class="step-dot active">2</div><div class="step-line"></div><div class="step-dot">3</div></div>
+        <div id="step-2-warning" class="auth-warning"></div>
+        <div id="form-s2" autocomplete="off">
+          <div class="provider-verification-grid">
+            <div>
+              <div class="form-group"><label>Choose Service Category</label><select class="form-control" id="category" required><option value="" disabled selected>Choose a category</option><option>Home Repair</option><option>Cleaning</option><option>Personal Care</option><option>Appliance Maintenance</option><option>Home Installation</option><option>Outdoor & Property Maintenance</option><option>Others</option></select></div>
+              <div class="form-group"><label>Select Services</label><select class="form-control" id="service" required disabled><option value="" disabled selected>Select a category first</option></select></div>
+              <div class="form-group"><label>Years of Experience</label><select id="experience-years" class="form-control" required><option value="" disabled selected>Enter your years of experience</option><option>1 year below</option><option>2-3 years</option><option>3 years and higher</option></select></div>
+              <div class="form-group"><label>Skill Verification</label><p class="field-note">(Certificates, Recognition, Portfolio, Feedbacks, Photos, etc.)</p><label class="upload-pill" id="docs-box"><span id="docs-label">Upload Supporting Documents</span><strong>+</strong><input id="docs" type="file" multiple accept="image/*,.pdf" required onchange="handleUpload(this,'docs-label','docs-box')"/></label></div>
+            </div>
+            <div>
+              <div class="form-group"><label>Upload Resume</label><label class="upload-pill" id="resume-box"><span id="resume-label">Upload your resume</span><strong>+</strong><input id="resume" type="file" accept=".pdf,.doc,.docx,image/*" required onchange="handleUpload(this,'resume-label','resume-box')"/></label></div>
+              <div class="form-group identity-group"><label>Identity Verification</label><label class="upload-pill" id="id-front-box"><span id="id-front-label">Upload front of ID</span><strong>+</strong><input id="id-front" type="file" accept="image/*,.pdf" required onchange="handleUpload(this,'id-front-label','id-front-box')"/></label><label class="upload-pill" id="id-back-box"><span id="id-back-label">Upload back of ID</span><strong>+</strong><input id="id-back" type="file" accept="image/*,.pdf" required onchange="handleUpload(this,'id-back-label','id-back-box')"/></label></div>
+            </div>
+          </div>
+          <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" onclick="nextStep(event,3)">Next<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></button></div>
+        </div>
+      </div>
+
+      <div id="step-3" class="auth-step" style="display:none">
+        <button type="button" class="flow-back-icon" onclick="showStep(2)" aria-label="Back">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="auth-heading compact">
+          <h1>Skills Assessment</h1>
+          <p>Take a brief skill assessment to confirm your expertise and earn a verification badge.</p>
+        </div>
+        <div class="step-indicator"><div class="step-dot done">1</div><div class="step-line done"></div><div class="step-dot done">2</div><div class="step-line done"></div><div class="step-dot active">3</div></div>
+        <div id="step-3-warning" class="auth-warning"></div>
+        <div id="form-s3" autocomplete="off">
+          <p class="assessment-intro">This assessment covers the selected service category. Please read each question carefully, choose the most appropriate answer, and ensure all questions are completed before submission.</p>
+          <div class="assessment-panel" id="assessment-list"></div>
+          <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" id="submit-btn" onclick="submitProvider()">Submit</button></div>
+        </div>
+      </div>
+
+      <div id="step-success" class="auth-step submitted-step" style="display:none">
+        <div class="submitted-card">
+          <div class="submitted-check"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <h1>Application Submitted!</h1>
+          <p>Thank you for signing up! Your service provider application has been submitted and is now under admin review.</p>
+          <strong id="provider-score-text">Score: 0%</strong>
+          <span>Status: Under Review</span>
+          <a class="btn btn-primary btn-full" href="providerLogin.html">Go to Application Status <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></a>
+          <button type="button" class="btn btn-outline btn-full" onclick="showStep(1)">Edit Profile</button>
+        </div>
+      </div>
+    </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="../landing/index.html" class="nav-brand">
+          <div class="nav-logo-icon">
+            <img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo">
+          </div>
+          <span class="nav-logo-text"><span style="color:#fff">Serbisyo</span><span>Now</span></span>
+        </a>
+        <p>A local service marketplace in Angeles City that connects customers with skilled service providers for home and personal services.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="../landing/index.html">Home</a></li>
+          <li><a href="../landing/index.html#services">Services</a></li>
+          <li><a href="../landing/index.html#how-it-works">How SerbisyoNow works?</a></li>
+          <li><a href="loginChoice.html">Login Options</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="#">Home Repair</a></li>
+          <li><a href="#">Cleaning</a></li>
+          <li><a href="#">Personal Care</a></li>
+          <li><a href="#">Appliance Maintenance</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>For Users</h4>
+        <ul>
+          <li><a href="#">Address</a></li>
+          <li><a href="#">Contact #</a></li>
+          <li><a href="#">Email info</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>© 2026 SerbisyoNow. All rights reserved.</span>
+        <div>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Services</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../shared/js/app.js?v=20260610-register-success2"></script>
+  <script>
+    const AUTH_API_BASE = SN.utils.apiBase();
+    const PROVIDER_REGISTER_SUCCESS_KEY = 'sn_provider_register_success';
+    let activeAssessmentQuestions = [];
+    let latestAssessmentScore = 0;
+
+    function isGoogleRegistration() {
+      if (new URLSearchParams(window.location.search).get('google') !== '1') return false;
+      try {
+        return Boolean(JSON.parse(localStorage.getItem('sn_google_prefill_provider') || 'null')?.email);
+      } catch {
+        return false;
+      }
+    }
+
+    const questionBank = [
+      { q: 'A client complains about low water pressure in the faucet. What is the most likely cause to check first?', a: 'Blockage or valve problem', o: ['Paint issue', 'Blockage or valve problem', 'Roof leak', 'Door alignment'] },
+      { q: 'A client reports that a light is flickering frequently. What is the best first step in diagnosing the issue?', a: 'Check connections and power source', o: ['Replace all wires', 'Check connections and power source', 'Turn off the house electricity', 'Ignore it'] },
+      { q: 'You are called to fix a leaking pipe under a sink. What should you do first before starting the repair?', a: 'Turn off the water supply', o: ['Start replacing the pipe', 'Add sealant immediately', 'Turn off the water supply', 'Ignore the leak'] },
+      { q: 'A refrigerator is not keeping food cold enough. What should you check first?', a: 'Thermostat setting inside the refrigerator', o: ['Door alignment and seal condition', 'Thermostat setting inside the refrigerator', 'Frequency of door opening', 'Placement near heat sources'] },
+      { q: 'An air conditioner is running but not cooling properly. What is the most likely issue to check first?', a: 'Dirty air filter or restricted airflow', o: ['Thermostat setting is too high', 'Power supply is completely off', 'Remote control battery is low', 'Dirty air filter or restricted airflow'] },
+      { q: 'An appliance frequently trips the circuit breaker when turned on. What is the most appropriate action?', a: 'Check for electrical fault or overload', o: ['Reset breaker repeatedly', 'Check for electrical fault or overload', 'Use extension cord', 'None of the above'] },
+      { q: 'A wooden door is difficult to close because it rubs against the frame. What is the best solution?', a: 'Adjust or sand the edges', o: ['Force it closed', 'Adjust or sand the edges', 'Remove the handle', 'Replace all hinges immediately'] },
+      { q: 'A power outlet suddenly stops working while other appliances are still functioning. What is the likely cause?', a: 'Tripped circuit or faulty outlet', o: ['Tripped circuit or faulty outlet', 'Broken appliance', 'No electricity in house', 'None of the above'] },
+      { q: 'A refrigerator freezer works, but the lower compartment is not cooling properly. What is the likely issue?', a: 'Blocked air vents between compartments', o: ['Dirty or clogged condenser coils', 'Frequent door opening causing temperature fluctuation', 'Faulty thermostat settings', 'Blocked air vents between compartments'] },
+      { q: 'Rust is forming on exposed pipes. What does this indicate?', a: 'Pipe may be deteriorating and needs replacement', o: ['Pipe may be deteriorating and needs replacement', 'Natural oxidation due to moisture exposure', 'Mineral buildup from water flow', 'Surface discoloration from chemical reactions'] },
+      { q: 'What should be done before cleaning a ceiling fan or appliance?', a: 'Disconnect the power source', o: ['Spray water immediately', 'Disconnect the power source', 'Pull the fan blades down', 'Use metal tools first'] },
+      { q: 'A tile sounds hollow when tapped. What can this indicate?', a: 'Poor bonding or loose tile', o: ['Perfect installation', 'Poor bonding or loose tile', 'Normal paint issue', 'Electrical problem'] },
+      { q: 'What is the safest first step before repairing an electrical switch?', a: 'Turn off the circuit breaker', o: ['Touch the wire to test it', 'Turn off the circuit breaker', 'Use wet hands', 'Replace the bulb only'] },
+      { q: 'A washing machine vibrates heavily during spin. What should you check first?', a: 'Load balance and machine leveling', o: ['Paint color', 'Load balance and machine leveling', 'Drain smell only', 'Door handle'] },
+      { q: 'Which document best proves service experience?', a: 'Certificate, portfolio, or client feedback', o: ['Random receipt', 'Certificate, portfolio, or client feedback', 'Blank paper', 'Unreadable photo'] },
+      { q: 'What should you do if a client asks for work outside your skill level?', a: 'Decline or refer to a qualified provider', o: ['Guess the repair', 'Decline or refer to a qualified provider', 'Charge extra and try', 'Ignore safety rules'] },
+      { q: 'What is important when entering a customer home?', a: 'Respect property and communicate clearly', o: ['Move items without asking', 'Respect property and communicate clearly', 'Ignore the customer', 'Start unrelated work'] },
+      { q: 'A drain is slow but not fully blocked. What is a reasonable first check?', a: 'Inspect trap or visible blockage', o: ['Break the pipe', 'Inspect trap or visible blockage', 'Replace the roof', 'Turn on all appliances'] },
+      { q: 'What should be included before starting paid service work?', a: 'Scope, price, and expected completion', o: ['Only verbal guessing', 'Scope, price, and expected completion', 'No discussion', 'Hidden fees'] },
+      { q: 'What is the best response after finishing a repair?', a: 'Test the work and explain what was done', o: ['Leave immediately', 'Test the work and explain what was done', 'Hide old parts', 'Avoid questions'] },
+    ];
+
+    const servicesByCategory = {
+      'Home Repair': [
+        'Plumbing',
+        'Electrical',
+        'Carpentry',
+        'Roof Repair',
+        'Painting',
+        'Door and Window Repair',
+        'Others',
+      ],
+      'Cleaning': [
+        'House Cleaning',
+        'Deep Cleaning',
+        'Laundry Service',
+        'Drain Cleaning',
+        'Move-in / Move-out Cleaning',
+        'Others',
+      ],
+      'Personal Care': [
+        'Massage Therapy',
+        'Nail Care',
+        'Haircut and Grooming',
+        'Home Wellness Care',
+        'Others',
+      ],
+      'Appliance Maintenance': [
+        'Refrigerator Repair',
+        'Aircon Cleaning',
+        'Washing Machine Repair',
+        'Small Appliance Repair',
+        'Appliance Installation',
+        'Others',
+      ],
+      'Home Installation': [
+        'Pipe Installation',
+        'Light Fixture Installation',
+        'Shelf Installation',
+        'Curtain and Blinds Installation',
+        'General Fixture Installation',
+        'Others',
+      ],
+      'Outdoor & Property Maintenance': [
+        'Grass Cutting',
+        'Garden Cleanup',
+        'Gutter Cleaning',
+        'Outdoor Repair',
+        'Property Maintenance',
+        'Others',
+      ],
+      'Others': [
+        'Others',
+      ],
+    };
+
+    async function providerApiRequest(path, payload) {
+      const response = await fetch(`${AUTH_API_BASE}${path}`, { method: 'POST', body: payload });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'Request failed.');
+      return data;
+    }
+
+    function shuffle(items) {
+      return [...items].sort(() => Math.random() - 0.5);
+    }
+
+    function renderAssessment() {
+      activeAssessmentQuestions = shuffle(questionBank).slice(0, 10);
+      const list = document.getElementById('assessment-list');
+      list.innerHTML = activeAssessmentQuestions.map((item, index) => `
+        <fieldset class="assessment-question">
+          <legend>${index + 1}. ${item.q}</legend>
+          ${item.o.map(option => `
+            <label class="assessment-option">
+              <input type="radio" name="assessment-${index}" value="${option}" required>
+              <span>${option}</span>
+            </label>
+          `).join('')}
+        </fieldset>
+      `).join('');
+    }
+
+    function updateServiceOptions() {
+      const category = document.getElementById('category')?.value || '';
+      const serviceField = document.getElementById('service');
+      if (!serviceField) return;
+      const services = servicesByCategory[category] || [];
+      serviceField.innerHTML = services.length
+        ? '<option value="" disabled selected>Choose a service</option>' + services.map(service => `<option>${service}</option>`).join('')
+        : '<option value="" disabled selected>Select a category first</option>';
+      serviceField.disabled = !services.length;
+    }
+
+    function showFieldError(field, message) {
+      if (!field) return;
+      field.classList.add('error');
+      const group = field.closest('.form-group');
+      if (!group) return;
+      let error = group.querySelector('.field-error');
+      if (!error) {
+        error = document.createElement('span');
+        error.className = 'field-error';
+        group.appendChild(error);
+      }
+      error.textContent = message;
+    }
+
+    function clearFormErrors(form) {
+      form?.querySelectorAll('.field-error').forEach(err => err.remove());
+      form?.querySelectorAll('.form-control').forEach(field => field.classList.remove('error'));
+    }
+
+    function validateForm(form, messages = {}) {
+      clearFormErrors(form);
+      let valid = true;
+      form.querySelectorAll('[required]').forEach(field => {
+        const value = field.type === 'file' ? (field.files.length ? field.files[0].name : '') : field.value.trim();
+        if (!value) {
+          valid = false;
+          showFieldError(field, messages[field.id] || 'Please fill out this field.');
+        }
+      });
+      return valid;
+    }
+
+    function validateStep1() {
+      const googleMode = isGoogleRegistration();
+      const valid = validateForm(document.getElementById('form-s1'), {
+        fullname: 'What is your full name?',
+        address: 'Enter your address.',
+        gender: 'Please choose a gender.',
+        contact: 'Enter your contact number.',
+        dob: 'Select your birth date.',
+        email: 'Enter your email address.',
+        password: 'Create a password.',
+        'confirm-pw': 'Confirm your password.',
+      });
+      if (!valid) return SN.toast.error('Please complete all required fields before continuing.'), false;
+      if (googleMode) return true;
+      if (document.getElementById('password').value !== document.getElementById('confirm-pw').value) {
+        showFieldError(document.getElementById('confirm-pw'), 'Passwords do not match.');
+        SN.toast.error('Passwords do not match.');
+        return false;
+      }
+      return true;
+    }
+
+    function validateStep2() {
+      const valid = validateForm(document.getElementById('form-s2'), {
+        category: 'Select a category.',
+        service: 'Select a service.',
+        'experience-years': 'Select your years of experience.',
+        docs: 'Upload supporting documents.',
+        resume: 'Upload your resume.',
+        'id-front': 'Upload the front of your ID.',
+        'id-back': 'Upload the back of your ID.',
+      });
+      if (!valid) SN.toast.error('Please fill out all required provider fields before continuing.');
+      return valid;
+    }
+
+    function validateAssessment() {
+      const answers = activeAssessmentQuestions.map((item, index) => {
+        const selected = document.querySelector(`input[name="assessment-${index}"]:checked`);
+        return { question: item.q, answer: selected?.value || '', correct: item.a };
+      });
+      if (answers.some(item => !item.answer)) {
+        SN.toast.error('Please answer all assessment questions before submitting.');
+        return null;
+      }
+      const correctCount = answers.filter(item => item.answer === item.correct).length;
+      latestAssessmentScore = Math.round((correctCount / answers.length) * 100);
+      return answers;
+    }
+
+    function nextStep(e, to) {
+      e.preventDefault();
+      if (to === 2 && !validateStep1()) return;
+      if (to === 3 && !validateStep2()) return;
+      showStep(to);
+    }
+
+    function showStep(n) {
+      sessionStorage.removeItem(PROVIDER_REGISTER_SUCCESS_KEY);
+      document.body.classList.remove('is-application-submitted');
+      document.querySelector('.provider-flow-card')?.classList.remove('is-success-card');
+      ['step-1', 'step-2', 'step-3', 'step-success'].forEach(id => {
+        const step = document.getElementById(id);
+        if (step) {
+          step.classList.remove('is-visible');
+          step.hidden = id !== `step-${n}`;
+          step.style.display = id === `step-${n}` ? 'block' : 'none';
+        }
+      });
+    }
+
+    function showSuccess() {
+      sessionStorage.setItem(PROVIDER_REGISTER_SUCCESS_KEY, '1');
+      document.body.classList.add('is-application-submitted');
+      document.querySelector('.provider-flow-card')?.classList.add('is-success-card');
+      ['step-1', 'step-2', 'step-3'].forEach(id => document.getElementById(id).style.display = 'none');
+      const success = document.getElementById('step-success');
+      if (success) {
+        success.hidden = false;
+        success.classList.add('is-visible');
+        success.style.display = 'flex';
+      }
+      document.getElementById('provider-score-text').textContent = `Score: ${latestAssessmentScore}%`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function applyGooglePrefill() {
+      const openedFromGoogle = new URLSearchParams(window.location.search).get('google') === '1';
+      if (!openedFromGoogle) {
+        localStorage.removeItem('sn_google_prefill_provider');
+        return;
+      }
+
+      let profile = null;
+      try {
+        profile = JSON.parse(localStorage.getItem('sn_google_prefill_provider') || 'null');
+      } catch {
+        profile = null;
+      }
+      if (!profile?.email) return;
+
+      const nameField = document.getElementById('fullname');
+      const emailField = document.getElementById('email');
+      const passwordField = document.getElementById('password');
+      const confirmField = document.getElementById('confirm-pw');
+
+      if (nameField && !nameField.value) nameField.value = profile.fullName || '';
+      if (emailField) {
+        emailField.value = profile.email;
+        emailField.readOnly = true;
+        emailField.classList.add('is-google-prefilled');
+      }
+      if (passwordField && confirmField) {
+        passwordField.value = '';
+        confirmField.value = '';
+        passwordField.required = false;
+        confirmField.required = false;
+        passwordField.closest('.form-group')?.classList.add('sn-google-hidden-field');
+        confirmField.closest('.form-group')?.classList.add('sn-google-hidden-field');
+      }
+
+      const warning = document.getElementById('step-1-warning');
+      if (warning) {
+        warning.textContent = 'Gmail verified. Complete the remaining details, documents, and skill assessment.';
+        warning.classList.add('show');
+      }
+    }
+
+    function saveProviderApplication(data) {
+      const application = {
+        user: data.user,
+        score: latestAssessmentScore,
+        status: data.user?.verification_status || 'pending',
+        submittedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('sn_provider_application', JSON.stringify(application));
+      localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    }
+
+    function handleUpload(input, labelId, boxId) {
+      if (input.files && input.files[0]) {
+        const label = input.files.length > 1 ? `${input.files.length} files selected` : input.files[0].name;
+        document.getElementById(labelId).textContent = label;
+        document.getElementById(boxId).classList.add('uploaded');
+      }
+    }
+
+    function submitProvider() {
+      const answers = validateAssessment();
+      if (!answers) return;
+      const btn = document.getElementById('submit-btn');
+      btn.textContent = 'Submitting...';
+      btn.disabled = true;
+
+      const payload = new FormData();
+      payload.append('fullName', document.getElementById('fullname').value.trim());
+      payload.append('address', document.getElementById('address').value.trim());
+      payload.append('gender', document.getElementById('gender').value);
+      payload.append('contact', document.getElementById('contact').value.trim());
+      payload.append('dob', document.getElementById('dob').value);
+      payload.append('email', document.getElementById('email').value.trim());
+      if (isGoogleRegistration()) {
+        const profile = JSON.parse(localStorage.getItem('sn_google_prefill_provider') || 'null');
+        payload.append('authProvider', 'google');
+        payload.append('googleSub', profile?.googleSub || '');
+      } else {
+        payload.append('password', document.getElementById('password').value);
+      }
+      payload.append('category', document.getElementById('category').value);
+      payload.append('service', document.getElementById('service').value);
+      payload.append('experience', `Assessment score: ${latestAssessmentScore}%. Answers: ${JSON.stringify(answers)}`);
+      payload.append('experienceYears', document.getElementById('experience-years').value);
+      payload.append('experienceCertification', 'Assessment completed');
+
+      Array.from(document.getElementById('docs')?.files || []).forEach(file => payload.append('docs', file));
+      const resume = document.getElementById('resume');
+      if (resume?.files?.[0]) payload.append('docs', resume.files[0]);
+      const idFront = document.getElementById('id-front');
+      const idBack = document.getElementById('id-back');
+      if (idFront?.files?.[0]) payload.append('idFront', idFront.files[0]);
+      if (idBack?.files?.[0]) payload.append('idBack', idBack.files[0]);
+
+      providerApiRequest('/api/auth/provider/register', payload)
+        .then((data) => {
+          saveProviderApplication(data);
+          localStorage.removeItem('sn_google_prefill_provider');
+          sessionStorage.setItem(PROVIDER_REGISTER_SUCCESS_KEY, '1');
+          showSuccess();
+        })
+        .catch(error => {
+          const message = error.message || 'Failed to submit provider application.';
+          if (message.toLowerCase().includes('email')) {
+            showStep(1);
+            const emailField = document.getElementById('email');
+            showFieldError(emailField, message);
+            emailField?.focus();
+          }
+          SN.toast.error(message);
+        })
+        .finally(() => {
+          btn.textContent = 'Submit';
+          btn.disabled = false;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderAssessment();
+      document.getElementById('category')?.addEventListener('change', updateServiceOptions);
+      updateServiceOptions();
+      applyGooglePrefill();
+      if (sessionStorage.getItem(PROVIDER_REGISTER_SUCCESS_KEY) === '1') {
+        showSuccess();
+      }
+    });
+  </script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+/* ============================================================
+   SerbisyoNow – Shared Topbar (dashboard-style)
+   File: shared/css/sn-topbar.css
+   ============================================================ */
+
+.sn-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 68px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.sn-topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  height: 68px;
+}
+
+.sn-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sn-topbar-logo {
+  width: 36px;
+  height: 36px;
+  background: var(--white);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+
+.sn-topbar-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.sn-topbar-title {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.sn-topbar-title span:first-child { color: var(--blue-dark); }
+.sn-topbar-title span:last-child  { color: var(--orange); }
+
+.sn-topbar-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 9px 14px;
+  min-width: 240px;
+  max-width: 560px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.sn-topbar-search:focus-within {
+  border-color: var(--blue-main);
+  box-shadow: 0 0 0 3px rgba(43, 85, 204, 0.10);
+}
+
+.sn-topbar-search-ico { opacity: 0.85; }
+
+.sn-topbar-search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.sn-topbar-search input::placeholder { color: var(--text-muted); }
+
+.sn-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.sn-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sn-topbar-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--bg-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+.sn-topbar-icon-btn:hover {
+  background: var(--blue-pale);
+  color: var(--blue-main);
+  border-color: var(--blue-main);
+}
+
+.sn-topbar-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 2px solid var(--white);
+}
+
+.sn-topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 6px;
+}
+
+.sn-topbar-user-meta {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.sn-topbar-user-name {
+  font-weight: 800;
+  color: var(--orange);
+  font-size: var(--text-sm);
+}
+
+.sn-topbar-user-sub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.sn-topbar-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--blue-pale);
+  border: 2px solid var(--border);
+}
+
+/* Use on pages where you don't want a search bar */
+.sn-topbar.no-search .sn-topbar-search { display: none; }
+
+@media (max-width: 768px) {
+  .sn-topbar-search { display: none; }
+  .sn-topbar-user-meta { display: none; }
+}

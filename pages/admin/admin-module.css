@@ -1,0 +1,222 @@
+@import url("./user-management/user-management.css");
+
+.admin-module-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-module-nav a {
+  border-radius: var(--radius-full);
+  padding: 9px 14px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.admin-module-nav a:hover,
+.admin-module-nav a.active {
+  background: var(--blue-pale);
+  color: var(--blue-main);
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-card {
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-card h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  color: var(--blue-dark);
+}
+
+.admin-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.admin-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.admin-list-item strong {
+  display: block;
+  color: var(--blue-dark);
+}
+
+.admin-list-item span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-actions .btn {
+  min-height: 34px;
+}
+
+.btn-danger {
+  background: var(--danger-bg);
+  color: #b91c1c;
+  border: 1.5px solid rgba(239,68,68,0.35);
+  box-shadow: none;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  color: var(--white);
+  transform: translateY(-1px);
+}
+
+.admin-inline-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(220px, 1.4fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-form-message {
+  margin: 12px 0 0;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.admin-form-message.success {
+  background: var(--success-bg);
+  color: #15803d;
+  border: 1px solid rgba(34,197,94,0.25);
+}
+
+.admin-form-message.error {
+  background: var(--danger-bg);
+  color: #b91c1c;
+  border: 1px solid rgba(239,68,68,0.25);
+}
+
+.admin-chart {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-chart-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 44px;
+  gap: 10px;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.admin-chart-track {
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--bg-input);
+  overflow: hidden;
+}
+
+.admin-chart-fill {
+  height: 100%;
+  background: var(--gradient-blue);
+}
+
+.admin-confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.admin-confirm-modal[hidden] {
+  display: none;
+}
+
+.admin-confirm-card {
+  width: min(420px, 100%);
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 26px;
+  text-align: center;
+}
+
+.admin-confirm-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-full);
+  background: var(--danger-bg);
+  color: #dc2626;
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+
+.admin-confirm-card h2 {
+  margin: 0;
+  color: var(--blue-dark);
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+}
+
+.admin-confirm-card p {
+  margin: 10px 0 20px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.admin-confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+@media (max-width: 920px) {
+  .admin-grid { grid-template-columns: 1fr; }
+  .admin-list-item { align-items: flex-start; flex-direction: column; }
+  .admin-inline-form { grid-template-columns: 1fr; }
+  .admin-confirm-actions { flex-direction: column-reverse; }
+}

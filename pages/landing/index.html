@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SerbisyoNow - Your Local Service Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="theme-color" content="#1a3a8f"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="SerbisyoNow"/>
+  <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml"/>
+  <link rel="stylesheet" href="../../shared/css/variables.css"/>
+  <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
+  <link rel="stylesheet" href="landing.css"/>
+  <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
+  <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
+</head>
+<body>
+
+  <header class="sn-topbar">
+    <div class="container sn-topbar-inner">
+      <a class="sn-topbar-brand" href="#">
+        <div class="sn-topbar-logo">
+          <img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo">
+        </div>
+        <span class="sn-topbar-title"><span>Serbisyo</span><span>Now</span></span>
+      </a>
+
+
+      <div class="sn-topbar-right">
+        <div class="sn-topbar-actions">
+          <a href="../auth/loginChoice.html" class="btn btn-outline btn-sm">Get Service</a>
+          <a href="../auth/loginChoice.html" class="btn btn-orange btn-sm">Be a Provider</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="hero-overlay"></div>
+    <div class="container hero-content">
+      <h1 class="hero-title">Your Local Service<br/><span>Marketplace</span></h1>
+      <p class="hero-sub">"Services made easy in Angeles City"</p>
+      <div class="hero-search">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="text" placeholder="What do you need help with?"/>
+        <button class="hero-search-btn">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Services ── -->
+  <section class="section" id="services">
+    <div class="container">
+      <h2 class="section-title">Services</h2>
+
+      <div class="service-categories">
+        <button class="service-cat-card active" type="button" data-category="homeRepair">
+          <div class="service-cat-icon" style="background:#EEF4FF">
+            <img src="../../images/LANDING PAGE/Service Catergory Images/Repairs.png" onerror="this.innerHTML='🔧'" alt="Home Repair"/>
+          </div>
+          <span>Home Repair</span>
+          <div class="active-indicator"></div>
+        </button>
+        <button class="service-cat-card" type="button" data-category="cleaning">
+          <div class="service-cat-icon" style="background:#F0FFF4">
+            <img src="../../images/LANDING PAGE/Service Catergory Images/Cleaning.png" onerror="this.innerHTML='🧹'" alt="Cleaning"/>
+          </div>
+          <span>Cleaning</span>
+        </button>
+        <button class="service-cat-card" type="button" data-category="personalCare">
+          <div class="service-cat-icon" style="background:#FFF0FB">
+            <img src="../../images/LANDING PAGE/Service Catergory Images/Personal Care.png" onerror="this.innerHTML='💇'" alt="Personal Care"/>
+          </div>
+          <span>Personal Care</span>
+        </button>
+        <button class="service-cat-card" type="button" data-category="applianceMaintenance">
+          <div class="service-cat-icon" style="background:#FFFFF0">
+            <img src="../../images/LANDING PAGE/Service Catergory Images/Appliance Maintenance.png" onerror="this.innerHTML='🔌'" alt="Appliance"/>
+          </div>
+          <span>Appliance<br/>Maintenance</span>
+        </button>
+        <button class="service-cat-card" type="button" data-category="homeInstallation">
+          <div class="service-cat-icon" style="background:#FFF8EE">
+            <img src="../../images/LANDING PAGE/Service Catergory Images/Installationn.png" onerror="this.innerHTML='🔩'" alt="Installation"/>
+          </div>
+          <span>Home<br/>Installation</span>
+        </button>
+        <button class="service-cat-card" type="button" data-category="outdoorMaintenance">
+          <div class="service-cat-icon" style="background:#F0FFF8">
+            <img src="../../images/LANDING PAGE/Service Catergory Images/Outdoor & Property Repair.png" onerror="this.innerHTML='🌿'" alt="Outdoor"/>
+          </div>
+          <span>Outdoor &amp; Property<br/>Maintenance</span>
+        </button>
+      </div>
+
+      <div class="service-tags" id="landing-service-tags">
+        <button class="service-tag active">Plumbing</button>
+        <button class="service-tag">Electrical</button>
+        <button class="service-tag">Appliance</button>
+        <button class="service-tag">Carpentry</button>
+        <button class="service-tag">Roof</button>
+        <button class="service-tag">Furniture</button>
+        <button class="service-tag">Painting Services</button>
+        <button class="service-tag">Door and Window</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How It Works ── -->
+  <section class="section section-alt" id="how-it-works">
+    <div class="container">
+      <h2 class="section-title">How SerbisyoNow works?</h2>
+      <p class="section-sub">SerbisyoNow connects customers with skilled local service providers in Angeles City. Customers can easily request services, while providers can offer their skills, manage bookings, and earn income – all in one convenient platform.</p>
+
+      <h3 class="section-label">For Customers</h3>
+      <div class="how-steps">
+        <div class="step-card">
+          <div class="step-icon step-illustration">
+            <img src="../../images/LANDING PAGE/How SerbisyoNow works_ (For Customers)/Request Service.png" alt="Request service illustration"/>
+          </div>
+          <h4>Request Service</h4>
+          <p>Find the service you need with just a few taps. Quickly select the category, sign up and get started effortlessly.</p>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step-card">
+          <div class="step-icon step-illustration">
+            <img src="../../images/LANDING PAGE/How SerbisyoNow works_ (For Customers)/Match with Providers.png" alt="Match with providers illustration"/>
+          </div>
+          <h4>Match with Providers</h4>
+          <p>The system matches your request with nearby verified providers. See provider badges, ratings, and distance to make informed choices.</p>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step-card">
+          <div class="step-icon step-illustration">
+            <img src="../../images/LANDING PAGE/How SerbisyoNow works_ (For Customers)/Book & Get it done.png" alt="Book and get it done illustration"/>
+          </div>
+          <h4>Book &amp; Get it Done</h4>
+          <p>Once a provider accepts your request, confirm your appointment and track the service until completion. Hassle-free and reliable.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ── -->
+  <section class="cta-section">
+    <div class="container">
+      <h2>Get Started with SerbisyoNow?</h2>
+      <p>Find service providers or start offering your skills today in Angeles City.</p>
+      <div class="cta-buttons">
+        <a href="../auth/loginChoice.html" class="btn btn-outline btn-lg" style="color:white;border-color:white;">Get Service</a>
+        <a href="../auth/loginChoice.html" class="btn btn-orange btn-lg">Be a Provider</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ── -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="#" class="nav-brand">
+          <div class="nav-logo-icon">
+            <img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo">
+          </div>
+          <span class="nav-logo-text"><span style="color:#fff">Serbisyo</span><span>Now</span></span>
+        </a>
+        <p>A local service marketplace in Angeles City that connects customers with skilled service providers for home and personal services.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#">Home</a></li>
+          <li><a href="#services">Services</a></li>
+          <li><a href="#how-it-works">How SerbisyoNow works?</a></li>
+          <li><a href="#">Different Opportunities</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="#">Health Care</a></li>
+          <li><a href="#">Education</a></li>
+          <li><a href="#">Courses</a></li>
+          <li><a href="#">Assistance</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>For Users</h4>
+        <ul>
+          <li><a href="#">Address</a></li>
+          <li><a href="#">Contact #</a></li>
+          <li><a href="#">Email info</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>© 2026 SerbisyoNow. All rights reserved.</span>
+        <div>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Services</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../shared/js/app.js"></script>
+  <script src="js/landing.js"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

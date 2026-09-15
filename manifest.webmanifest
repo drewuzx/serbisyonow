@@ -1,0 +1,66 @@
+{
+  "name": "SerbisyoNow",
+  "short_name": "SerbisyoNow",
+  "description": "A local service marketplace for customers, providers, and admins.",
+  "id": "/pages/landing/index.html",
+  "start_url": "/pages/landing/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#f4f7fb",
+  "theme_color": "#1a3a8f",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/image_logo/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/image_logo/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/image_logo/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/image_logo/main_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/image_logo/main_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Get Service",
+      "short_name": "Service",
+      "url": "/pages/auth/loginChoice.html",
+      "icons": [{ "src": "/image_logo/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Customer Login",
+      "short_name": "Customer",
+      "url": "/pages/auth/customerLogin.html",
+      "icons": [{ "src": "/image_logo/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Provider Login",
+      "short_name": "Provider",
+      "url": "/pages/auth/providerLogin.html",
+      "icons": [{ "src": "/image_logo/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}
