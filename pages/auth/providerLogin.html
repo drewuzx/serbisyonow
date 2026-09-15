@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../../shared/css/variables.css"/>
   <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
-  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260915-password-toggle"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260915-forgot-password"/>
   <link rel="stylesheet" href="../landing/landing.css"/>
   <style>
 
@@ -51,7 +51,7 @@
           <div class="auth-heading"><h1>Welcome back!</h1><p>Login to your provider dashboard.</p></div>
           <form id="login-form" onsubmit="handleLogin(event)" novalidate>
             <div class="form-group"><label for="email">Email address</label><input class="form-control" type="email" id="email" placeholder="Enter your email address" autocomplete="email" required/></div>
-            <div class="form-group"><label for="password">Password</label><div class="input-wrap"><input class="form-control" type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required/><button type="button" class="toggle-pw" aria-label="Toggle password"><svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div><a href="#" class="forgot">Forgot Password?</a></div>
+            <div class="form-group"><label for="password">Password</label><div class="input-wrap"><input class="form-control" type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required/><button type="button" class="toggle-pw" aria-label="Toggle password"><svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div><a href="forgotPassword.html?role=provider" class="forgot">Forgot Password?</a></div>
             <button type="submit" class="btn btn-primary btn-full btn-lg" id="login-btn">Login</button>
             <div class="divider">Or Login with</div>
             <button type="button" class="btn-google" onclick="googleLogin()">Google</button>
@@ -138,6 +138,33 @@
       if (!form) return;
       form.querySelectorAll('.field-error').forEach((err) => err.remove());
       form.querySelectorAll('.form-control').forEach((field) => field.classList.remove('error'));
+      clearLoginBanner();
+    }
+
+    function loginBanner() {
+      const form = document.getElementById('login-form');
+      if (!form) return null;
+      let banner = document.getElementById('login-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'login-banner';
+        banner.className = 'auth-banner';
+        banner.hidden = true;
+        form.parentNode.insertBefore(banner, form);
+      }
+      return banner;
+    }
+
+    function showLoginBanner(message) {
+      const banner = loginBanner();
+      if (!banner) return;
+      banner.textContent = message;
+      banner.hidden = false;
+    }
+
+    function clearLoginBanner() {
+      const banner = document.getElementById('login-banner');
+      if (banner) banner.hidden = true;
     }
 
     async function providerApiRequest(path, payload) {
@@ -185,7 +212,14 @@
           setTimeout(() => window.location.href = '../provider/dashboard/dashboard.html', 700);
         })
         .catch((error) => {
-          SN.toast.error(error.message || 'Login failed.');
+          const message = error.message || 'Login failed.';
+          if (message.toLowerCase().includes('invalid email or password')) {
+            showFieldError(passwordField, 'Wrong email or password. Please try again.');
+          } else if (message.toLowerCase().includes('failed to fetch')) {
+            showLoginBanner('Cannot reach the auth server. Please check your connection and try again.');
+          } else {
+            showLoginBanner(message);
+          }
         })
         .finally(() => {
           btn.textContent = 'Login';
@@ -199,8 +233,14 @@
     document.addEventListener('DOMContentLoaded', () => {
       const emailField = document.getElementById('email');
       const passwordField = document.getElementById('password');
-      emailField?.addEventListener('input', () => clearFieldError(emailField));
-      passwordField?.addEventListener('input', () => clearFieldError(passwordField));
+      emailField?.addEventListener('input', () => {
+        clearFieldError(emailField);
+        clearLoginBanner();
+      });
+      passwordField?.addEventListener('input', () => {
+        clearFieldError(passwordField);
+        clearLoginBanner();
+      });
     });
   </script>
   <script src="/shared/js/pwa-register.js?v=20260915-api"></script>

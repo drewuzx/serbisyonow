@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../../shared/css/variables.css"/>
   <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
-  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260915-password-toggle"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260915-forgot-password"/>
   <link rel="stylesheet" href="../landing/landing.css"/>
   <style>
     @media (max-width: 920px) { .hero-login { grid-template-columns: 1fr; gap: 24px; } .hero-login-left { text-align: center; } .hero-login-left p { margin: 0 auto; } }
@@ -50,7 +50,7 @@
           <div class="auth-heading"><h1>Welcome!</h1><p>Please login to continue</p></div>
           <form id="login-form" onsubmit="handleLogin(event)" novalidate>
             <div class="form-group"><label for="email">Email address</label><input class="form-control" type="email" id="email" placeholder="Enter your email address" autocomplete="email" required/></div>
-            <div class="form-group"><label for="password">Password</label><div class="input-wrap"><input class="form-control" type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required/><button type="button" class="toggle-pw" aria-label="Toggle password"><svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div><a href="#" class="forgot">Forgot Password?</a></div>
+            <div class="form-group"><label for="password">Password</label><div class="input-wrap"><input class="form-control" type="password" id="password" placeholder="Enter your password" autocomplete="current-password" required/><button type="button" class="toggle-pw" aria-label="Toggle password"><svg id="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div><a href="forgotPassword.html?role=customer" class="forgot">Forgot Password?</a></div>
             <button type="submit" class="btn btn-primary btn-full btn-lg" id="login-btn">Login</button>
             <div class="divider">Or Login with</div>
             <button type="button" class="btn-google" onclick="googleLogin()">Google</button>
@@ -110,7 +110,7 @@
     </div>
   </footer>
   <script src="../../shared/js/app.js?v=20260915-api"></script>
-  <script src="../../shared/js/customerLogin.js?v=20260915-api"></script>
+  <script src="../../shared/js/customerLogin.js?v=20260915-forgot-password"></script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>
 </html>

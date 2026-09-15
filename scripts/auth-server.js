@@ -23,6 +23,7 @@ const frontendBaseUrl = configuredFrontendBaseUrl || 'http://127.0.0.1:5500';
 const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 const googleAuthTickets = new Map();
+const passwordResetTtlMinutes = Math.max(10, Number(process.env.PASSWORD_RESET_TTL_MINUTES || 60));
 
 for (const dir of [
   path.join(uploadDir, 'customer-ids'),
@@ -62,6 +63,10 @@ const FIELD_LABELS = {
   idAddress: 'Address on ID',
   currentPassword: 'Current password',
   newPassword: 'New password',
+  email: 'Email address',
+  password: 'Password',
+  token: 'Reset token',
+  role: 'Account type',
   available_date: 'Available date',
   start_time: 'Start time',
   end_time: 'End time',
@@ -218,6 +223,106 @@ async function ensureUniqueAccountEmail(email) {
     error.field = 'email';
     throw error;
   }
+}
+
+function normalizeAccountRole(value) {
+  const role = String(value || '').trim().toLowerCase();
+  if (role === 'customer' || role === 'provider') return role;
+  const error = new Error('Choose customer or provider reset.');
+  error.statusCode = 400;
+  error.field = 'role';
+  throw error;
+}
+
+function accountTable(role) {
+  return role === 'provider' ? 'providers' : 'customers';
+}
+
+function passwordResetLoginPath(role) {
+  return role === 'provider'
+    ? '/pages/auth/providerLogin.html'
+    : '/pages/auth/customerLogin.html';
+}
+
+function hashPasswordResetToken(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+function canExposeResetLink(req) {
+  if (process.env.ALLOW_RESET_LINK_IN_RESPONSE === 'true') return true;
+  if (process.env.NODE_ENV === 'production') return false;
+  const host = String(req.hostname || '').toLowerCase();
+  return ['localhost', '127.0.0.1', '::1'].includes(host);
+}
+
+function smtpConfig() {
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+  return {
+    host,
+    user,
+    pass,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true',
+    from: String(process.env.SMTP_FROM || user || 'SerbisyoNow <no-reply@serbisyonow.local>').trim(),
+    configured: Boolean(host && user && pass),
+  };
+}
+
+function isEmailLike(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+}
+
+function passwordResetUrl(req, token) {
+  const base = configuredFrontendBaseUrl || requestFrontendBase(req) || publicBaseUrl(req);
+  return `${base}/pages/auth/resetPassword.html?token=${encodeURIComponent(token)}`;
+}
+
+async function sendPasswordResetEmail({ to, role, resetUrl }) {
+  const config = smtpConfig();
+  if (!config.configured) return { sent: false, reason: 'not_configured' };
+
+  let nodemailer;
+  try {
+    nodemailer = require('nodemailer');
+  } catch (error) {
+    error.message = 'Email sending needs nodemailer installed. Run npm install and redeploy.';
+    throw error;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+  });
+
+  const accountLabel = role === 'provider' ? 'provider' : 'customer';
+  await transporter.sendMail({
+    from: config.from,
+    to,
+    subject: 'Reset your SerbisyoNow password',
+    text: [
+      `We received a password reset request for your SerbisyoNow ${accountLabel} account.`,
+      '',
+      `Open this link within ${passwordResetTtlMinutes} minutes:`,
+      resetUrl,
+      '',
+      'If you did not request this, you can ignore this email.',
+    ].join('\n'),
+    html: `
+      <p>We received a password reset request for your SerbisyoNow ${accountLabel} account.</p>
+      <p><a href="${resetUrl}">Reset your password</a></p>
+      <p>This link expires in ${passwordResetTtlMinutes} minutes.</p>
+      <p>If you did not request this, you can ignore this email.</p>
+    `,
+  });
+
+  return { sent: true };
 }
 
 function clampScore(value) {
@@ -422,6 +527,23 @@ async function ensureAdminSupportTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id SERIAL PRIMARY KEY,
+      account_type TEXT NOT NULL CHECK (account_type IN ('customer', 'provider')),
+      account_id INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
+      ON password_reset_tokens (token_hash);
+
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account
+      ON password_reset_tokens (account_type, account_id);
 
     CREATE TABLE IF NOT EXISTS admin_feedback (
       id SERIAL PRIMARY KEY,
@@ -1171,6 +1293,127 @@ app.post('/api/auth/google/account-status', asyncRoute(async (req, res) => {
   }
 
   res.json({ action: 'register', role });
+}));
+
+app.post('/api/auth/password-reset/request', asyncRoute(async (req, res) => {
+  requireFields(req.body, ['role', 'email']);
+  const role = normalizeAccountRole(req.body.role);
+  const email = String(req.body.email || '').trim().toLowerCase();
+
+  if (!isEmailLike(email)) {
+    return res.status(400).json({ message: 'Please enter a valid email address.', field: 'email' });
+  }
+
+  const mailReady = smtpConfig().configured;
+  const exposeResetLink = canExposeResetLink(req);
+  if (!mailReady && !exposeResetLink) {
+    return res.status(503).json({
+      message: 'Password reset email is not configured yet. Please contact the system admin.',
+    });
+  }
+
+  await db.query(`
+    DELETE FROM password_reset_tokens
+    WHERE used_at IS NOT NULL
+       OR expires_at < NOW() - INTERVAL '1 day'
+  `);
+
+  const result = await db.query(
+    `SELECT id, full_name, email
+     FROM ${accountTable(role)}
+     WHERE lower(email) = lower($1::text)
+     LIMIT 1`,
+    [email]
+  );
+
+  const account = result.rows[0];
+  let resetUrl = '';
+  let emailSent = false;
+
+  if (account) {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    resetUrl = passwordResetUrl(req, rawToken);
+    await db.query(
+      `INSERT INTO password_reset_tokens
+        (account_type, account_id, email, token_hash, expires_at)
+       VALUES ($1, $2, lower($3), $4, NOW() + ($5::text || ' minutes')::interval)`,
+      [role, account.id, account.email, hashPasswordResetToken(rawToken), passwordResetTtlMinutes]
+    );
+
+    if (mailReady) {
+      try {
+        const mailResult = await sendPasswordResetEmail({
+          to: account.email,
+          role,
+          resetUrl,
+        });
+        emailSent = mailResult.sent;
+      } catch (error) {
+        console.error('Password reset email failed:', error);
+        if (!exposeResetLink) {
+          return res.status(503).json({
+            message: 'Password reset email could not be sent. Please try again later.',
+          });
+        }
+      }
+    }
+  }
+
+  res.json({
+    ok: true,
+    message: 'If this email is registered, a password reset link has been prepared.',
+    expires_in_minutes: passwordResetTtlMinutes,
+    email_sent: emailSent,
+    ...(account && exposeResetLink ? { reset_url: resetUrl } : {}),
+  });
+}));
+
+app.post('/api/auth/password-reset/complete', asyncRoute(async (req, res) => {
+  requireFields(req.body, ['token', 'password']);
+  const token = String(req.body.token || '').trim();
+  const password = String(req.body.password || '');
+
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters.', field: 'password' });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const tokenResult = await db.query(
+    `UPDATE password_reset_tokens
+     SET used_at = NOW()
+     WHERE token_hash = $1
+       AND used_at IS NULL
+       AND expires_at > NOW()
+     RETURNING account_type, account_id, email`,
+    [hashPasswordResetToken(token)]
+  );
+
+  const resetToken = tokenResult.rows[0];
+  if (!resetToken) {
+    return res.status(400).json({
+      message: 'This reset link is invalid or expired. Please request a new one.',
+    });
+  }
+
+  const result = await db.query(
+    `UPDATE ${accountTable(resetToken.account_type)}
+     SET password_hash = $1,
+         auth_provider = 'password',
+         updated_at = NOW()
+     WHERE id = $2
+     RETURNING id`,
+    [passwordHash, resetToken.account_id]
+  );
+
+  if (!result.rowCount) {
+    return res.status(404).json({ message: 'Account not found. Please request a new reset link.' });
+  }
+
+  res.json({
+    ok: true,
+    role: resetToken.account_type,
+    redirect: passwordResetLoginPath(resetToken.account_type),
+  });
 }));
 
 app.post('/api/auth/customer/register', upload.fields([

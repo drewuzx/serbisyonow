@@ -71,6 +71,23 @@ CREATE TABLE IF NOT EXISTS service_categories (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  account_type TEXT NOT NULL CHECK (account_type IN ('customer', 'provider')),
+  account_id INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
+  ON password_reset_tokens (token_hash);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account
+  ON password_reset_tokens (account_type, account_id);
+
 CREATE TABLE IF NOT EXISTS admin_feedback (
   id SERIAL PRIMARY KEY,
   type TEXT NOT NULL DEFAULT 'feedback'

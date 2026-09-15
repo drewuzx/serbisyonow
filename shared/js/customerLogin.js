@@ -30,6 +30,33 @@ function clearLoginFormErrors() {
   if (!form) return;
   form.querySelectorAll('.field-error').forEach((err) => err.remove());
   form.querySelectorAll('.form-control').forEach((field) => field.classList.remove('error'));
+  clearLoginBanner();
+}
+
+function loginBanner() {
+  const form = document.getElementById('login-form');
+  if (!form) return null;
+  let banner = document.getElementById('login-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'login-banner';
+    banner.className = 'auth-banner';
+    banner.hidden = true;
+    form.parentNode.insertBefore(banner, form);
+  }
+  return banner;
+}
+
+function showLoginBanner(message) {
+  const banner = loginBanner();
+  if (!banner) return;
+  banner.textContent = message;
+  banner.hidden = false;
+}
+
+function clearLoginBanner() {
+  const banner = document.getElementById('login-banner');
+  if (banner) banner.hidden = true;
 }
 
 async function apiRequest(path, payload) {
@@ -82,7 +109,14 @@ function handleLogin(e) {
       setTimeout(() => window.location.href = '../customer/dashboard/dashboard.html', 700);
     })
     .catch((error) => {
-      SN.toast.error(error.message || 'Login failed.');
+      const message = error.message || 'Login failed.';
+      if (message.toLowerCase().includes('invalid email or password')) {
+        showFieldError(passField, 'Wrong email or password. Please try again.');
+      } else if (message.toLowerCase().includes('failed to fetch')) {
+        showLoginBanner('Cannot reach the auth server. Please check your connection and try again.');
+      } else {
+        showLoginBanner(message);
+      }
     })
     .finally(() => {
       btn.textContent = 'Login'; btn.disabled = false;
@@ -97,6 +131,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const emailField = document.getElementById('email');
   const passField = document.getElementById('password');
 
-  emailField?.addEventListener('input', () => clearFieldError(emailField));
-  passField?.addEventListener('input', () => clearFieldError(passField));
+  emailField?.addEventListener('input', () => {
+    clearFieldError(emailField);
+    clearLoginBanner();
+  });
+  passField?.addEventListener('input', () => {
+    clearFieldError(passField);
+    clearLoginBanner();
+  });
 });
