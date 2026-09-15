@@ -76,6 +76,9 @@
     if (!response.ok) {
       const error = new Error(data.message || 'Could not request password reset.');
       error.field = data.field;
+      error.detail = data.detail;
+      error.smtpCode = data.smtp_code;
+      error.smtpResponseCode = data.smtp_response_code;
       throw error;
     }
     return data;
@@ -122,12 +125,13 @@
         devPanel.hidden = true;
       }
     } catch (error) {
+      const detail = error.detail ? ` ${error.detail}` : '';
       if (error.field === 'email') {
         showFieldError(emailField, error.message);
       } else if (String(error.message || '').toLowerCase().includes('failed to fetch')) {
         showBanner('Cannot reach the auth server. Please check your connection and try again.');
       } else {
-        showBanner(error.message || 'Could not request password reset.');
+        showBanner(`${error.message || 'Could not request password reset.'}${detail}`);
       }
     } finally {
       setLoading(button, false);

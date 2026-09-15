@@ -258,7 +258,8 @@ function canExposeResetLink(req) {
 function smtpConfig() {
   const host = String(process.env.SMTP_HOST || '').trim();
   const user = String(process.env.SMTP_USER || '').trim();
-  const pass = String(process.env.SMTP_PASS || '').trim();
+  const rawPass = String(process.env.SMTP_PASS || '').trim();
+  const pass = /^smtp\.gmail\.com$/i.test(host) ? rawPass.replace(/\s+/g, '') : rawPass;
   return {
     host,
     user,
@@ -268,6 +269,63 @@ function smtpConfig() {
     from: String(process.env.SMTP_FROM || user || 'SerbisyoNow <no-reply@serbisyonow.local>').trim(),
     configured: Boolean(host && user && pass),
   };
+}
+
+function smtpTimeoutMs(name, fallback) {
+  const value = Number(process.env[name] || fallback);
+  return Number.isFinite(value) && value >= 3000 ? value : fallback;
+}
+
+function smtpTransportOptions(config, override = {}) {
+  return {
+    host: config.host,
+    port: override.port || config.port,
+    secure: override.secure ?? config.secure,
+    dnsTimeout: smtpTimeoutMs('SMTP_DNS_TIMEOUT_MS', 10000),
+    connectionTimeout: smtpTimeoutMs('SMTP_CONNECTION_TIMEOUT_MS', 12000),
+    greetingTimeout: smtpTimeoutMs('SMTP_GREETING_TIMEOUT_MS', 12000),
+    socketTimeout: smtpTimeoutMs('SMTP_SOCKET_TIMEOUT_MS', 15000),
+    requireTLS: (override.port || config.port) === 587,
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+  };
+}
+
+function smtpFallbackOptions(config) {
+  const attempts = [smtpTransportOptions(config)];
+  const isGmailSmtp = /(^|\.)gmail\.com$/i.test(config.host) || /^smtp\.gmail\.com$/i.test(config.host);
+  if (isGmailSmtp && config.port !== 465) {
+    attempts.push(smtpTransportOptions(config, { port: 465, secure: true }));
+  }
+  if (isGmailSmtp && config.port !== 587) {
+    attempts.push(smtpTransportOptions(config, { port: 587, secure: false }));
+  }
+  return attempts;
+}
+
+function publicSmtpError(error) {
+  const code = String(error?.code || '');
+  const responseCode = Number(error?.responseCode || 0);
+
+  if (code === 'MODULE_NOT_FOUND') {
+    return 'Email package is missing. Run npm install, push the lockfile, and redeploy Render.';
+  }
+
+  if (code === 'EAUTH' || responseCode === 534 || responseCode === 535) {
+    return 'Gmail rejected the SMTP login. Use the 16-character Google App Password from the same Gmail account, and make sure 2-Step Verification is enabled.';
+  }
+
+  if (responseCode === 550 || responseCode === 553) {
+    return 'Gmail rejected the sender address. Make SMTP_FROM use the same Gmail as SMTP_USER.';
+  }
+
+  if (['ETIMEDOUT', 'ESOCKET', 'ECONNECTION', 'EDNS'].includes(code)) {
+    return 'The server could not complete the Gmail SMTP connection. Try SMTP_PORT=465 with SMTP_SECURE=true, then restart or redeploy.';
+  }
+
+  return 'Gmail SMTP failed. Check the Render logs for the SMTP code, then verify SMTP_USER, SMTP_PASS, and SMTP_FROM.';
 }
 
 function isEmailLike(email) {
@@ -291,22 +349,8 @@ async function sendPasswordResetEmail({ to, role, resetUrl }) {
     throw error;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    dnsTimeout: 10000,
-    connectionTimeout: 12000,
-    greetingTimeout: 12000,
-    socketTimeout: 15000,
-    auth: {
-      user: config.user,
-      pass: config.pass,
-    },
-  });
-
   const accountLabel = role === 'provider' ? 'provider' : 'customer';
-  await transporter.sendMail({
+  const message = {
     from: config.from,
     to,
     subject: 'Reset your SerbisyoNow password',
@@ -324,9 +368,27 @@ async function sendPasswordResetEmail({ to, role, resetUrl }) {
       <p>This link expires in ${passwordResetTtlMinutes} minutes.</p>
       <p>If you did not request this, you can ignore this email.</p>
     `,
-  });
+  };
 
-  return { sent: true };
+  let lastError;
+  for (const options of smtpFallbackOptions(config)) {
+    try {
+      const transporter = nodemailer.createTransport(options);
+      await transporter.sendMail(message);
+      return { sent: true };
+    } catch (error) {
+      lastError = error;
+      const responseCode = Number(error?.responseCode || 0);
+      if (String(error?.code || '') === 'EAUTH' || responseCode === 534 || responseCode === 535) break;
+    }
+  }
+
+  if (lastError) {
+    lastError.publicMessage = publicSmtpError(lastError);
+    throw lastError;
+  }
+
+  return { sent: false };
 }
 
 function clampScore(value) {
@@ -1357,6 +1419,9 @@ app.post('/api/auth/password-reset/request', asyncRoute(async (req, res) => {
         if (!exposeResetLink) {
           return res.status(503).json({
             message: 'Password reset email could not be sent. Please try again later.',
+            detail: error.publicMessage || publicSmtpError(error),
+            smtp_code: error.code || null,
+            smtp_response_code: error.responseCode || null,
           });
         }
       }
