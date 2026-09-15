@@ -295,6 +295,10 @@ async function sendPasswordResetEmail({ to, role, resetUrl }) {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    dnsTimeout: 10000,
+    connectionTimeout: 12000,
+    greetingTimeout: 12000,
+    socketTimeout: 15000,
     auth: {
       user: config.user,
       pass: config.pass,
