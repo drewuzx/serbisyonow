@@ -192,6 +192,15 @@
 .input-wrap { position: relative; }
 .input-wrap .form-control { padding-right: 44px; }
 
+.input-wrap input[type="password"]::-ms-reveal,
+.input-wrap input[type="password"]::-ms-clear,
+.input-wrap input[type="text"]::-ms-reveal,
+.input-wrap input[type="text"]::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .toggle-pw {
   position: absolute; right: 14px; top: 50%;
   transform: translateY(-50%);
