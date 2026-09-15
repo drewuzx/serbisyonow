@@ -153,9 +153,54 @@ function googleDashboardPath(role) {
 
 async function buildRegistrationPasswordHash(req) {
   if (req.body.authProvider === 'google') {
-    return bcrypt.hash(`google-only:${req.body.email}:${crypto.randomBytes(24).toString('hex')}`, 12);
+    return buildGoogleOnlyPasswordHash(req.body.email);
   }
   return bcrypt.hash(req.body.password, 12);
+}
+
+async function buildGoogleOnlyPasswordHash(email) {
+  return bcrypt.hash(`google-only:${email}:${crypto.randomBytes(24).toString('hex')}`, 12);
+}
+
+function googleProfileName(profile) {
+  return String(profile?.fullName || profile?.email || 'Google User').trim();
+}
+
+async function createGoogleCustomerAccount(profile) {
+  const passwordHash = await buildGoogleOnlyPasswordHash(profile.email);
+  const result = await db.query(
+    `INSERT INTO customers
+      (full_name, address, gender, contact, dob, email, password_hash, id_type, id_address, auth_provider, google_sub)
+     VALUES ($1, '', 'Prefer not to say', '', '1900-01-01', lower($2), $3, NULL, NULL, 'google', $4)
+     RETURNING *`,
+    [
+      googleProfileName(profile),
+      profile.email,
+      passwordHash,
+      profile.googleSub || null,
+    ]
+  );
+  return result.rows[0];
+}
+
+async function createGoogleProviderAccount(profile) {
+  const passwordHash = await buildGoogleOnlyPasswordHash(profile.email);
+  const result = await db.query(
+    `INSERT INTO providers
+      (full_name, address, gender, contact, dob, email, password_hash, category, service,
+       experience, experience_years, experience_certification, auth_provider, google_sub)
+     VALUES ($1, '', 'Prefer not to say', '', '1900-01-01', lower($2), $3, 'Profile Setup',
+       'Complete service details', 'Google signup pending profile completion.', 'Not provided',
+       'Pending profile completion', 'google', $4)
+     RETURNING *`,
+    [
+      googleProfileName(profile),
+      profile.email,
+      passwordHash,
+      profile.googleSub || null,
+    ]
+  );
+  return result.rows[0];
 }
 
 async function ensureUniqueAccountEmail(email) {
@@ -1079,11 +1124,16 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
     });
   }
 
-  res.json({
-    action: 'register',
+  const createdAccount = role === 'provider'
+    ? await createGoogleProviderAccount(profile)
+    : await createGoogleCustomerAccount(profile);
+
+  res.status(201).json({
+    action: 'login',
     role,
-    redirect: googleRegisterPath(role),
-    profile,
+    redirect: googleDashboardPath(role),
+    is_new_google_account: true,
+    user: role === 'provider' ? providerRow(createdAccount) : customerRow(createdAccount),
   });
 }));
 
