@@ -51,6 +51,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+const UPLOAD_FOLDERS = new Set(['customer-ids', 'provider-docs']);
+
 const FIELD_LABELS = {
   provider_id: 'Service provider',
   service: 'Service',
@@ -77,6 +79,35 @@ const FIELD_LABELS = {
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
+
+app.get('/uploads/:folder/:filename', asyncRoute(async (req, res) => {
+  const folder = String(req.params.folder || '').trim();
+  const filename = String(req.params.filename || '').trim();
+  if (!UPLOAD_FOLDERS.has(folder) || !filename || filename.includes('/') || filename.includes('\\')) {
+    return res.status(404).type('text/plain').send('Uploaded file not found.');
+  }
+
+  const result = await db.query(
+    `SELECT original_name, mime_type, size_bytes, content
+     FROM uploaded_files
+     WHERE folder = $1 AND filename = $2
+     LIMIT 1`,
+    [folder, filename]
+  );
+
+  const file = result.rows[0];
+  if (!file) {
+    return res.status(404).type('text/plain').send(
+      'Uploaded file is not available. This file may have been uploaded before persistent upload storage was enabled.'
+    );
+  }
+
+  res.type(file.mime_type || 'application/octet-stream');
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.set('Content-Disposition', `inline; filename="${String(file.original_name || filename).replace(/["\r\n]/g, '')}"`);
+  if (file.size_bytes) res.set('Content-Length', String(file.size_bytes));
+  res.send(file.content);
+}));
 
 app.get('/', (_req, res) => {
   res.redirect('/pages/landing/index.html');
@@ -749,6 +780,93 @@ function geoPointFromRow(row) {
   return inferGeoPoint(row?.address);
 }
 
+function uploadedFileFolder(file) {
+  return file?.fieldname === 'docs' ? 'provider-docs' : 'customer-ids';
+}
+
+function requestUploadedFiles(req) {
+  return Object.values(req.files || {}).flat().filter(Boolean);
+}
+
+async function persistUploadedFile(file, owner = {}) {
+  const folder = uploadedFileFolder(file);
+  if (!UPLOAD_FOLDERS.has(folder) || !file?.filename || !file?.path) return;
+
+  const content = await fs.promises.readFile(file.path);
+  await db.query(`
+    INSERT INTO uploaded_files
+      (folder, filename, original_name, mime_type, size_bytes, content, owner_role, owner_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    ON CONFLICT (folder, filename) DO UPDATE
+    SET original_name = EXCLUDED.original_name,
+        mime_type = EXCLUDED.mime_type,
+        size_bytes = EXCLUDED.size_bytes,
+        content = EXCLUDED.content,
+        owner_role = COALESCE(EXCLUDED.owner_role, uploaded_files.owner_role),
+        owner_id = COALESCE(EXCLUDED.owner_id, uploaded_files.owner_id),
+        updated_at = NOW()
+  `, [
+    folder,
+    file.filename,
+    file.originalname || file.filename,
+    file.mimetype || 'application/octet-stream',
+    Number(file.size || content.length),
+    content,
+    owner.role || null,
+    owner.id || null,
+  ]);
+}
+
+async function persistRequestUploads(req, owner = {}) {
+  const files = requestUploadedFiles(req);
+  if (!files.length) return;
+  await Promise.all(files.map((file) => persistUploadedFile(file, owner)));
+}
+
+async function backfillUploadFolderFromDisk(folder) {
+  const folderPath = path.join(uploadDir, folder);
+  let names = [];
+  try {
+    names = await fs.promises.readdir(folderPath);
+  } catch {
+    return;
+  }
+
+  await Promise.all(names.map(async (filename) => {
+    const filePath = path.join(folderPath, filename);
+    const stat = await fs.promises.stat(filePath).catch(() => null);
+    if (!stat?.isFile()) return;
+    const content = await fs.promises.readFile(filePath);
+    await db.query(`
+      INSERT INTO uploaded_files
+        (folder, filename, original_name, mime_type, size_bytes, content)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (folder, filename) DO NOTHING
+    `, [
+      folder,
+      filename,
+      filename,
+      mimeTypeFromFilename(filename),
+      stat.size,
+      content,
+    ]);
+  }));
+}
+
+async function backfillUploadedFilesFromDisk() {
+  await Promise.all([...UPLOAD_FOLDERS].map((folder) => backfillUploadFolderFromDisk(folder)));
+}
+
+function mimeTypeFromFilename(filename) {
+  const ext = path.extname(String(filename || '')).toLowerCase();
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.gif') return 'image/gif';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.pdf') return 'application/pdf';
+  return 'application/octet-stream';
+}
+
 function distanceKm(a, b) {
   const toRad = (value) => Number(value) * Math.PI / 180;
   const lat1 = toRad(a.lat);
@@ -852,6 +970,9 @@ function providerRow(row) {
     experience: row.experience,
     experience_years: row.experience_years,
     experience_certification: row.experience_certification,
+    documents_files: row.documents_files || [],
+    id_front_file: row.id_front_file,
+    id_back_file: row.id_back_file,
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
     location_accuracy_m: row.location_accuracy_m === null || row.location_accuracy_m === undefined ? null : Number(row.location_accuracy_m),
@@ -892,6 +1013,24 @@ async function ensureAdminSupportTables() {
 
     CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account
       ON password_reset_tokens (account_type, account_id);
+
+    CREATE TABLE IF NOT EXISTS uploaded_files (
+      id SERIAL PRIMARY KEY,
+      folder TEXT NOT NULL CHECK (folder IN ('customer-ids', 'provider-docs')),
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL DEFAULT '',
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      content BYTEA NOT NULL,
+      owner_role TEXT CHECK (owner_role IN ('customer', 'provider')),
+      owner_id INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (folder, filename)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_uploaded_files_lookup
+      ON uploaded_files (folder, filename);
 
     CREATE TABLE IF NOT EXISTS admin_feedback (
       id SERIAL PRIMARY KEY,
@@ -1046,6 +1185,7 @@ async function ensureAdminSupportTables() {
     `);
   }
 
+  await backfillUploadedFilesFromDisk();
   await seedCustomerDemoData();
   await seedProviderDemoData();
 }
@@ -1777,6 +1917,7 @@ app.post('/api/auth/customer/register', upload.fields([
     ...(isGoogleAuth ? [] : ['password']),
   ]);
   await ensureUniqueAccountEmail(req.body.email);
+  await persistRequestUploads(req);
 
   const passwordHash = await buildRegistrationPasswordHash(req);
   const result = await db.query(
@@ -1868,6 +2009,7 @@ app.patch('/api/auth/customer/verification/resubmit', upload.fields([
   { name: 'idBack', maxCount: 1 },
 ]), asyncRoute(async (req, res) => {
   requireFields(req.body, ['id', 'idType', 'idAddress']);
+  await persistRequestUploads(req);
   const result = await db.query(
     `UPDATE customers
      SET id_type = $2,
@@ -2313,6 +2455,7 @@ app.post('/api/auth/provider/register', upload.fields([
     'category', 'service', 'experience', 'experienceYears', 'experienceCertification',
   ]);
   await ensureUniqueAccountEmail(req.body.email);
+  await persistRequestUploads(req);
 
   const passwordHash = await buildRegistrationPasswordHash(req);
   const docs = (req.files?.docs || []).map((file) => file.filename);

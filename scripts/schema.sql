@@ -88,6 +88,24 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account
   ON password_reset_tokens (account_type, account_id);
 
+CREATE TABLE IF NOT EXISTS uploaded_files (
+  id SERIAL PRIMARY KEY,
+  folder TEXT NOT NULL CHECK (folder IN ('customer-ids', 'provider-docs')),
+  filename TEXT NOT NULL,
+  original_name TEXT NOT NULL DEFAULT '',
+  mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  content BYTEA NOT NULL,
+  owner_role TEXT CHECK (owner_role IN ('customer', 'provider')),
+  owner_id INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (folder, filename)
+);
+
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_lookup
+  ON uploaded_files (folder, filename);
+
 CREATE TABLE IF NOT EXISTS admin_feedback (
   id SERIAL PRIMARY KEY,
   type TEXT NOT NULL DEFAULT 'feedback'
