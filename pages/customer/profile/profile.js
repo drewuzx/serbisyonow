@@ -69,7 +69,7 @@ function populatePage(user) {
  document.getElementById('view-gender').textContent = user?.gender || '';
  document.getElementById('view-dob').textContent = user?.dob? formatDate(user.dob): '';
 
- const statusLabels = { verified: ' Verified', pending: ' Pending', rejected: ' Rejected' };
+ const statusLabels = { verified: ' Verified', pending: ' Pending', rejected: ' Declined' };
  document.getElementById('view-status').textContent = statusLabels[status] || status;
 
  // Account card

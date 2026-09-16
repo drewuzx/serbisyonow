@@ -253,7 +253,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderLiveReviews(data.bookings || [], data.reviews || []);
   updateReviewsNotificationCount(data);
  }
- } catch (_) { /* keep the page usable if the server is offline */ }
+ } catch (error) {
+  renderLiveReviews([], []);
+  const status = document.getElementById('sn-reviews-live-status');
+  if (status) status.textContent = error.message || 'Reviews unavailable. Please try again.';
+ }
 
  document.querySelectorAll('.sn-filter-tab').forEach(tab => {
  tab.addEventListener('click', () => {

@@ -76,10 +76,13 @@ function renderFavoritesList(favorites) {
 
 async function refreshFavorites(customer, options = {}) {
  try {
-  const data = await favFetch(`/api/customer/${customer.id}/favorites`);
+ const data = await favFetch(`/api/customer/${customer.id}/favorites`);
   renderFavoritesList(data.favorites || []);
  } catch (error) {
-  if (!options.quiet) setFavoritesStatus('Favorites unavailable. Showing saved sample cards.');
+  if (!options.quiet) {
+   renderFavoritesList([]);
+   setFavoritesStatus(error.message || 'Favorites unavailable. Please try again.');
+  }
   console.warn(error.message || error);
  }
 }

@@ -1175,98 +1175,24 @@ async function ensureAdminSupportTables() {
     ON CONFLICT (name) DO NOTHING
   `);
 
-  const feedbackCount = await db.query('SELECT COUNT(*)::int AS count FROM admin_feedback');
-  if (!feedbackCount.rows[0]?.count) {
-    await db.query(`
-      INSERT INTO admin_feedback (type, subject, message, submitted_by, related_party, status)
-      VALUES
-        ('complaint', 'Late arrival complaint', 'Provider arrived later than the selected appointment window.', 'Maria Santos', 'Juan Plumbing Services', 'open'),
-        ('feedback', 'Service quality feedback', 'Cleaning service was good but customer requested clearer arrival updates.', 'Ramon Cruz', 'Gina Cleaning Services', 'review')
-    `);
-  }
-
   await backfillUploadedFilesFromDisk();
-  await seedCustomerDemoData();
-  await seedProviderDemoData();
+  await backfillProviderProfileData();
 }
 
-async function seedCustomerDemoData() {
-  const [{ rows: customerRows }, { rows: providerRows }] = await Promise.all([
-    db.query('SELECT id, address FROM customers ORDER BY id ASC LIMIT 1'),
-    db.query('SELECT id, service FROM providers ORDER BY id ASC LIMIT 3'),
-  ]);
-  const customer = customerRows[0];
-  const provider = providerRows[0];
-  if (!customer || !provider) return;
-
-  const bookingCount = await db.query('SELECT COUNT(*)::int AS count FROM customer_bookings WHERE customer_id = $1', [customer.id]);
-  if (!bookingCount.rows[0]?.count) {
-    await db.query(`
-      INSERT INTO customer_bookings (customer_id, provider_id, service, scheduled_date, scheduled_time, address, amount, payment_method, status)
-      VALUES
-        ($1, $2, $3, CURRENT_DATE + INTERVAL '1 day', '10:00 AM', $4, 500, 'cash', 'upcoming'),
-        ($1, $2, $3, CURRENT_DATE - INTERVAL '2 days', '02:30 PM', $4, 650, 'gcash', 'completed'),
-        ($1, $2, $3, CURRENT_DATE, '04:00 PM', $4, 450, 'cash', 'ongoing')
-    `, [customer.id, provider.id, provider.service || 'Home Repair', customer.address || 'Angeles City']);
-  }
-
-  await db.query(`
-    INSERT INTO customer_favorites (customer_id, provider_id)
-    VALUES ($1, $2)
-    ON CONFLICT (customer_id, provider_id) DO NOTHING
-  `, [customer.id, provider.id]);
-
-  const messageCount = await db.query('SELECT COUNT(*)::int AS count FROM customer_messages WHERE customer_id = $1', [customer.id]);
-  if (!messageCount.rows[0]?.count) {
-    await db.query(`
-      INSERT INTO customer_messages (customer_id, provider_id, sender_role, message, is_read)
-      VALUES
-        ($1, $2, 'provider', 'Hello, I received your booking request and can confirm the schedule.', FALSE),
-        ($1, $2, 'customer', 'Thank you. Please bring the needed materials.', TRUE)
-    `, [customer.id, provider.id]);
-  }
-
-  const reviewCount = await db.query('SELECT COUNT(*)::int AS count FROM customer_reviews WHERE customer_id = $1', [customer.id]);
-  if (!reviewCount.rows[0]?.count) {
-    const completedBooking = await db.query(
-      `SELECT id FROM customer_bookings WHERE customer_id = $1 AND status = 'completed' ORDER BY id ASC LIMIT 1`,
-      [customer.id]
-    );
-    await db.query(`
-      INSERT INTO customer_reviews (customer_id, provider_id, booking_id, rating, comment)
-      VALUES ($1, $2, $3, 5, 'Fast service and clear communication.')
-    `, [customer.id, provider.id, completedBooking.rows[0]?.id || null]);
-  }
-}
-
-async function seedProviderDemoData() {
-  const providers = await db.query('SELECT id, category, service, address FROM providers ORDER BY id ASC LIMIT 20');
+async function backfillProviderProfileData() {
+  const providers = await db.query('SELECT * FROM providers ORDER BY id ASC');
   for (const provider of providers.rows) {
-    await db.query(`
-      INSERT INTO provider_services (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, is_active)
-      SELECT $1, $2, $3, $4, 500, 1500, TRUE, TRUE, TRUE
-      WHERE NOT EXISTS (SELECT 1 FROM provider_services WHERE provider_id = $1)
-    `, [
-      provider.id,
-      provider.service || provider.category || 'Home Service',
-      `Available ${provider.service || provider.category || 'service'} near ${provider.address || 'Angeles City'}.`,
-      provider.category || 'General',
-    ]);
-
-    await db.query(`
-      INSERT INTO provider_availability (provider_id, available_date, start_time, end_time, is_available)
-      VALUES
-        ($1, CURRENT_DATE, '09:00 AM', '05:00 PM', TRUE),
-        ($1, CURRENT_DATE + INTERVAL '1 day', '09:00 AM', '05:00 PM', TRUE),
-        ($1, CURRENT_DATE + INTERVAL '2 days', '10:00 AM', '04:00 PM', TRUE)
-      ON CONFLICT (provider_id, available_date, start_time) DO NOTHING
-    `, [provider.id]);
-
+    await ensureProviderProfileService(provider);
     await db.query(`
       INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
-      SELECT $1, $2, 80, 'Skilled Verified'
+      SELECT $1, $2, $3, $4
       WHERE NOT EXISTS (SELECT 1 FROM provider_skill_assessments WHERE provider_id = $1)
-    `, [provider.id, provider.category || 'General']);
+    `, [
+      provider.id,
+      provider.category || 'General',
+      extractAssessmentScore(provider.experience),
+      calculateProviderBadge(extractAssessmentScore(provider.experience), provider.experience_years),
+    ]);
   }
 }
 
@@ -1305,6 +1231,30 @@ async function upsertServiceCategory(name, service = '') {
         ),
         updated_at = NOW()
   `, [categoryName, description, serviceName]);
+}
+
+async function ensureProviderProfileService(provider) {
+  if (!provider?.id) return;
+  const title = String(provider.service || provider.category || '').trim();
+  const category = String(provider.category || 'General').trim();
+  if (!title) return;
+
+  await db.query(`
+    INSERT INTO provider_services
+      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, is_active)
+    SELECT $1, $2, $3, $4, 0, 0, TRUE, TRUE, TRUE
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM provider_services
+      WHERE provider_id = $1 AND lower(title) = lower($2)
+    )
+  `, [
+    provider.id,
+    title,
+    `Available ${title} service near ${provider.address || 'Angeles City'}.`,
+    category,
+  ]);
+  await upsertServiceCategory(category, title);
 }
 
 function feedbackRow(row) {
@@ -2255,6 +2205,31 @@ app.get('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
   res.json({ bookings: result.rows.map(customerBookingRow) });
 }));
 
+app.patch('/api/customer/:id/bookings/:bookingId/cancel', asyncRoute(async (req, res) => {
+  const result = await db.query(`
+    UPDATE customer_bookings
+    SET status = 'cancelled', updated_at = NOW()
+    WHERE customer_id = $1
+      AND id = $2
+      AND status IN ('pending', 'upcoming', 'ongoing')
+    RETURNING *
+  `, [req.params.id, req.params.bookingId]);
+  if (!result.rowCount) {
+    return res.status(404).json({ message: 'Active booking not found or already closed.' });
+  }
+
+  const booking = result.rows[0];
+  await db.query(`
+    UPDATE provider_availability
+    SET is_available = TRUE
+    WHERE provider_id = $1
+      AND available_date = $2
+      AND start_time = $3
+  `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
+
+  res.json({ booking: customerBookingRow(booking) });
+}));
+
 app.get('/api/directions', asyncRoute(async (req, res) => {
   const from_lat = Number(req.query.from_lat);
   const from_lng = Number(req.query.from_lng);
@@ -2455,7 +2430,6 @@ app.post('/api/auth/provider/register', upload.fields([
     'category', 'service', 'experience', 'experienceYears', 'experienceCertification',
   ]);
   await ensureUniqueAccountEmail(req.body.email);
-  await persistRequestUploads(req);
 
   const passwordHash = await buildRegistrationPasswordHash(req);
   const docs = (req.files?.docs || []).map((file) => file.filename);
@@ -2488,11 +2462,12 @@ app.post('/api/auth/provider/register', upload.fields([
 
   const assessmentScore = extractAssessmentScore(req.body.experience);
   const badge = calculateProviderBadge(assessmentScore, req.body.experienceYears);
+  await persistRequestUploads(req, { role: 'provider', id: result.rows[0].id });
   await db.query(`
     INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
     VALUES ($1, $2, $3, $4)
   `, [result.rows[0].id, req.body.category || 'General', assessmentScore, badge]);
-  await upsertServiceCategory(req.body.category, req.body.service);
+  await ensureProviderProfileService(result.rows[0]);
 
   res.status(201).json({ user: providerRow(result.rows[0]) });
 }));
@@ -2511,6 +2486,66 @@ app.post('/api/auth/provider/login', asyncRoute(async (req, res) => {
 
 app.get('/api/auth/provider/status/:id', asyncRoute(async (req, res) => {
   const result = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
+  if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
+  res.json({ user: providerRow(result.rows[0]) });
+}));
+
+app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
+  requireFields(req.body, ['full_name', 'contact', 'address', 'category', 'service']);
+  const result = await db.query(`
+    UPDATE providers
+    SET full_name = $2,
+        contact = $3,
+        address = $4,
+        category = $5,
+        service = $6,
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+  `, [
+    req.params.id,
+    String(req.body.full_name || '').trim(),
+    String(req.body.contact || '').trim(),
+    String(req.body.address || '').trim(),
+    String(req.body.category || '').trim(),
+    String(req.body.service || '').trim(),
+  ]);
+  if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
+  await ensureProviderProfileService(result.rows[0]);
+  res.json({ user: providerRow(result.rows[0]) });
+}));
+
+app.patch('/api/provider/:id/credentials', upload.fields([
+  { name: 'docs', maxCount: 10 },
+  { name: 'idFront', maxCount: 1 },
+  { name: 'idBack', maxCount: 1 },
+]), asyncRoute(async (req, res) => {
+  const docs = (req.files?.docs || []).map((file) => file.filename);
+  const idFront = req.files?.idFront?.[0]?.filename || null;
+  const idBack = req.files?.idBack?.[0]?.filename || null;
+  if (!docs.length && !idFront && !idBack) {
+    return res.status(400).json({ message: 'Upload at least one credential file.' });
+  }
+
+  await persistRequestUploads(req, { role: 'provider', id: req.params.id });
+  const result = await db.query(`
+    UPDATE providers
+    SET documents_files = (
+          SELECT ARRAY(
+            SELECT DISTINCT item
+            FROM unnest(COALESCE(documents_files, ARRAY[]::TEXT[]) || $2::TEXT[]) AS item
+            WHERE item <> ''
+            ORDER BY item
+          )
+        ),
+        id_front_file = COALESCE($3, id_front_file),
+        id_back_file = COALESCE($4, id_back_file),
+        is_verified = FALSE,
+        verification_status = 'pending',
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+  `, [req.params.id, docs, idFront, idBack]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
   res.json({ user: providerRow(result.rows[0]) });
 }));
@@ -2997,6 +3032,37 @@ app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
   res.status(201).json({ availability: result.rows[0] });
 }));
 
+app.patch('/api/provider/:providerId/availability/:slotId', asyncRoute(async (req, res) => {
+  const result = await db.query(`
+    UPDATE provider_availability
+    SET available_date = COALESCE($3, available_date),
+        start_time = COALESCE($4, start_time),
+        end_time = COALESCE($5, end_time),
+        is_available = COALESCE($6, is_available)
+    WHERE provider_id = $1 AND id = $2
+    RETURNING *
+  `, [
+    req.params.providerId,
+    req.params.slotId,
+    req.body.available_date || null,
+    req.body.start_time || null,
+    req.body.end_time || null,
+    typeof req.body.is_available === 'boolean' ? req.body.is_available : null,
+  ]);
+  if (!result.rowCount) return res.status(404).json({ message: 'Availability slot not found.' });
+  res.json({ availability: result.rows[0] });
+}));
+
+app.delete('/api/provider/:providerId/availability/:slotId', asyncRoute(async (req, res) => {
+  const result = await db.query(`
+    DELETE FROM provider_availability
+    WHERE provider_id = $1 AND id = $2
+    RETURNING id
+  `, [req.params.providerId, req.params.slotId]);
+  if (!result.rowCount) return res.status(404).json({ message: 'Availability slot not found.' });
+  res.json({ ok: true });
+}));
+
 app.patch('/api/provider/:providerId/bookings/:bookingId/status', asyncRoute(async (req, res) => {
   requireFields(req.body, ['status']);
   const status = String(req.body.status).toLowerCase();
@@ -3010,6 +3076,20 @@ app.patch('/api/provider/:providerId/bookings/:bookingId/status', asyncRoute(asy
     RETURNING *
   `, [req.params.providerId, req.params.bookingId, status]);
   if (!result.rowCount) return res.status(404).json({ message: 'Booking not found.' });
+  const booking = result.rows[0];
+  if (status === 'cancelled') {
+    await db.query(`
+      UPDATE provider_availability
+      SET is_available = TRUE
+      WHERE provider_id = $1 AND available_date = $2 AND start_time = $3
+    `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
+  } else if (['upcoming', 'ongoing', 'completed'].includes(status)) {
+    await db.query(`
+      UPDATE provider_availability
+      SET is_available = FALSE
+      WHERE provider_id = $1 AND available_date = $2 AND start_time = $3
+    `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
+  }
   res.json({ booking: providerBookingRow(result.rows[0]) });
 }));
 

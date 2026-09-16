@@ -41,6 +41,13 @@ function snStatusPill(status) {
  return `<span class="sn-status-pill ${value}">${value}</span>`;
 }
 
+function snBookingGroupStatus(status) {
+ const value = String(status || 'pending').toLowerCase();
+ if (value === 'ongoing') return 'in-progress';
+ if (value === 'accepted') return 'upcoming';
+ return value;
+}
+
 async function snSaveCustomerFavorite(customerId, providerId) {
  const response = await fetch(`${CUSTOMER_API_BASE}/api/customer/${customerId}/favorites`, {
   method: 'POST',
@@ -478,8 +485,13 @@ document.addEventListener('click', async (event) => {
 });
 
 function renderCustomerBooking(booking) {
+ const status = String(booking.status || '').toLowerCase();
+ const canCancel = ['pending', 'upcoming', 'ongoing'].includes(status);
+  const cancelButton = canCancel
+  ? `<button class="sn-btn sn-btn-danger" type="button" data-booking-action="cancel" data-booking-id="${snEsc(booking.id)}">Cancel Booking</button>`
+  : '';
  return `
- <div class="sn-booking-group" data-status="${snEsc(booking.status)}" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon">&#128197;</div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(booking.scheduled_time)}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Payment: ${snEsc(booking.payment_method || 'cash')}</span></div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.amount)}</strong><div style="margin:8px 0">${snStatusPill(booking.status)}</div><button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button></div></div></div>
+ <div class="sn-booking-group" data-status="${snEsc(snBookingGroupStatus(booking.status))}" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon">&#128197;</div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(booking.scheduled_time)}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Payment: ${snEsc(booking.payment_method || 'cash')}</span></div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.amount)}</strong><div style="margin:8px 0">${snStatusPill(booking.status)}</div><button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div></div>
  `;
 }
 

@@ -51,6 +51,20 @@
       return `<button class="btn btn-primary" type="button" data-verify-provider="${provider.id}">Verify</button><button class="btn btn-outline" type="button" data-reject-provider="${provider.id}">Decline</button>`;
     }
 
+    function providerUploadUrl(folder, filename) {
+      return `${ADMIN_API_BASE}/uploads/${folder}/${encodeURIComponent(filename)}`;
+    }
+
+    function providerDocumentLinks(provider) {
+      const docs = Array.isArray(provider.documents_files) ? provider.documents_files : [];
+      const links = [
+        provider.id_front_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_front_file)}" target="_blank" rel="noopener noreferrer">Front ID</a>` : '',
+        provider.id_back_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_back_file)}" target="_blank" rel="noopener noreferrer">Back ID</a>` : '',
+        ...docs.map((filename, index) => `<a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">Document ${index + 1}</a>`),
+      ].filter(Boolean);
+      return links.length ? links.join(' ') : 'No file';
+    }
+
     function setProviderMessage(text, type = 'info') {
       providerMessage.textContent = text;
       providerMessage.className = `admin-form-message ${type}`;
@@ -81,6 +95,7 @@
             <strong>${adminEscape(provider.full_name)}</strong>
             <span>${adminEscape(provider.category || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
             <span>Assessment: ${provider.assessment_score ?? 0}% - Experience: ${adminEscape(provider.experience_years || '-')} - Badge: ${adminEscape(provider.badge_status || 'Needs Reassessment')}</span>
+            <span>Uploaded files: ${providerDocumentLinks(provider)}</span>
           </div>
           <div class="admin-actions">
             <span class="status-badge ${status.className}">${status.label}</span>

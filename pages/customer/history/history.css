@@ -220,6 +220,20 @@
 }
 .sn-pill--completed { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
 .sn-pill--cancelled { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+.sn-pill--active { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+
+.sn-history-empty {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  padding: 24px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-align: center;
+}
 
 /* â”€â”€ RIGHT PANEL â”€â”€ */
 .sn-history-right {

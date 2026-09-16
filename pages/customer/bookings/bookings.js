@@ -15,7 +15,9 @@ function bookingEsc(value) {
 }
 
 function todayInputValue() {
- return new Date().toISOString().slice(0, 10);
+ const now = new Date();
+ const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+ return local.toISOString().slice(0, 10);
 }
 
 async function bookingFetch(path, options = {}) {
@@ -106,6 +108,38 @@ function bookingAlert(message, options = {}) {
  document.body.appendChild(modal);
  modal.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => modal.remove()));
  return Promise.resolve(true);
+}
+
+function bookingConfirm(message, options = {}) {
+ const modal = document.createElement('div');
+ modal.className = `sn-modal sn-modal--${options.type || 'warning'}`;
+ modal.innerHTML = `
+  <div class="sn-modal-card">
+   <button type="button" class="sn-modal-close" aria-label="Close">x</button>
+   <div class="sn-modal-icon sn-modal-icon--${options.type || 'warning'}">!</div>
+   <h3 class="sn-modal-title">${bookingEsc(options.title || 'Confirm action')}</h3>
+   <p class="sn-modal-body">${bookingEsc(message)}</p>
+   <div class="sn-modal-actions">
+    <button class="btn btn-outline" type="button" data-confirm="no">Keep Booking</button>
+    <button class="btn btn-primary" type="button" data-confirm="yes">${bookingEsc(options.confirmText || 'Confirm')}</button>
+   </div>
+  </div>
+ `;
+ document.body.appendChild(modal);
+ document.body.classList.add('sn-modal-open');
+ return new Promise((resolve) => {
+  function finish(value) {
+   modal.remove();
+   document.body.classList.remove('sn-modal-open');
+   resolve(value);
+  }
+  modal.querySelector('.sn-modal-close')?.addEventListener('click', () => finish(false));
+  modal.querySelector('[data-confirm="no"]')?.addEventListener('click', () => finish(false));
+  modal.querySelector('[data-confirm="yes"]')?.addEventListener('click', () => finish(true));
+  modal.addEventListener('click', (event) => {
+   if (event.target === modal) finish(false);
+  });
+ });
 }
 
 function bookingFriendlyError(message) {
@@ -366,6 +400,13 @@ function setupBookingActions() {
 
  document.addEventListener('sn:customer-bookings-rendered', renderBookingCalendar);
  document.addEventListener('click', (event) => {
+  const cancelButton = event.target.closest('[data-booking-action="cancel"]');
+  if (cancelButton) {
+   event.preventDefault();
+   cancelCustomerBooking(cancelButton.dataset.bookingId, cancelButton);
+   return;
+  }
+
   const detailButton = event.target.closest('[data-booking-action="details"], .sn-booking-actions .sn-btn-outline');
   if (detailButton && detailButton.textContent.trim().toLowerCase().includes('view details')) {
    event.preventDefault();
@@ -379,8 +420,37 @@ function setupBookingActions() {
    const booking = getStoredBookingById(calendarEvent.dataset.bookingId)
     || allVisibleBookings().find(item => String(item.id || '') === String(calendarEvent.dataset.bookingId));
    showBookingDetails(booking);
-  }
+ }
+});
+}
+
+async function cancelCustomerBooking(bookingId, button) {
+ const customer = getCurrentCustomer();
+ if (!customer?.id || !bookingId) return;
+ const confirmed = await bookingConfirm('This will cancel your booking and reopen the provider schedule slot.', {
+  title: 'Cancel booking?',
+  confirmText: 'Cancel Booking',
+  type: 'warning',
  });
+ if (!confirmed) return;
+ const originalText = button?.textContent || 'Cancel Booking';
+ if (button) {
+  button.disabled = true;
+  button.textContent = 'Cancelling...';
+ }
+ try {
+  await bookingFetch(`/api/customer/${customer.id}/bookings/${bookingId}/cancel`, { method: 'PATCH' });
+  window.location.reload();
+ } catch (error) {
+  if (button) {
+   button.disabled = false;
+   button.textContent = originalText;
+  }
+  await bookingAlert(bookingFriendlyError(error.message), {
+   title: 'Booking Not Cancelled',
+   type: 'warning',
+  });
+ }
 }
 
 async function renderBookingRequestForm(customer) {
@@ -629,6 +699,10 @@ document.addEventListener('DOMContentLoaded', async () => {
  if (!currentCustomer) {
  window.location.href = '../../auth/customerLogin.html';
  return;
+ }
+ const bookingsHost = document.getElementById('sn-bookings');
+ if (bookingsHost && !window.snCustomerBookings) {
+ bookingsHost.innerHTML = '<div class="sn-customer-card"><p>Loading your bookings...</p></div>';
  }
 
  // Re-fetch fresh verification status from API

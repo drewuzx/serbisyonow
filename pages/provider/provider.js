@@ -48,6 +48,16 @@ async function providerSend(path, method, body) {
   return data;
 }
 
+async function providerSendForm(path, method, body) {
+  const response = await fetch(`${PROVIDER_API_BASE}${path}`, {
+    method,
+    body,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || 'Request failed.');
+  return data;
+}
+
 async function getAvailableServiceCategories() {
   try {
     const data = await providerGet('/api/categories');
@@ -375,6 +385,10 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
 
 document.addEventListener('DOMContentLoaded', () => {
   const provider = getProviderUser();
+  if (!provider?.id) {
+    window.location.href = '../../auth/providerLogin.html';
+    return;
+  }
   const userName = document.getElementById('sn-user-name');
   const userStatus = document.getElementById('sn-user-status');
   const shell = document.querySelector('.sn-shell');
@@ -805,10 +819,10 @@ function renderServices(services) {
         <strong style="display:block;text-align:right;color:#005cab">Price: ${money(service.starting_price)} - ${money(service.max_price)}</strong>
         <div class="sn-provider-payment-row">
           <span>Payment Options</span>
-          <label><input type="checkbox" ${service.accepts_cash ? 'checked' : ''}> Cash</label>
-          <label><input type="checkbox" ${service.accepts_gcash ? 'checked' : ''}> GCash / QR</label>
-          <label><input type="checkbox" ${service.accepts_other ? 'checked' : ''}> Other</label>
-          <span style="margin-left:auto">On / Off Service:</span><span class="sn-provider-toggle"></span>
+          <label><input type="checkbox" data-service-field="accepts_cash" ${service.accepts_cash ? 'checked' : ''}> Cash</label>
+          <label><input type="checkbox" data-service-field="accepts_gcash" ${service.accepts_gcash ? 'checked' : ''}> GCash / QR</label>
+          <label><input type="checkbox" data-service-field="accepts_other" ${service.accepts_other ? 'checked' : ''}> Other</label>
+          <span style="margin-left:auto">On / Off Service:</span><label class="sn-provider-switch"><input type="checkbox" data-service-field="is_active" ${service.is_active ? 'checked' : ''}><span class="sn-provider-toggle"></span></label>
         </div>
       </article>
     `).join('') || '<article class="sn-provider-service-card"><p>No services listed yet.</p></article>'}
@@ -825,6 +839,33 @@ function renderServices(services) {
   host.querySelectorAll('[data-action="remove-service"]').forEach((button) => {
     button.addEventListener('click', () => removeService(button.closest('[data-service-id]')?.dataset.serviceId));
   });
+  host.querySelectorAll('[data-service-field]').forEach((input) => {
+    input.addEventListener('change', () => updateServiceField(
+      input.closest('[data-service-id]')?.dataset.serviceId,
+      input.dataset.serviceField,
+      input.checked,
+      input,
+    ));
+  });
+}
+
+async function updateServiceField(serviceId, field, value, input) {
+  const provider = getProviderUser();
+  if (!provider?.id || !serviceId || !field) return;
+  input.disabled = true;
+  try {
+    await providerSend(`/api/provider/${provider.id}/services/${serviceId}`, 'PATCH', { [field]: value });
+    loadProviderDatabase();
+  } catch (error) {
+    input.checked = !value;
+    await openProviderModal({
+      title: 'Service not updated',
+      message: error.message || 'Unable to update this service option.',
+      confirmText: 'OK',
+    });
+  } finally {
+    input.disabled = false;
+  }
 }
 
 async function saveService(service) {
@@ -1444,17 +1485,186 @@ async function closeCompletedBooking(bookingId, bookingCard = null) {
   loadProviderDatabase();
 }
 
+function providerDateInputValue(value = new Date()) {
+  const localInputDate = (date) => {
+    const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 10);
+  };
+  if (!value) return localInputDate(new Date());
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? localInputDate(new Date()) : localInputDate(date);
+}
+
+function setScheduleStatus(message, type = 'info') {
+  const status = document.getElementById('sn-provider-schedule-status');
+  if (!status) return;
+  status.textContent = message;
+  status.hidden = false;
+  status.className = `sn-profile-status sn-profile-status--${type}`;
+}
+
 function renderSchedule(availability, bookings) {
   const grid = document.querySelector('.sn-page-grid');
   if (!grid) return;
+  const today = providerDateInputValue();
+  const activeBookings = (bookings || [])
+    .filter((booking) => !['completed', 'cancelled'].includes(String(booking.status || '').toLowerCase()))
+    .slice(0, 8);
+  const slots = [...(availability || [])].sort((a, b) => {
+    const dateSort = String(a.available_date || '').localeCompare(String(b.available_date || ''));
+    if (dateSort) return dateSort;
+    return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+  });
+
   grid.innerHTML = `
-    <article class="sn-panel"><h3>Appointments</h3><div class="sn-panel-list">${bookings.slice(0, 6).map(booking => `
-      <div class="sn-module-card"><div><strong>${booking.scheduled_time}</strong><span>${booking.service} - ${booking.customer_name || 'Customer'} - ${shortDate(booking.scheduled_date)}</span></div>${statusPill(booking.status)}</div>
-    `).join('') || '<p>No bookings yet.</p>'}</div></article>
-    <article class="sn-panel"><h3>Availability</h3><div class="sn-panel-list">${availability.map(slot => `
-      <div class="sn-module-card"><div><strong>${shortDate(slot.available_date)}</strong><span>${slot.start_time} - ${slot.end_time}</span></div>${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Booked</span>'}</div>
-    `).join('') || '<p>No available slots.</p>'}</div></article>
+    <article class="sn-panel sn-schedule-create-panel">
+      <h3>Add Availability</h3>
+      <form id="sn-provider-availability-form" class="sn-form-grid sn-schedule-form">
+        <div class="sn-form-field">
+          <label for="sn-availability-date">Date</label>
+          <input id="sn-availability-date" name="available_date" type="date" min="${today}" value="${today}" required />
+        </div>
+        <div class="sn-form-field">
+          <label for="sn-availability-start">Start Time</label>
+          <input id="sn-availability-start" name="start_time" type="time" required />
+        </div>
+        <div class="sn-form-field">
+          <label for="sn-availability-end">End Time</label>
+          <input id="sn-availability-end" name="end_time" type="time" required />
+        </div>
+        <label class="sn-schedule-check">
+          <input id="sn-availability-open" name="is_available" type="checkbox" checked />
+          <span>Open for customer booking</span>
+        </label>
+        <div class="sn-actions-row full">
+          <button class="btn btn-primary" type="submit">Save Availability</button>
+        </div>
+      </form>
+      <p class="sn-profile-status" id="sn-provider-schedule-status" hidden></p>
+    </article>
+    <article class="sn-panel">
+      <h3>Appointments</h3>
+      <div class="sn-panel-list">${activeBookings.map(booking => `
+        <div class="sn-module-card">
+          <div>
+            <strong>${esc(booking.scheduled_time || '-')}</strong>
+            <span>${esc(booking.service || 'Service')} - ${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)}</span>
+          </div>
+          ${statusPill(booking.status)}
+        </div>
+      `).join('') || '<p>No active bookings yet.</p>'}</div>
+    </article>
+    <article class="sn-panel sn-schedule-slots-panel">
+      <h3>Availability Slots</h3>
+      <div class="sn-panel-list">${slots.map(slot => `
+        <div class="sn-module-card sn-schedule-slot" data-slot-id="${esc(slot.id)}">
+          <div>
+            <strong>${shortDate(slot.available_date)}</strong>
+            <span>${esc(slot.start_time || '-')} - ${esc(slot.end_time || '-')}</span>
+          </div>
+          <div class="sn-schedule-slot-actions">
+            ${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Closed</span>'}
+            <button class="btn btn-outline btn-sm" type="button" data-schedule-action="toggle" data-next-state="${slot.is_available ? 'false' : 'true'}">${slot.is_available ? 'Close' : 'Reopen'}</button>
+            <button class="btn btn-danger btn-sm" type="button" data-schedule-action="delete">Delete</button>
+          </div>
+        </div>
+      `).join('') || '<p>No availability slots yet. Add one so customers can book you.</p>'}</div>
+    </article>
   `;
+
+  document.getElementById('sn-provider-availability-form')?.addEventListener('submit', saveAvailabilitySlot);
+  grid.querySelectorAll('[data-schedule-action="toggle"]').forEach((button) => {
+    button.addEventListener('click', () => updateAvailabilitySlot(
+      button.closest('[data-slot-id]')?.dataset.slotId,
+      button.dataset.nextState === 'true',
+      button,
+    ));
+  });
+  grid.querySelectorAll('[data-schedule-action="delete"]').forEach((button) => {
+    button.addEventListener('click', () => removeAvailabilitySlot(button.closest('[data-slot-id]')?.dataset.slotId));
+  });
+
+  const addButton = document.querySelector('.sn-topbar-right .btn');
+  if (addButton) {
+    addButton.type = 'button';
+    addButton.onclick = () => {
+      document.querySelector('.sn-schedule-create-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('sn-availability-date')?.focus();
+    };
+  }
+}
+
+async function saveAvailabilitySlot(event) {
+  event.preventDefault();
+  const provider = getProviderUser();
+  if (!provider?.id) return;
+  const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  const formData = new FormData(form);
+  const startTime = formData.get('start_time');
+  const endTime = formData.get('end_time');
+  if (startTime && endTime && String(endTime) <= String(startTime)) {
+    setScheduleStatus('End time must be later than start time.', 'error');
+    return;
+  }
+
+  const body = {
+    available_date: formData.get('available_date'),
+    start_time: startTime,
+    end_time: endTime,
+    is_available: formData.get('is_available') === 'on',
+  };
+
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Saving...';
+  }
+  try {
+    await providerSend(`/api/provider/${provider.id}/availability`, 'POST', body);
+    setScheduleStatus('Availability saved.', 'success');
+    await loadProviderDatabase();
+  } catch (error) {
+    setScheduleStatus(error.message || 'Unable to save availability.', 'error');
+  } finally {
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Save Availability';
+    }
+  }
+}
+
+async function updateAvailabilitySlot(slotId, isAvailable, button) {
+  const provider = getProviderUser();
+  if (!provider?.id || !slotId) return;
+  if (button) button.disabled = true;
+  try {
+    await providerSend(`/api/provider/${provider.id}/availability/${slotId}`, 'PATCH', { is_available: isAvailable });
+    await loadProviderDatabase();
+  } catch (error) {
+    await openProviderModal({
+      title: 'Schedule not updated',
+      message: error.message || 'Unable to update this availability slot.',
+      confirmText: 'OK',
+    });
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function removeAvailabilitySlot(slotId) {
+  const provider = getProviderUser();
+  if (!provider?.id || !slotId) return;
+  const confirmed = await openProviderModal({
+    title: 'Delete availability',
+    message: 'Customers will no longer be able to choose this time slot.',
+    confirmText: 'Delete',
+    danger: true,
+  });
+  if (!confirmed) return;
+  await providerSend(`/api/provider/${provider.id}/availability/${slotId}`, 'DELETE');
+  loadProviderDatabase();
 }
 
 function renderInbox(messages) {
@@ -1802,20 +2012,130 @@ function renderProfile(provider, metrics) {
   const locationLabel = provider.latitude && provider.longitude
     ? `${Number(provider.latitude).toFixed(6)}, ${Number(provider.longitude).toFixed(6)}${accuracyLabel}${updatedLabel}`
     : 'GPS location not saved yet';
+  const documentLinks = renderProviderCredentialLinks(provider);
   panel.innerHTML = `
     <h2>Provider Information</h2>
     <div class="sn-form-grid">
-      <div class="sn-form-field"><label>Business or Display Name</label><input value="${provider.full_name || ''}" /></div>
-      <div class="sn-form-field"><label>Contact Number</label><input value="${provider.contact || ''}" /></div>
-      <div class="sn-form-field"><label>Primary Category</label><input value="${provider.category || ''}" /></div>
-      <div class="sn-form-field"><label>Verification Badge</label><input value="${metrics?.badge_status || provider.verification_status || ''}" /></div>
-      <div class="sn-form-field full"><label>Address</label><textarea>${provider.address || ''}</textarea></div>
+      <div class="sn-form-field"><label>Business or Display Name</label><input id="sn-provider-full-name" value="${esc(provider.full_name || '')}" /></div>
+      <div class="sn-form-field"><label>Contact Number</label><input id="sn-provider-contact" value="${esc(provider.contact || '')}" /></div>
+      <div class="sn-form-field"><label>Primary Category</label><input id="sn-provider-category" value="${esc(provider.category || '')}" /></div>
+      <div class="sn-form-field"><label>Main Service</label><input id="sn-provider-service" value="${esc(provider.service || '')}" /></div>
+      <div class="sn-form-field"><label>Verification Badge</label><input value="${esc(metrics?.badge_status || provider.verification_status || '')}" readonly /></div>
+      <div class="sn-form-field"><label>Supporting Documents</label><input id="sn-provider-docs" type="file" multiple accept="image/*,.pdf,.doc,.docx" /></div>
+      <div class="sn-form-field"><label>Front of ID</label><input id="sn-provider-id-front" type="file" accept="image/*,.pdf" /></div>
+      <div class="sn-form-field"><label>Back of ID</label><input id="sn-provider-id-back" type="file" accept="image/*,.pdf" /></div>
+      <div class="sn-form-field full"><label>Address</label><textarea id="sn-provider-address">${esc(provider.address || '')}</textarea></div>
       <div class="sn-form-field full"><label>GPS Service Location</label><input id="sn-provider-gps-label" value="${esc(locationLabel)}" readonly /></div>
     </div>
-    <div class="sn-actions-row"><button class="btn btn-primary">Save Profile</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button><button class="btn btn-outline">Upload Credentials</button></div>
+    <div class="sn-provider-documents">${documentLinks}</div>
+    <p class="sn-profile-status" id="sn-provider-profile-status" hidden></p>
+    <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-save-profile" type="button">Save Profile</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button><button class="btn btn-outline" id="sn-provider-upload-credentials" type="button">Upload Credentials</button></div>
   `;
+  document.getElementById('sn-provider-save-profile')?.addEventListener('click', saveProviderProfile);
   document.getElementById('sn-provider-save-gps')?.addEventListener('click', saveProviderGpsLocation);
   document.getElementById('sn-provider-live-gps')?.addEventListener('click', toggleProviderLiveTracking);
+  document.getElementById('sn-provider-upload-credentials')?.addEventListener('click', uploadProviderCredentials);
+}
+
+function providerUploadUrl(folder, filename) {
+  return `${PROVIDER_API_BASE}/uploads/${folder}/${encodeURIComponent(filename)}`;
+}
+
+function renderProviderCredentialLinks(provider) {
+  const docs = Array.isArray(provider.documents_files) ? provider.documents_files : [];
+  const links = [
+    ...docs.map((filename, index) => `<a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">Document ${index + 1}</a>`),
+    provider.id_front_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_front_file)}" target="_blank" rel="noopener noreferrer">Front ID</a>` : '',
+    provider.id_back_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_back_file)}" target="_blank" rel="noopener noreferrer">Back ID</a>` : '',
+  ].filter(Boolean);
+  return links.length
+    ? `<strong>Uploaded Credentials</strong><div>${links.join('')}</div>`
+    : '<strong>Uploaded Credentials</strong><span>No credential files uploaded yet.</span>';
+}
+
+function setProviderProfileStatus(message, type = 'info') {
+  const status = document.getElementById('sn-provider-profile-status');
+  if (!status) return;
+  status.textContent = message;
+  status.className = `sn-profile-status sn-profile-status--${type}`;
+  status.hidden = !message;
+}
+
+async function saveProviderProfile() {
+  const provider = getProviderUser();
+  if (!provider?.id) return;
+  const button = document.getElementById('sn-provider-save-profile');
+  const body = {
+    full_name: document.getElementById('sn-provider-full-name')?.value.trim() || '',
+    contact: document.getElementById('sn-provider-contact')?.value.trim() || '',
+    category: document.getElementById('sn-provider-category')?.value.trim() || '',
+    service: document.getElementById('sn-provider-service')?.value.trim() || '',
+    address: document.getElementById('sn-provider-address')?.value.trim() || '',
+  };
+  if (Object.values(body).some((value) => !value)) {
+    setProviderProfileStatus('Please complete display name, contact, category, service, and address.', 'error');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Saving...';
+  }
+  try {
+    const data = await providerSend(`/api/provider/${provider.id}/profile`, 'PATCH', body);
+    localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    const userName = document.getElementById('sn-user-name');
+    if (userName) userName.textContent = data.user.full_name || 'Service Provider';
+    setProviderProfileStatus('Profile saved successfully.', 'success');
+  } catch (error) {
+    setProviderProfileStatus(error.message || 'Unable to save provider profile.', 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Save Profile';
+    }
+  }
+}
+
+async function uploadProviderCredentials() {
+  const provider = getProviderUser();
+  if (!provider?.id) return;
+  const docsInput = document.getElementById('sn-provider-docs');
+  const frontInput = document.getElementById('sn-provider-id-front');
+  const backInput = document.getElementById('sn-provider-id-back');
+  const files = [
+    ...(docsInput?.files || []),
+    ...(frontInput?.files || []),
+    ...(backInput?.files || []),
+  ];
+  if (!files.length) {
+    setProviderProfileStatus('Choose at least one document or ID image before uploading.', 'error');
+    return;
+  }
+
+  const button = document.getElementById('sn-provider-upload-credentials');
+  const form = new FormData();
+  Array.from(docsInput?.files || []).forEach((file) => form.append('docs', file));
+  if (frontInput?.files?.[0]) form.append('idFront', frontInput.files[0]);
+  if (backInput?.files?.[0]) form.append('idBack', backInput.files[0]);
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Uploading...';
+  }
+  try {
+    const data = await providerSendForm(`/api/provider/${provider.id}/credentials`, 'PATCH', form);
+    localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    await loadProviderDatabase();
+    setProviderProfileStatus('Credentials uploaded. Your verification is back under admin review.', 'success');
+  } catch (error) {
+    setProviderProfileStatus(error.message || 'Unable to upload credentials.', 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Upload Credentials';
+    }
+  }
 }
 
 async function saveProviderCoordinates(coords, label, suffix = '') {
