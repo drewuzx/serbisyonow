@@ -21,6 +21,12 @@ API_PUBLIC_BASE_URL=https://your-serbisyonow-domain.onrender.com
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI=https://your-serbisyonow-domain.onrender.com/api/auth/google/callback
+PASSWORD_RESET_TTL_MINUTES=60
+ALLOW_RESET_LINK_IN_RESPONSE=false
+GMAIL_API_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GMAIL_API_CLIENT_SECRET=your-google-client-secret
+GMAIL_API_REFRESH_TOKEN=your-gmail-api-refresh-token
+GMAIL_API_FROM=SerbisyoNow <your-gmail@gmail.com>
 ```
 
 ## Google OAuth
@@ -36,6 +42,28 @@ If you keep testing locally, also keep this local redirect URI:
 ```txt
 http://localhost:3000/api/auth/google/callback
 ```
+
+## Forgot Password Email
+
+Render Free blocks SMTP ports, so Gmail SMTP will not work reliably on the live site. Use Gmail API instead.
+
+1. In Google Cloud Console, enable the Gmail API for the same project.
+2. Create a Gmail API refresh token with this scope:
+
+```txt
+https://www.googleapis.com/auth/gmail.send
+```
+
+3. Add these Render environment variables:
+
+```txt
+GMAIL_API_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GMAIL_API_CLIENT_SECRET=your-google-client-secret
+GMAIL_API_REFRESH_TOKEN=your-gmail-api-refresh-token
+GMAIL_API_FROM=SerbisyoNow <your-gmail@gmail.com>
+```
+
+`GMAIL_API_FROM` should use the Gmail account that created the refresh token.
 
 ## Deploy Commands
 

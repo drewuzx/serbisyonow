@@ -271,6 +271,49 @@ function smtpConfig() {
   };
 }
 
+function resendConfig() {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
+  const from = String(process.env.RESEND_FROM || process.env.SMTP_FROM || 'SerbisyoNow <onboarding@resend.dev>').trim();
+  return {
+    apiKey,
+    from,
+    configured: Boolean(apiKey && from),
+  };
+}
+
+function brevoConfig() {
+  const apiKey = String(process.env.BREVO_API_KEY || '').trim();
+  const senderEmail = String(process.env.BREVO_SENDER_EMAIL || '').trim();
+  const senderName = String(process.env.BREVO_SENDER_NAME || 'SerbisyoNow').trim();
+  return {
+    apiKey,
+    senderEmail,
+    senderName,
+    configured: Boolean(apiKey && senderEmail),
+  };
+}
+
+function gmailApiConfig() {
+  const clientId = String(process.env.GMAIL_API_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = String(process.env.GMAIL_API_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  const refreshToken = String(process.env.GMAIL_API_REFRESH_TOKEN || '').trim();
+  const from = String(process.env.GMAIL_API_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
+  return {
+    clientId,
+    clientSecret,
+    refreshToken,
+    from,
+    configured: Boolean(clientId && clientSecret && refreshToken && from),
+  };
+}
+
+function emailDeliveryConfigured() {
+  return gmailApiConfig().configured
+    || brevoConfig().configured
+    || resendConfig().configured
+    || smtpConfig().configured;
+}
+
 function smtpTimeoutMs(name, fallback) {
   const value = Number(process.env[name] || fallback);
   return Number.isFinite(value) && value >= 3000 ? value : fallback;
@@ -328,6 +371,51 @@ function publicSmtpError(error) {
   return 'Gmail SMTP failed. Check the Render logs for the SMTP code, then verify SMTP_USER, SMTP_PASS, and SMTP_FROM.';
 }
 
+function publicResendError(status, data) {
+  const message = String(data?.message || data?.error || '').toLowerCase();
+  if (status === 401 || status === 403) {
+    return 'Resend rejected the API key. Check RESEND_API_KEY in Render Environment.';
+  }
+  if (status === 422 && (message.includes('domain') || message.includes('from'))) {
+    return 'Resend rejected the sender. Use a verified sender/domain for RESEND_FROM.';
+  }
+  if (status === 429) {
+    return 'Resend rate limit reached. Wait and try again, or check your Resend account limits.';
+  }
+  return 'Resend email API failed. Check RESEND_API_KEY and RESEND_FROM.';
+}
+
+function publicBrevoError(status, data) {
+  const message = String(data?.message || data?.error || '').toLowerCase();
+  if (status === 401 || status === 403) {
+    return 'Brevo rejected the API key. Check BREVO_API_KEY in Render Environment.';
+  }
+  if (status === 400 && (message.includes('sender') || message.includes('from'))) {
+    return 'Brevo rejected the sender. Verify BREVO_SENDER_EMAIL in Brevo, then try again.';
+  }
+  if (status === 429) {
+    return 'Brevo rate limit reached. Wait and try again, or check your Brevo free daily limit.';
+  }
+  return 'Brevo email API failed. Check BREVO_API_KEY and BREVO_SENDER_EMAIL.';
+}
+
+function publicGmailApiError(status, data, phase = 'send') {
+  const message = String(data?.error_description || data?.error?.message || data?.error || '').toLowerCase();
+  if (message.includes('invalid_grant')) {
+    return 'Google rejected the Gmail API refresh token. Create a new refresh token with the Gmail send scope, then redeploy.';
+  }
+  if (status === 400 && phase === 'token') {
+    return 'Google rejected the Gmail API token request. Check GMAIL_API_CLIENT_ID, GMAIL_API_CLIENT_SECRET, and GMAIL_API_REFRESH_TOKEN.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Gmail API permission failed. Enable Gmail API and use a refresh token created with the gmail.send scope.';
+  }
+  if (status === 429) {
+    return 'Gmail API sending limit reached. Wait and try again later.';
+  }
+  return 'Gmail API email failed. Check the Gmail API env vars and Render logs.';
+}
+
 function isEmailLike(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 }
@@ -337,21 +425,10 @@ function passwordResetUrl(req, token) {
   return `${base}/pages/auth/resetPassword.html?token=${encodeURIComponent(token)}`;
 }
 
-async function sendPasswordResetEmail({ to, role, resetUrl }) {
-  const config = smtpConfig();
-  if (!config.configured) return { sent: false, reason: 'not_configured' };
-
-  let nodemailer;
-  try {
-    nodemailer = require('nodemailer');
-  } catch (error) {
-    error.message = 'Email sending needs nodemailer installed. Run npm install and redeploy.';
-    throw error;
-  }
-
+function passwordResetEmailMessage({ from, to, role, resetUrl }) {
   const accountLabel = role === 'provider' ? 'provider' : 'customer';
-  const message = {
-    from: config.from,
+  return {
+    from,
     to,
     subject: 'Reset your SerbisyoNow password',
     text: [
@@ -369,6 +446,203 @@ async function sendPasswordResetEmail({ to, role, resetUrl }) {
       <p>If you did not request this, you can ignore this email.</p>
     `,
   };
+}
+
+function cleanEmailHeader(value) {
+  return String(value || '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+function base64UrlEncode(value) {
+  return Buffer.from(String(value || ''), 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function gmailRawMessage(message) {
+  const boundary = `serbisyonow_${crypto.randomBytes(12).toString('hex')}`;
+  const headers = [
+    `From: ${cleanEmailHeader(message.from)}`,
+    `To: ${cleanEmailHeader(message.to)}`,
+    `Subject: ${cleanEmailHeader(message.subject)}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ];
+
+  const body = [
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    message.text,
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    message.html,
+    `--${boundary}--`,
+    '',
+  ];
+
+  return base64UrlEncode([...headers, '', ...body].join('\r\n'));
+}
+
+async function gmailApiAccessToken(config) {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      refresh_token: config.refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    const error = new Error(data.error_description || data.error || 'Gmail API token request failed.');
+    error.code = 'GMAIL_API_TOKEN_ERROR';
+    error.responseCode = response.status;
+    error.publicMessage = publicGmailApiError(response.status, data, 'token');
+    throw error;
+  }
+
+  return data.access_token;
+}
+
+async function sendPasswordResetWithGmailApi({ to, role, resetUrl }) {
+  const config = gmailApiConfig();
+  if (!config.configured) return { sent: false, reason: 'gmail_api_not_configured' };
+
+  const message = passwordResetEmailMessage({
+    from: config.from,
+    to,
+    role,
+    resetUrl,
+  });
+
+  const accessToken = await gmailApiAccessToken(config);
+  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw: gmailRawMessage(message) }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || data.error || 'Gmail API send failed.');
+    error.code = 'GMAIL_API_SEND_ERROR';
+    error.responseCode = response.status;
+    error.publicMessage = publicGmailApiError(response.status, data, 'send');
+    throw error;
+  }
+
+  return { sent: true, provider: 'gmail_api', id: data.id || null };
+}
+
+async function sendPasswordResetWithResend({ to, role, resetUrl }) {
+  const config = resendConfig();
+  if (!config.configured) return { sent: false, reason: 'resend_not_configured' };
+
+  const message = passwordResetEmailMessage({
+    from: config.from,
+    to,
+    role,
+    resetUrl,
+  });
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: message.from,
+      to: [message.to],
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.message || data.error || 'Resend email API failed.');
+    error.code = 'RESEND_API_ERROR';
+    error.responseCode = response.status;
+    error.publicMessage = publicResendError(response.status, data);
+    throw error;
+  }
+
+  return { sent: true, provider: 'resend', id: data.id || null };
+}
+
+async function sendPasswordResetWithBrevo({ to, role, resetUrl }) {
+  const config = brevoConfig();
+  if (!config.configured) return { sent: false, reason: 'brevo_not_configured' };
+
+  const message = passwordResetEmailMessage({
+    from: `${config.senderName} <${config.senderEmail}>`,
+    to,
+    role,
+    resetUrl,
+  });
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'api-key': config.apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: {
+        name: config.senderName,
+        email: config.senderEmail,
+      },
+      to: [{ email: message.to }],
+      subject: message.subject,
+      htmlContent: message.html,
+      textContent: message.text,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.message || data.error || 'Brevo email API failed.');
+    error.code = 'BREVO_API_ERROR';
+    error.responseCode = response.status;
+    error.publicMessage = publicBrevoError(response.status, data);
+    throw error;
+  }
+
+  return { sent: true, provider: 'brevo', id: data.messageId || null };
+}
+
+async function sendPasswordResetWithSmtp({ to, role, resetUrl }) {
+  const config = smtpConfig();
+  if (!config.configured) return { sent: false, reason: 'smtp_not_configured' };
+
+  let nodemailer;
+  try {
+    nodemailer = require('nodemailer');
+  } catch (error) {
+    error.message = 'Email sending needs nodemailer installed. Run npm install and redeploy.';
+    throw error;
+  }
+
+  const message = passwordResetEmailMessage({
+    from: config.from,
+    to,
+    role,
+    resetUrl,
+  });
 
   let lastError;
   for (const options of smtpFallbackOptions(config)) {
@@ -389,6 +663,14 @@ async function sendPasswordResetEmail({ to, role, resetUrl }) {
   }
 
   return { sent: false };
+}
+
+async function sendPasswordResetEmail(args) {
+  if (gmailApiConfig().configured) return sendPasswordResetWithGmailApi(args);
+  if (brevoConfig().configured) return sendPasswordResetWithBrevo(args);
+  if (resendConfig().configured) return sendPasswordResetWithResend(args);
+  if (smtpConfig().configured) return sendPasswordResetWithSmtp(args);
+  return { sent: false, reason: 'not_configured' };
 }
 
 function clampScore(value) {
@@ -1370,7 +1652,7 @@ app.post('/api/auth/password-reset/request', asyncRoute(async (req, res) => {
     return res.status(400).json({ message: 'Please enter a valid email address.', field: 'email' });
   }
 
-  const mailReady = smtpConfig().configured;
+  const mailReady = emailDeliveryConfigured();
   const exposeResetLink = canExposeResetLink(req);
   if (!mailReady && !exposeResetLink) {
     return res.status(503).json({
