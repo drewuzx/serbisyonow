@@ -220,3 +220,50 @@
   .admin-inline-form { grid-template-columns: 1fr; }
   .admin-confirm-actions { flex-direction: column-reverse; }
 }
+
+@media (max-width: 640px) {
+  .admin-module-nav {
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin-inline: -2px;
+    padding: 8px;
+    overflow-x: auto;
+    border-radius: 18px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .admin-module-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-module-nav a {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+
+  .admin-list-item {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .admin-actions {
+    width: 100%;
+  }
+
+  .admin-actions .btn,
+  .admin-actions .status-badge,
+  .admin-actions .pill {
+    flex: 1 1 130px;
+    justify-content: center;
+  }
+
+  .admin-chart-row {
+    grid-template-columns: 1fr 48px;
+  }
+
+  .admin-chart-row span {
+    grid-column: 1 / -1;
+  }
+}

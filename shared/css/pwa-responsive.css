@@ -817,6 +817,10 @@ button {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  .admin-wrap .table-wrap {
+    overflow-x: visible;
+  }
 }
 
 @media (max-width: 420px) {

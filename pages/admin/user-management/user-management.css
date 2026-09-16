@@ -171,13 +171,88 @@ td a:hover { text-decoration: underline; }
   .admin-header-actions .btn { width: 100%; }
   .admin-controls { grid-template-columns: 1fr; }
   .admin-panel-head { flex-direction: column; align-items: flex-start; gap: 8px; }
-  table { min-width: 820px; }
+
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  tr {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  tr:hover td {
+    background: transparent;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(104px, 34%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    min-width: 0;
+    border: 0;
+    padding: 9px 0;
+    overflow-wrap: anywhere;
+  }
+
+  td + td {
+    border-top: 1px solid var(--border);
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  td[data-label="Action"] {
+    align-items: center;
+  }
+
+  td[data-label="Action"] .action-group {
+    min-width: 0;
+  }
 }
 @media (max-width: 480px) {
   .admin-wrap { padding: 14px 12px; }
   .admin-panel { padding: 14px; }
   .metrics-grid { grid-template-columns: 1fr; }
   .admin-header h1 { font-size: 1.3rem; }
+  td {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
 }
 /* ── Action Group ── */
 .action-group {

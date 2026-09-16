@@ -115,15 +115,15 @@ function renderRows(users) {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${user.id}</td>
-      <td><span class="role-badge ${role}">${roleLabel}</span></td>
-      <td>${user.full_name}</td>
-      <td>${user.email}</td>
-      <td>${user.contact || '-'}</td>
-      <td>${getAccountDetail(user)}</td>
-      <td>${frontLink}<br>${backLink}</td>
-      <td>${formatDate(user.created_at)}</td>
-      <td>${actionContent}</td>
+      <td data-label="ID">${user.id}</td>
+      <td data-label="User type"><span class="role-badge ${role}">${roleLabel}</span></td>
+      <td data-label="Full name">${user.full_name}</td>
+      <td data-label="Email">${user.email}</td>
+      <td data-label="Contact">${user.contact || '-'}</td>
+      <td data-label="Account detail">${getAccountDetail(user)}</td>
+      <td data-label="Uploaded IDs">${frontLink}<br>${backLink}</td>
+      <td data-label="Created">${formatDate(user.created_at)}</td>
+      <td data-label="Action">${actionContent}</td>
     `;
     body.appendChild(tr);
   });
