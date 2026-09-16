@@ -242,6 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const list = document.getElementById('sn-history-list');
   if (list) list.innerHTML = '<div class="sn-history-empty">Loading booking history...</div>';
+  showHistoryEmpty('Loading history', 'Your completed and cancelled bookings will appear here.');
 
   try {
     const statusData = await historyFetch(`/api/auth/customer/status/${currentCustomer.id}`);

@@ -1,22 +1,171 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Booking History - SerbisyoNow</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="../../../shared/css/variables.css" /><link rel="stylesheet" href="./history.css" /><link rel="stylesheet" href="../customer-module.css" />  <link rel="manifest" href="/manifest.webmanifest" />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booking History - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="./history.css" />
+  <link rel="stylesheet" href="../customer-module.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
   <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
   <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
-</head><body><div class="sn-shell" id="sn-shell"><div class="sn-overlay" id="sn-overlay"></div><!-- Sidebar --><aside class="sn-sidebar" id="sn-sidebar"><div class="sn-brand"><div class="sn-logo"><img src="../../../image_logo/main_logo.svg" alt="SerbisyoNow logo" /></div><div class="sn-brand-text"><div class="sn-brand-name">SerbisyoNow</div></div><button class="sn-hamburger sn-hamburger--brand" id="sn-hamburger" type="button" aria-label="Close menu"><span></span><span></span><span></span></button></div><div class="sn-user-greeting"><div class="sn-avatar-lg"></div><div class="sn-greeting-details"><div class="sn-greeting-label">Welcome,</div><div class="sn-greeting-name" id="sn-user-name">Customer</div><div class="sn-greeting-loc" id="sn-user-status">Angeles City</div></div></div><nav class="sn-nav" aria-label="Sidebar"><a class="sn-nav-item" href="../dashboard/dashboard.html"><span class="sn-ico"></span><span>Home</span></a><a class="sn-nav-item" href="../search/search.html"><span class="sn-ico"></span><span>Search</span></a><a class="sn-nav-item" href="../bookings/bookings.html"><span class="sn-ico"></span><span>Bookings</span></a><a class="sn-nav-item" href="../inbox/inbox.html"><span class="sn-ico"></span><span>Inbox</span></a><a class="sn-nav-item" href="../favorites/favorites.html"><span class="sn-ico">*</span><span>Favorites</span></a><a class="sn-nav-item" href="../reviews/reviews.html"><span class="sn-ico"></span><span>Reviews</span></a><a class="sn-nav-item active" href="./history.html"><span class="sn-ico"></span><span>History</span></a><a class="sn-nav-item" href="../profile/profile.html"><span class="sn-ico"></span><span>Profile</span></a><div class="sn-nav-sep" role="separator"></div><button class="sn-nav-item sn-nav-item--danger" id="sn-logout" type="button"><span class="sn-ico"></span><span>Logout</span></button></nav></aside><!-- Main --><main class="sn-main"><!-- Topbar --><header class="sn-topbar"><button class="sn-hamburger sn-hamburger--top" id="sn-hamburger-top" type="button" aria-label="Open menu"><span></span><span></span><span></span></button><div class="sn-topbar-search"><span class="sn-topbar-search-ico"></span><input id="sn-global-search" type="search" placeholder="Search" /><button class="sn-topbar-pill" type="button" title="Filters"></button></div><div class="sn-topbar-right"><button class="sn-icon-btn" type="button" title="Messages"></button><button class="sn-icon-btn" type="button" title="Notifications">
- <span class="sn-dot"></span></button><div class="sn-avatar" aria-hidden="true"></div></div></header><!-- History Two-Panel Layout --><div class="sn-history-layout"><!-- LEFT PANEL --><div class="sn-history-left"><div class="sn-history-left-header"><h2 class="sn-page-title">Booking History</h2><p class="sn-page-sub">View your past and completed services</p></div>
+</head>
+<body>
+  <div class="sn-shell" id="sn-shell">
+    <div class="sn-overlay" id="sn-overlay"></div>
+    <aside class="sn-sidebar" id="sn-sidebar">
+      <div class="sn-brand">
+        <div class="sn-logo"><img src="../../../image_logo/main_logo.svg" alt="SerbisyoNow logo" /></div>
+        <div class="sn-brand-text"><div class="sn-brand-name">SerbisyoNow</div></div>
+        <button class="sn-hamburger sn-hamburger--brand" id="sn-hamburger" type="button" aria-label="Close menu"><span></span><span></span><span></span></button>
+      </div>
+      <div class="sn-user-greeting">
+        <div class="sn-avatar-lg"></div>
+        <div class="sn-greeting-details">
+          <div class="sn-greeting-label">Welcome,</div>
+          <div class="sn-greeting-name" id="sn-user-name">Customer</div>
+          <div class="sn-greeting-loc" id="sn-user-status">Angeles City</div>
+        </div>
+      </div>
+      <nav class="sn-nav" aria-label="Sidebar">
+        <a class="sn-nav-item" href="../dashboard/dashboard.html"><span class="sn-ico"></span><span>Home</span></a>
+        <a class="sn-nav-item" href="../search/search.html"><span class="sn-ico"></span><span>Search</span></a>
+        <a class="sn-nav-item" href="../bookings/bookings.html"><span class="sn-ico"></span><span>Bookings</span></a>
+        <a class="sn-nav-item" href="../inbox/inbox.html"><span class="sn-ico"></span><span>Inbox</span></a>
+        <a class="sn-nav-item" href="../favorites/favorites.html"><span class="sn-ico">*</span><span>Favorites</span></a>
+        <a class="sn-nav-item" href="../reviews/reviews.html"><span class="sn-ico"></span><span>Reviews</span></a>
+        <a class="sn-nav-item active" href="./history.html"><span class="sn-ico"></span><span>History</span></a>
+        <a class="sn-nav-item" href="../profile/profile.html"><span class="sn-ico"></span><span>Profile</span></a>
+        <div class="sn-nav-sep" role="separator"></div>
+        <button class="sn-nav-item sn-nav-item--danger" id="sn-logout" type="button"><span class="sn-ico"></span><span>Logout</span></button>
+      </nav>
+    </aside>
 
-<div class="sn-history-search-row"><div class="sn-history-search-wrap"><span></span><input type="search" class="sn-history-search" placeholder="Search history..." id="history-search" /></div><button class="sn-history-filter-btn" type="button" title="Filter"></button></div>
+    <main class="sn-main">
+      <header class="sn-topbar">
+        <button class="sn-hamburger sn-hamburger--top" id="sn-hamburger-top" type="button" aria-label="Open menu"><span></span><span></span><span></span></button>
+        <div class="sn-topbar-search">
+          <span class="sn-topbar-search-ico"></span>
+          <input id="sn-global-search" type="search" placeholder="Search" />
+          <button class="sn-topbar-pill" type="button" title="Filters"></button>
+        </div>
+        <div class="sn-topbar-right">
+          <button class="sn-icon-btn" type="button" title="Messages"></button>
+          <button class="sn-icon-btn" type="button" title="Notifications"><span class="sn-dot"></span></button>
+          <div class="sn-avatar" aria-hidden="true"></div>
+        </div>
+      </header>
 
-<!-- Date Sort -->
-<div class="sn-date-sort">
-  <button class="sn-sort-btn" id="sort-asc" data-sort="asc" title="Oldest first">↑ Ascending</button>
-  <button class="sn-sort-btn active" id="sort-desc" data-sort="desc" title="Newest first">↓ Descending</button>
-</div>
+      <div class="sn-history-layout">
+        <div class="sn-history-left">
+          <div class="sn-history-left-header">
+            <h2 class="sn-page-title">Booking History</h2>
+            <p class="sn-page-sub">View your completed and cancelled services</p>
+          </div>
+          <div class="sn-history-search-row">
+            <div class="sn-history-search-wrap">
+              <span></span>
+              <input type="search" class="sn-history-search" placeholder="Search history..." id="history-search" />
+            </div>
+            <button class="sn-history-filter-btn" type="button" title="Filter"></button>
+          </div>
+          <div class="sn-date-sort">
+            <button class="sn-sort-btn" id="sort-asc" data-sort="asc" title="Oldest first">Ascending</button>
+            <button class="sn-sort-btn active" id="sort-desc" data-sort="desc" title="Newest first">Descending</button>
+          </div>
+          <div class="sn-filter-tabs">
+            <button class="sn-filter-tab active" type="button" data-filter="all">All</button>
+            <button class="sn-filter-tab" type="button" data-filter="completed">Completed</button>
+            <button class="sn-filter-tab" type="button" data-filter="cancelled">Cancelled</button>
+          </div>
+          <div class="sn-history-list" id="sn-history-list">
+            <div class="sn-history-empty">Loading booking history...</div>
+          </div>
+        </div>
 
-<div class="sn-filter-tabs"><button class="sn-filter-tab active" type="button" data-filter="all">All</button><button class="sn-filter-tab" type="button" data-filter="completed">Completed</button><button class="sn-filter-tab" type="button" data-filter="cancelled">Cancelled</button></div><div class="sn-history-list" id="sn-history-list"><div class="sn-history-item active" data-id="1" data-status="completed"><div class="sn-hi-avatar sn-hi-avatar--1"></div><div class="sn-hi-info"><div class="sn-hi-name">Juan Plumbing Services</div><div class="sn-hi-meta">Fixed-sink Leak &nbsp;-&nbsp; May 05, 2026</div><div class="sn-hi-amount">Total Amount &nbsp;<strong>PHP 600.00</strong></div></div><span class="sn-status-pill sn-pill--completed">Completed</span></div><div class="sn-history-item" data-id="2" data-status="completed"><div class="sn-hi-avatar sn-hi-avatar--2"></div><div class="sn-hi-info"><div class="sn-hi-name">Jane Nail Services</div><div class="sn-hi-meta">Fixed-sink Leak &nbsp;-&nbsp; May 05, 2026</div><div class="sn-hi-amount">Total Amount &nbsp;<strong>PHP 980.00</strong></div></div><span class="sn-status-pill sn-pill--completed">Completed</span></div><div class="sn-history-item" data-id="3" data-status="completed"><div class="sn-hi-avatar sn-hi-avatar--3"></div><div class="sn-hi-info"><div class="sn-hi-name">Gina Cleaning Services</div><div class="sn-hi-meta">Fixed Sink Leak &nbsp;-&nbsp; May 05, 2026</div><div class="sn-hi-amount">Total Amount &nbsp;<strong>PHP 850.00</strong></div></div><span class="sn-status-pill sn-pill--completed">Completed</span></div><div class="sn-history-item" data-id="4" data-status="cancelled"><div class="sn-hi-avatar sn-hi-avatar--4"></div><div class="sn-hi-info"><div class="sn-hi-name">Melchor Plumbing</div><div class="sn-hi-meta">Fixed Sink Leak &nbsp;-&nbsp; May 05, 2026</div><div class="sn-hi-amount">Total Amount &nbsp;<strong>PHP 600.00</strong></div><div class="sn-hi-reason">Reason: Booked the wrong service</div></div><span class="sn-status-pill sn-pill--cancelled">Cancelled</span></div><div class="sn-history-item" data-id="5" data-status="cancelled"><div class="sn-hi-avatar sn-hi-avatar--5"></div><div class="sn-hi-info"><div class="sn-hi-name">Roland Plumbing Solutions</div><div class="sn-hi-meta">Fixed Sink Leak &nbsp;-&nbsp; May 05, 2026</div><div class="sn-hi-amount">Total Amount &nbsp;<strong>PHP 600.00</strong></div><div class="sn-hi-reason">Reason: Duplicate booking</div></div><span class="sn-status-pill sn-pill--cancelled">Cancelled</span></div></div></div><!-- RIGHT PANEL --><div class="sn-history-right" id="sn-history-right"><div class="sn-detail-panel" id="sn-detail-panel"><!-- Detail Header --><div class="sn-detail-header"><div class="sn-detail-header-left"><div class="sn-detail-avatar sn-hi-avatar--1" id="detail-avatar"></div><div><div class="sn-detail-name" id="detail-provider-name">Juan Plumbing Services</div><div class="sn-detail-sub"><span id="detail-booking-id"> Booking ID: #JBK-10024</span>
- &nbsp;-&nbsp;
- <span id="detail-service-tag">Pipe Repair</span></div></div></div><div class="sn-detail-header-right"><span class="sn-verified-badge" id="detail-verified"> Skilled Verified</span><button class="sn-icon-btn" type="button" title="Message"></button></div></div><!-- Completion Banner --><div class="sn-completion-banner" id="sn-completion-banner"><span class="sn-banner-check"></span><div class="sn-banner-text"><strong id="banner-title">This booking has been completed.</strong><span id="banner-sub">Thank you for using SerbisyoNow!</span></div><button class="sn-banner-close" id="sn-banner-close" type="button">x</button></div><!-- Body --><div class="sn-detail-body"><!-- Booking Details --><div class="sn-detail-section"><div class="sn-detail-section-title">Booking Details</div><div class="sn-detail-rows"><div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Booking Date</span><span class="sn-dr-value" id="detail-date">May 05, 2026 at 9:00 AM</span></div><div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Service</span><span class="sn-dr-value" id="detail-service">Pipe Repair</span></div><div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Address</span><span class="sn-dr-value" id="detail-address">Blk 12 Lot 5, Quezon Street, Balibago Angeles City, Pampanga</span></div><div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Amount</span><span class="sn-dr-value sn-dr-amount" id="detail-amount">PHP 600.00</span></div><div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value" id="detail-payment">Cash</span></div><div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Status</span><span class="sn-dr-value" id="detail-status-badge"></span></div><div class="sn-dr" id="detail-completed-row"><span class="sn-dr-ico"></span><span class="sn-dr-label">Completed At</span><span class="sn-dr-value" id="detail-completed-at">May 05, 2026 at 1:30 PM</span></div><div class="sn-dr sn-dr--hidden" id="detail-reason-row"><span class="sn-dr-ico">x</span><span class="sn-dr-label">Reason</span><span class="sn-dr-value sn-dr-reason" id="detail-reason">-</span></div></div></div><!-- Right Side Cards --><div class="sn-detail-right-col"><div class="sn-provider-info-card"><div class="sn-provider-info-title">Service Provider</div><div class="sn-provider-info-body"><div class="sn-provider-info-avatar sn-hi-avatar--1" id="detail-card-avatar"></div><div><div class="sn-provider-info-name" id="detail-card-name">Juan Plumbing Services</div><div class="sn-provider-info-type">HOME REPAIRS</div><div class="sn-provider-info-rating">* 5.8 <span class="sn-rating-count">(52 reviews)</span></div><button class="sn-btn sn-btn-outline" type="button">View Profile</button></div></div></div><div class="sn-cust-actions"><div class="sn-cust-actions-title">Customer Actions</div><button class="sn-btn sn-btn-primary" type="button"> View Profile</button><button class="sn-btn sn-btn-outline" type="button"> Rebook Service</button><button class="sn-btn sn-btn-outline" type="button"> Message Provider</button></div></div></div></div><!-- Empty State --><div class="sn-detail-empty" id="sn-detail-empty" style="display:none;"><div class="sn-empty-ico"></div><div class="sn-empty-title">Select a booking</div><div class="sn-empty-sub">Click any item on the left to view its details.</div></div></div></div></main></div><script src="./history.js"></script><script src="../customer-data.js"></script>  <script src="/shared/js/pwa-register.js"></script>
-</body></html>
+        <div class="sn-history-right" id="sn-history-right">
+          <div class="sn-detail-panel" id="sn-detail-panel">
+            <div class="sn-detail-header" hidden>
+              <div class="sn-detail-header-left">
+                <div class="sn-detail-avatar sn-hi-avatar--1" id="detail-avatar"></div>
+                <div>
+                  <div class="sn-detail-name" id="detail-provider-name">Service Provider</div>
+                  <div class="sn-detail-sub">
+                    <span id="detail-booking-id">Booking ID</span>
+                    &nbsp;-&nbsp;
+                    <span id="detail-service-tag">Service</span>
+                  </div>
+                </div>
+              </div>
+              <div class="sn-detail-header-right">
+                <span class="sn-verified-badge" id="detail-verified">Skilled Verified</span>
+                <button class="sn-icon-btn" type="button" title="Message"></button>
+              </div>
+            </div>
+
+            <div class="sn-completion-banner" id="sn-completion-banner" hidden>
+              <span class="sn-banner-check"></span>
+              <div class="sn-banner-text">
+                <strong id="banner-title">Booking status</strong>
+                <span id="banner-sub">Booking details are loaded from your account.</span>
+              </div>
+              <button class="sn-banner-close" id="sn-banner-close" type="button">x</button>
+            </div>
+
+            <div class="sn-detail-body" hidden>
+              <div class="sn-detail-section">
+                <div class="sn-detail-section-title">Booking Details</div>
+                <div class="sn-detail-rows">
+                  <div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Booking Date</span><span class="sn-dr-value" id="detail-date">-</span></div>
+                  <div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Service</span><span class="sn-dr-value" id="detail-service">-</span></div>
+                  <div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Address</span><span class="sn-dr-value" id="detail-address">-</span></div>
+                  <div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Amount</span><span class="sn-dr-value sn-dr-amount" id="detail-amount">-</span></div>
+                  <div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value" id="detail-payment">-</span></div>
+                  <div class="sn-dr"><span class="sn-dr-ico"></span><span class="sn-dr-label">Status</span><span class="sn-dr-value" id="detail-status-badge"></span></div>
+                  <div class="sn-dr" id="detail-completed-row"><span class="sn-dr-ico"></span><span class="sn-dr-label">Completed At</span><span class="sn-dr-value" id="detail-completed-at">-</span></div>
+                  <div class="sn-dr sn-dr--hidden" id="detail-reason-row"><span class="sn-dr-ico">x</span><span class="sn-dr-label">Reason</span><span class="sn-dr-value sn-dr-reason" id="detail-reason">-</span></div>
+                </div>
+              </div>
+              <div class="sn-detail-right-col">
+                <div class="sn-provider-info-card">
+                  <div class="sn-provider-info-title">Service Provider</div>
+                  <div class="sn-provider-info-body">
+                    <div class="sn-provider-info-avatar sn-hi-avatar--1" id="detail-card-avatar"></div>
+                    <div>
+                      <div class="sn-provider-info-name" id="detail-card-name">Service Provider</div>
+                      <div class="sn-provider-info-type">Service</div>
+                      <div class="sn-provider-info-rating">Verified provider</div>
+                      <button class="sn-btn sn-btn-outline" type="button">View Profile</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="sn-cust-actions">
+                  <div class="sn-cust-actions-title">Customer Actions</div>
+                  <button class="sn-btn sn-btn-primary" type="button">View Profile</button>
+                  <button class="sn-btn sn-btn-outline" type="button">Rebook Service</button>
+                  <button class="sn-btn sn-btn-outline" type="button">Message Provider</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="sn-detail-empty" id="sn-detail-empty">
+              <div class="sn-empty-ico"></div>
+              <div class="sn-empty-title">Loading history</div>
+              <div class="sn-empty-sub">Your completed and cancelled bookings will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="./history.js"></script>
+  <script src="../customer-data.js"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>

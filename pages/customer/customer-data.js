@@ -646,15 +646,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  `).join('');
  }
 
- if (path.includes('/history/')) {
- const list = document.getElementById('sn-booking-list');
- if (list && data.bookings) {
- list.innerHTML = data.bookings.map(booking => `
- <button class="sn-list-item" type="button" data-id="${booking.id}" data-status="${snEsc(booking.status)}"><strong>${snEsc(booking.service)}</strong><span>${snEsc(booking.provider_name || 'Provider')} - ${snDate(booking.scheduled_date)}</span>${snStatusPill(booking.status)}
- </button>
- `).join('');
- }
- }
  } catch (error) {
  console.warn(error.message || error);
  }

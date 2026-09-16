@@ -1,9 +1,93 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Provider History - SerbisyoNow</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="../../../shared/css/variables.css" /><link rel="stylesheet" href="../provider.css" />  <link rel="manifest" href="/manifest.webmanifest" />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Provider History - SerbisyoNow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../../shared/css/variables.css" />
+  <link rel="stylesheet" href="../provider.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="SerbisyoNow" />
   <link rel="icon" href="/image_logo/main_logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/shared/css/pwa-responsive.css" />
   <link rel="apple-touch-icon" href="/image_logo/pwa/icon-192.png" />
-</head><body><div class="sn-shell sn-shell--provider"><div class="sn-overlay" id="sn-overlay"></div><aside class="sn-sidebar" id="sn-sidebar"><div class="sn-brand"><div class="sn-logo"><img src="../../../image_logo/main_logo.svg" alt="SerbisyoNow logo" /></div><div class="sn-brand-name">SerbisyoNow</div><button class="sn-hamburger sn-hamburger--brand" id="sn-hamburger" type="button"><span></span><span></span><span></span></button></div><div class="sn-user-greeting"><div class="sn-avatar-lg"></div><div><div class="sn-greeting-label">Welcome,</div><div class="sn-greeting-name" id="sn-user-name">Service Provider</div><div class="sn-greeting-loc" id="sn-user-status">Provider status</div></div></div><nav class="sn-nav"><a class="sn-nav-item" href="../dashboard/dashboard.html"><span class="sn-ico">&#127968;</span><span>Dashboard</span></a><a class="sn-nav-item" href="../profile/profile.html"><span class="sn-ico">&#128100;</span><span>Profile</span></a><a class="sn-nav-item" href="../services/services.html"><span class="sn-ico">&#128736;</span><span>Services</span></a><a class="sn-nav-item" href="../requests/requests.html"><span class="sn-ico">&#128197;</span><span>Requests</span></a><a class="sn-nav-item" href="../schedule/schedule.html"><span class="sn-ico">&#128198;</span><span>Schedule</span></a><a class="sn-nav-item" href="../inbox/inbox.html"><span class="sn-ico">&#128229;</span><span>Inbox</span></a><a class="sn-nav-item" href="../assessment/assessment.html"><span class="sn-ico">&#9989;</span><span>Assessment</span></a><a class="sn-nav-item" href="../reviews/reviews.html"><span class="sn-ico">&#11088;</span><span>Reviews</span></a><a class="sn-nav-item active" href="./history.html"><span class="sn-ico">&#128344;</span><span>History</span></a><div class="sn-nav-sep"></div><button class="sn-nav-item sn-nav-item--danger" id="sn-logout" type="button"><span class="sn-ico">&#128682;</span><span>Logout</span></button></nav></aside><main class="sn-main"><header class="sn-topbar"><button class="sn-hamburger sn-hamburger--top" id="sn-hamburger-top" type="button"><span></span><span></span><span></span></button><div class="sn-topbar-search"><input type="search" placeholder="Search service history..." /></div></header><section class="sn-earnings-section" aria-labelledby="sn-earnings-title"><div class="sn-earnings-head"><div><h2 id="sn-earnings-title">History of Earnings</h2><p>Track income from completed jobs over recent periods.</p></div></div><div class="sn-earnings-grid"><article class="sn-earnings-card"><div class="sn-earnings-card-label">Last 30 days</div><div class="sn-earnings-card-value">PHP 0</div><div class="sn-earnings-card-meta">0 completed jobs</div></article><article class="sn-earnings-card"><div class="sn-earnings-card-label">Last 2 weeks</div><div class="sn-earnings-card-value">PHP 0</div><div class="sn-earnings-card-meta">0 completed jobs</div></article><article class="sn-earnings-card"><div class="sn-earnings-card-label">Last 7 days</div><div class="sn-earnings-card-value">PHP 0</div><div class="sn-earnings-card-meta">0 completed jobs</div></article></div></section><section class="sn-hero"><div class="sn-hero-text"><p class="sn-hero-eyebrow">Service History Page</p><p style="color:white;margin:0">Completed and ongoing service requests.</p></div></section><section class="sn-panel sn-provider-history-shell"><h2>Service Records</h2><div class="sn-panel-list"><div class="sn-module-card"><div><strong>#SN-1038 Pipe Repair</strong><span>Completed - Maria Santos - May 18, 2026</span></div><span class="sn-status-pill active">Completed</span></div><div class="sn-module-card"><div><strong>#SN-1042 AC Cleaning</strong><span>Ongoing - Teresa Mendoza - Today</span></div><span class="sn-status-pill info">Ongoing</span></div><div class="sn-module-card"><div><strong>#SN-1022 Faucet Install</strong><span>Completed - Joel Perez - May 10, 2026</span></div><span class="sn-status-pill active">Completed</span></div></div></section></main></div><script src="../provider.js"></script>  <script src="/shared/js/pwa-register.js"></script>
-</body></html>
+</head>
+<body>
+  <div class="sn-shell sn-shell--provider">
+    <div class="sn-overlay" id="sn-overlay"></div>
+    <aside class="sn-sidebar" id="sn-sidebar">
+      <div class="sn-brand">
+        <div class="sn-logo"><img src="../../../image_logo/main_logo.svg" alt="SerbisyoNow logo" /></div>
+        <div class="sn-brand-name">SerbisyoNow</div>
+        <button class="sn-hamburger sn-hamburger--brand" id="sn-hamburger" type="button"><span></span><span></span><span></span></button>
+      </div>
+      <div class="sn-user-greeting">
+        <div class="sn-avatar-lg"></div>
+        <div>
+          <div class="sn-greeting-label">Welcome,</div>
+          <div class="sn-greeting-name" id="sn-user-name">Service Provider</div>
+          <div class="sn-greeting-loc" id="sn-user-status">Provider status</div>
+        </div>
+      </div>
+      <nav class="sn-nav">
+        <a class="sn-nav-item" href="../dashboard/dashboard.html"><span class="sn-ico">&#127968;</span><span>Dashboard</span></a>
+        <a class="sn-nav-item" href="../profile/profile.html"><span class="sn-ico">&#128100;</span><span>Profile</span></a>
+        <a class="sn-nav-item" href="../services/services.html"><span class="sn-ico">&#128736;</span><span>Services</span></a>
+        <a class="sn-nav-item" href="../requests/requests.html"><span class="sn-ico">&#128197;</span><span>Requests</span></a>
+        <a class="sn-nav-item" href="../schedule/schedule.html"><span class="sn-ico">&#128198;</span><span>Schedule</span></a>
+        <a class="sn-nav-item" href="../inbox/inbox.html"><span class="sn-ico">&#128229;</span><span>Inbox</span></a>
+        <a class="sn-nav-item" href="../assessment/assessment.html"><span class="sn-ico">&#9989;</span><span>Assessment</span></a>
+        <a class="sn-nav-item" href="../reviews/reviews.html"><span class="sn-ico">&#11088;</span><span>Reviews</span></a>
+        <a class="sn-nav-item active" href="./history.html"><span class="sn-ico">&#128344;</span><span>History</span></a>
+        <div class="sn-nav-sep"></div>
+        <button class="sn-nav-item sn-nav-item--danger" id="sn-logout" type="button"><span class="sn-ico">&#128682;</span><span>Logout</span></button>
+      </nav>
+    </aside>
+
+    <main class="sn-main">
+      <header class="sn-topbar">
+        <button class="sn-hamburger sn-hamburger--top" id="sn-hamburger-top" type="button"><span></span><span></span><span></span></button>
+        <div class="sn-topbar-search"><input type="search" placeholder="Search service history..." /></div>
+      </header>
+
+      <section class="sn-earnings-section" aria-labelledby="sn-earnings-title">
+        <div class="sn-earnings-head">
+          <div>
+            <h2 id="sn-earnings-title">History of Earnings</h2>
+            <p>Track income from completed jobs over recent periods.</p>
+          </div>
+        </div>
+        <div class="sn-earnings-grid">
+          <article class="sn-earnings-card">
+            <div class="sn-earnings-card-label">Last 30 days</div>
+            <div class="sn-earnings-card-value">PHP 0</div>
+            <div class="sn-earnings-card-meta">0 completed jobs</div>
+          </article>
+          <article class="sn-earnings-card">
+            <div class="sn-earnings-card-label">Last 2 weeks</div>
+            <div class="sn-earnings-card-value">PHP 0</div>
+            <div class="sn-earnings-card-meta">0 completed jobs</div>
+          </article>
+          <article class="sn-earnings-card">
+            <div class="sn-earnings-card-label">Last 7 days</div>
+            <div class="sn-earnings-card-value">PHP 0</div>
+            <div class="sn-earnings-card-meta">0 completed jobs</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="sn-panel sn-provider-history-shell">
+        <div class="sn-history-empty">
+          <div class="sn-empty-title">Loading service history</div>
+          <div class="sn-empty-sub">Completed, cancelled, and active service records will appear here.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="../provider.js"></script>
+  <script src="/shared/js/pwa-register.js"></script>
+</body>
+</html>
