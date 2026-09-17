@@ -166,9 +166,13 @@ function handleLogin(e) {
     })
     .catch((error) => {
       const message = error.message || 'Login failed.';
-      if (message.toLowerCase().includes('invalid email or password')) {
+      const normalizedMessage = message.toLowerCase();
+      if (normalizedMessage.includes('linked to google login')) {
+        showFieldError(passField, 'Use Google login, or reset your password first.');
+        showLoginBanner(message);
+      } else if (normalizedMessage.includes('invalid email or password')) {
         showFieldError(passField, 'Wrong email or password. Please try again.');
-      } else if (message.toLowerCase().includes('failed to fetch')) {
+      } else if (normalizedMessage.includes('failed to fetch')) {
         showLoginBanner('Cannot reach the auth server. Please check your connection and try again.');
       } else {
         showLoginBanner(message);

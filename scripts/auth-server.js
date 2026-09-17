@@ -1908,7 +1908,21 @@ app.post('/api/auth/customer/login', asyncRoute(async (req, res) => {
   const result = await db.query('SELECT * FROM customers WHERE lower(email) = lower($1::text)', [req.body.email.trim()]);
   const customer = result.rows[0];
 
-  if (!customer || !await bcrypt.compare(req.body.password, customer.password_hash)) {
+  if (!customer) {
+    return res.status(401).json({ message: 'Invalid email or password.' });
+  }
+
+  const passwordMatches = customer.password_hash
+    ? await bcrypt.compare(req.body.password, customer.password_hash)
+    : false;
+
+  if (!passwordMatches) {
+    if (String(customer.auth_provider || '').toLowerCase() === 'google') {
+      return res.status(401).json({
+        code: 'GOOGLE_CUSTOMER_PASSWORD_UNAVAILABLE',
+        message: 'This customer account is linked to Google login. Use the Google button, or use Forgot Password to create a new email/password login.',
+      });
+    }
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
 
