@@ -667,6 +667,11 @@ function extractAssessmentScore(experienceText) {
   return clampScore(match?.[1]);
 }
 
+function hasAssessmentSubmission(experienceText) {
+  const text = String(experienceText || '');
+  return /assessment\s*score\s*:\s*\d{1,3}\s*%/i.test(text) && /answers\s*:/i.test(text);
+}
+
 function parseExperienceYears(label) {
   const value = String(label || '').toLowerCase();
   if (value.includes('less') || value.includes('below')) return { min: 0, max: 1 };
@@ -2431,6 +2436,9 @@ app.post('/api/auth/provider/register', upload.fields([
     'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
     'category', 'service', 'experience', 'experienceYears', 'experienceCertification',
   ]);
+  if (!hasAssessmentSubmission(req.body.experience)) {
+    return res.status(400).json({ message: 'Please complete the provider skill assessment before submitting.' });
+  }
   await ensureUniqueAccountEmail(req.body.email);
 
   const passwordHash = await buildRegistrationPasswordHash(req);

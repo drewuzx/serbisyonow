@@ -181,7 +181,6 @@
   <script src="../../shared/js/app.js?v=20260915-google-role"></script>
   <script>
     const AUTH_API_BASE = SN.utils.apiBase();
-    const PROVIDER_REGISTER_SUCCESS_KEY = 'sn_provider_register_success';
     let activeAssessmentQuestions = [];
     let latestAssessmentScore = 0;
 
@@ -401,7 +400,6 @@
     }
 
     function showStep(n) {
-      sessionStorage.removeItem(PROVIDER_REGISTER_SUCCESS_KEY);
       document.body.classList.remove('is-application-submitted');
       document.querySelector('.provider-flow-card')?.classList.remove('is-success-card');
       ['step-1', 'step-2', 'step-3', 'step-success'].forEach(id => {
@@ -415,7 +413,6 @@
     }
 
     function showSuccess() {
-      sessionStorage.setItem(PROVIDER_REGISTER_SUCCESS_KEY, '1');
       document.body.classList.add('is-application-submitted');
       document.querySelector('.provider-flow-card')?.classList.add('is-success-card');
       ['step-1', 'step-2', 'step-3'].forEach(id => document.getElementById(id).style.display = 'none');
@@ -568,7 +565,6 @@
         .then((data) => {
           saveProviderApplication(data);
           localStorage.removeItem('sn_google_prefill_provider');
-          sessionStorage.setItem(PROVIDER_REGISTER_SUCCESS_KEY, '1');
           showSuccess();
         })
         .catch(error => {
@@ -588,13 +584,11 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      sessionStorage.removeItem('sn_provider_register_success');
       renderAssessment();
       document.getElementById('category')?.addEventListener('change', updateServiceOptions);
       updateServiceOptions();
       applyGooglePrefill();
-      if (sessionStorage.getItem(PROVIDER_REGISTER_SUCCESS_KEY) === '1') {
-        showSuccess();
-      }
     });
   </script>
   <script src="/shared/js/pwa-register.js?v=20260915-google-role"></script>
