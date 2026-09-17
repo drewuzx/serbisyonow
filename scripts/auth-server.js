@@ -198,6 +198,68 @@ function googleDashboardPath(role) {
     : '/pages/customer/dashboard/dashboard.html';
 }
 
+function rowHasText(row, field) {
+  return String(row?.[field] || '').trim() !== '';
+}
+
+function isCustomerRegistrationComplete(row) {
+  return Boolean(row
+    && rowHasText(row, 'full_name')
+    && rowHasText(row, 'address')
+    && rowHasText(row, 'gender')
+    && rowHasText(row, 'contact')
+    && rowHasText(row, 'dob')
+    && rowHasText(row, 'email')
+    && rowHasText(row, 'password_hash')
+    && rowHasText(row, 'id_type')
+    && rowHasText(row, 'id_address')
+    && rowHasText(row, 'id_front_file')
+    && rowHasText(row, 'id_back_file'));
+}
+
+function isProviderRegistrationComplete(row) {
+  const documents = Array.isArray(row?.documents_files) ? row.documents_files.filter(Boolean) : [];
+  return Boolean(row
+    && rowHasText(row, 'full_name')
+    && rowHasText(row, 'address')
+    && rowHasText(row, 'gender')
+    && rowHasText(row, 'contact')
+    && rowHasText(row, 'dob')
+    && rowHasText(row, 'email')
+    && rowHasText(row, 'password_hash')
+    && rowHasText(row, 'category')
+    && rowHasText(row, 'service')
+    && rowHasText(row, 'experience_years')
+    && rowHasText(row, 'experience_certification')
+    && hasAssessmentSubmission(row.experience)
+    && documents.length > 0
+    && rowHasText(row, 'id_front_file')
+    && rowHasText(row, 'id_back_file'));
+}
+
+function isRegistrationComplete(role, row) {
+  return role === 'provider'
+    ? isProviderRegistrationComplete(row)
+    : isCustomerRegistrationComplete(row);
+}
+
+async function findGoogleAccounts(email, googleSub = '') {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const sub = String(googleSub || '').trim();
+  const matchClause = sub
+    ? '(google_sub = $1 OR lower(email) = lower($2::text))'
+    : 'lower(email) = lower($1::text)';
+  const matchParams = sub ? [sub, normalizedEmail] : [normalizedEmail];
+  const [customer, provider] = await Promise.all([
+    db.query(`SELECT * FROM customers WHERE ${matchClause} LIMIT 1`, matchParams),
+    db.query(`SELECT * FROM providers WHERE ${matchClause} LIMIT 1`, matchParams),
+  ]);
+  return {
+    customer: customer.rows[0] || null,
+    provider: provider.rows[0] || null,
+  };
+}
+
 function registrationPassword(value) {
   const password = String(value || '');
   if (password.length < 8) {
@@ -1708,13 +1770,19 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
   if (!ticketData) return res.status(400).json({ message: 'Google login expired. Please try again.' });
 
   const { role, profile } = ticketData;
-  const [customer, provider] = await Promise.all([
-    db.query('SELECT * FROM customers WHERE lower(email) = lower($1::text)', [profile.email]),
-    db.query('SELECT * FROM providers WHERE lower(email) = lower($1::text)', [profile.email]),
-  ]);
+  const { customer, provider } = await findGoogleAccounts(profile.email, profile.googleSub);
 
-  const requestedAccount = role === 'provider' ? provider.rows[0] : customer.rows[0];
+  const requestedAccount = role === 'provider' ? provider : customer;
   if (requestedAccount) {
+    if (!isRegistrationComplete(role, requestedAccount)) {
+      return res.json({
+        action: 'register',
+        role,
+        redirect: googleRegisterPath(role),
+        profile,
+      });
+    }
+
     return res.json({
       action: 'login',
       role,
@@ -1724,7 +1792,7 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
   }
 
   const otherRole = role === 'provider' ? 'customer' : 'provider';
-  const otherAccountExists = role === 'provider' ? customer.rowCount : provider.rowCount;
+  const otherAccountExists = role === 'provider' ? customer : provider;
   if (otherAccountExists) {
     return res.status(409).json({
       message: `This Gmail is registered as a ${otherRole}. Please use ${otherRole} Google login.`,
@@ -1744,18 +1812,18 @@ app.post('/api/auth/google/account-status', asyncRoute(async (req, res) => {
   const role = String(req.body.role || '').toLowerCase() === 'provider' ? 'provider' : 'customer';
   const email = String(req.body.email || '').trim().toLowerCase();
   const googleSub = String(req.body.googleSub || '').trim();
-  const matchClause = googleSub
-    ? '(google_sub = $1 OR lower(email) = lower($2::text))'
-    : 'lower(email) = lower($1::text)';
-  const matchParams = googleSub ? [googleSub, email] : [email];
+  const { customer, provider } = await findGoogleAccounts(email, googleSub);
 
-  const [customer, provider] = await Promise.all([
-    db.query(`SELECT * FROM customers WHERE ${matchClause} LIMIT 1`, matchParams),
-    db.query(`SELECT * FROM providers WHERE ${matchClause} LIMIT 1`, matchParams),
-  ]);
-
-  const requestedAccount = role === 'provider' ? provider.rows[0] : customer.rows[0];
+  const requestedAccount = role === 'provider' ? provider : customer;
   if (requestedAccount) {
+    if (!isRegistrationComplete(role, requestedAccount)) {
+      return res.json({
+        action: 'register',
+        role,
+        redirect: googleRegisterPath(role),
+      });
+    }
+
     return res.json({
       action: 'login',
       role,
@@ -1765,7 +1833,7 @@ app.post('/api/auth/google/account-status', asyncRoute(async (req, res) => {
   }
 
   const otherRole = role === 'provider' ? 'customer' : 'provider';
-  const otherAccountExists = role === 'provider' ? customer.rowCount : provider.rowCount;
+  const otherAccountExists = role === 'provider' ? customer : provider;
   if (otherAccountExists) {
     return res.status(409).json({
       message: `This Gmail is registered as a ${otherRole}. Please use ${otherRole} Google login.`,
@@ -1907,32 +1975,79 @@ app.post('/api/auth/customer/register', upload.fields([
   requireFields(req.body, [
     'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
   ]);
-  await ensureUniqueAccountEmail(req.body.email);
-  await persistRequestUploads(req);
+
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const googleSub = String(req.body.googleSub || '').trim();
+  let existingGoogleCustomer = null;
+  if (isGoogleAuth) {
+    const { customer, provider } = await findGoogleAccounts(email, googleSub);
+    if (provider) {
+      return res.status(409).json({ message: 'This Gmail is registered as a provider. Please use provider Google login.' });
+    }
+    if (customer) {
+      if (isCustomerRegistrationComplete(customer)) {
+        return res.status(409).json({ message: 'This Gmail is already registered. Please sign in with Google.' });
+      }
+      existingGoogleCustomer = customer;
+    }
+  }
+  if (!existingGoogleCustomer) {
+    await ensureUniqueAccountEmail(email);
+  }
 
   const contact = normalizeContactNumber(req.body.contact);
   const passwordHash = await buildRegistrationPasswordHash(req);
+  const customerValues = [
+    req.body.fullName.trim(),
+    req.body.address.trim(),
+    req.body.gender,
+    contact,
+    req.body.dob,
+    email,
+    passwordHash,
+    req.body.idType || null,
+    req.body.idAddress || null,
+    req.files?.idFront?.[0]?.filename || null,
+    req.files?.idBack?.[0]?.filename || null,
+    isGoogleAuth ? 'google' : 'password',
+    isGoogleAuth ? googleSub || null : null,
+  ];
+
+  if (existingGoogleCustomer) {
+    const result = await db.query(
+      `UPDATE customers
+       SET full_name = $2,
+           address = $3,
+           gender = $4,
+           contact = $5,
+           dob = $6,
+           email = lower($7),
+           password_hash = $8,
+           id_type = $9,
+           id_address = $10,
+           id_front_file = COALESCE($11, id_front_file),
+           id_back_file = COALESCE($12, id_back_file),
+           auth_provider = $13,
+           google_sub = COALESCE($14, google_sub),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [existingGoogleCustomer.id, ...customerValues]
+    );
+    await persistRequestUploads(req, { role: 'customer', id: result.rows[0].id });
+    return res.status(201).json({ user: customerRow(result.rows[0]) });
+  }
+
   const result = await db.query(
     `INSERT INTO customers
       (full_name, address, gender, contact, dob, email, password_hash, id_type, id_address, id_front_file, id_back_file, auth_provider, google_sub)
      VALUES ($1, $2, $3, $4, $5, lower($6), $7, $8, $9, $10, $11, $12, $13)
      RETURNING *`,
     [
-      req.body.fullName.trim(),
-      req.body.address.trim(),
-      req.body.gender,
-      contact,
-      req.body.dob,
-      req.body.email.trim(),
-      passwordHash,
-      req.body.idType || null,
-      req.body.idAddress || null,
-      req.files?.idFront?.[0]?.filename || null,
-      req.files?.idBack?.[0]?.filename || null,
-      isGoogleAuth ? 'google' : 'password',
-      isGoogleAuth ? req.body.googleSub || null : null,
+      ...customerValues,
     ]
   );
+  await persistRequestUploads(req, { role: 'customer', id: result.rows[0].id });
 
   res.status(201).json({ user: customerRow(result.rows[0]) });
 }));
@@ -2488,12 +2603,94 @@ app.post('/api/auth/provider/register', upload.fields([
   if (!hasAssessmentSubmission(req.body.experience)) {
     return res.status(400).json({ message: 'Please complete the provider skill assessment before submitting.' });
   }
-  await ensureUniqueAccountEmail(req.body.email);
+
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const googleSub = String(req.body.googleSub || '').trim();
+  let existingGoogleProvider = null;
+  if (isGoogleAuth) {
+    const { customer, provider } = await findGoogleAccounts(email, googleSub);
+    if (customer) {
+      return res.status(409).json({ message: 'This Gmail is registered as a customer. Please use customer Google login.' });
+    }
+    if (provider) {
+      if (isProviderRegistrationComplete(provider)) {
+        return res.status(409).json({ message: 'This Gmail is already registered. Please sign in with Google.' });
+      }
+      existingGoogleProvider = provider;
+    }
+  }
+  if (!existingGoogleProvider) {
+    await ensureUniqueAccountEmail(email);
+  }
 
   const contact = normalizeContactNumber(req.body.contact);
   const passwordHash = await buildRegistrationPasswordHash(req);
   const docs = (req.files?.docs || []).map((file) => file.filename);
   const category = canonicalCategoryName(req.body.category);
+  const providerValues = [
+    req.body.fullName.trim(),
+    req.body.address.trim(),
+    req.body.gender,
+    contact,
+    req.body.dob,
+    email,
+    passwordHash,
+    category,
+    req.body.service,
+    req.body.experience.trim(),
+    req.body.experienceYears,
+    req.body.experienceCertification,
+    docs,
+    req.files?.idFront?.[0]?.filename || null,
+    req.files?.idBack?.[0]?.filename || null,
+    isGoogleAuth ? 'google' : 'password',
+    isGoogleAuth ? googleSub || null : null,
+  ];
+
+  if (existingGoogleProvider) {
+    const result = await db.query(
+      `UPDATE providers
+       SET full_name = $2,
+           address = $3,
+           gender = $4,
+           contact = $5,
+           dob = $6,
+           email = lower($7),
+           password_hash = $8,
+           category = $9,
+           service = $10,
+           experience = $11,
+           experience_years = $12,
+           experience_certification = $13,
+           documents_files = (
+             SELECT ARRAY(
+               SELECT DISTINCT item
+               FROM unnest(COALESCE(documents_files, ARRAY[]::TEXT[]) || $14::TEXT[]) AS item
+               WHERE item <> ''
+               ORDER BY item
+             )
+           ),
+           id_front_file = COALESCE($15, id_front_file),
+           id_back_file = COALESCE($16, id_back_file),
+           auth_provider = $17,
+           google_sub = COALESCE($18, google_sub),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [existingGoogleProvider.id, ...providerValues]
+    );
+
+    const assessmentScore = extractAssessmentScore(req.body.experience);
+    const badge = calculateProviderBadge(assessmentScore, req.body.experienceYears);
+    await persistRequestUploads(req, { role: 'provider', id: result.rows[0].id });
+    await db.query(`
+      INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
+      VALUES ($1, $2, $3, $4)
+    `, [result.rows[0].id, category || 'General', assessmentScore, badge]);
+    await ensureProviderProfileService(result.rows[0]);
+    return res.status(201).json({ user: providerRow(result.rows[0]) });
+  }
+
   const result = await db.query(
     `INSERT INTO providers
       (full_name, address, gender, contact, dob, email, password_hash, category, service,
@@ -2501,23 +2698,7 @@ app.post('/api/auth/provider/register', upload.fields([
      VALUES ($1, $2, $3, $4, $5, lower($6), $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
      RETURNING *`,
     [
-      req.body.fullName.trim(),
-      req.body.address.trim(),
-      req.body.gender,
-      contact,
-      req.body.dob,
-      req.body.email.trim(),
-      passwordHash,
-      category,
-      req.body.service,
-      req.body.experience.trim(),
-      req.body.experienceYears,
-      req.body.experienceCertification,
-      docs,
-      req.files?.idFront?.[0]?.filename || null,
-      req.files?.idBack?.[0]?.filename || null,
-      isGoogleAuth ? 'google' : 'password',
-      isGoogleAuth ? req.body.googleSub || null : null,
+      ...providerValues,
     ]
   );
 
