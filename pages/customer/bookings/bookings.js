@@ -775,20 +775,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
  // Filter tabs
  const tabs = document.querySelectorAll('.sn-filter-tab');
- const groups = document.querySelectorAll('.sn-booking-group');
+ const applyBookingFilter = (filter = 'all') => {
+  document.querySelectorAll('.sn-booking-group').forEach(group => {
+   group.style.display = filter === 'all' || group.dataset.status === filter ? '' : 'none';
+  });
+ };
 
  tabs.forEach(tab => {
  tab.addEventListener('click', () => {
  tabs.forEach(t => t.classList.remove('active'));
  tab.classList.add('active');
- const filter = tab.dataset.filter;
- groups.forEach(group => {
- if (filter === 'all' || group.dataset.status === filter) {
- group.style.display = '';
- } else {
- group.style.display = 'none';
- }
+ applyBookingFilter(tab.dataset.filter);
  });
  });
+ document.addEventListener('sn:customer-bookings-rendered', () => {
+  const activeFilter = document.querySelector('.sn-filter-tab.active')?.dataset.filter || 'all';
+  applyBookingFilter(activeFilter);
  });
 });

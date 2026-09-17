@@ -48,8 +48,8 @@ function snDate(value) {
 }
 
 function snStatusPill(status) {
- const value = String(status || 'pending').toLowerCase();
- return `<span class="sn-status-pill ${value}">${value}</span>`;
+ const info = snBookingStatusInfo(status);
+ return `<span class="sn-status-pill ${snEsc(info.key)}">${snEsc(info.label)}</span>`;
 }
 
 function snBookingGroupStatus(status) {
@@ -57,6 +57,20 @@ function snBookingGroupStatus(status) {
  if (value === 'ongoing') return 'in-progress';
  if (value === 'accepted') return 'upcoming';
  return value;
+}
+
+const SN_BOOKING_STATUS_FLOW = [
+ { key: 'pending', label: 'Pending', description: 'Nag-aantay ng approval' },
+ { key: 'upcoming', label: 'Upcoming', description: 'Naka-schedule na' },
+ { key: 'in-progress', label: 'In Progress', description: 'Ginagawa na' },
+ { key: 'completed', label: 'Completed', description: 'Tapos na' },
+ { key: 'cancelled', label: 'Cancelled', description: 'Cancelled booking' },
+];
+
+function snBookingStatusInfo(status) {
+ const key = snBookingGroupStatus(status);
+ return SN_BOOKING_STATUS_FLOW.find(item => item.key === key)
+  || { key, label: key.replace(/-/g, ' '), description: 'Booking status' };
 }
 
 async function snSaveCustomerFavorite(customerId, providerId) {
@@ -454,12 +468,15 @@ function renderProviderCard(provider, favoriteIds = new Set()) {
  const providerId = String(provider.id);
  const isFavorite = favoriteIds.has(providerId);
  const providerCategory = snCategoryLabel(provider.category);
+ const profileUrl = `../provider-profile/provider-profile.html?id=${encodeURIComponent(providerId)}`;
+ const bookingUrl = `../bookings/bookings.html?provider_id=${encodeURIComponent(providerId)}`;
  return `
  <div class="sn-provider-card"><button class="sn-fav-btn ${isFavorite ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${snEsc(providerId)}" aria-label="${isFavorite ? 'Saved to favorites' : 'Favorite provider'}">♥</button><div class="sn-provider-img sn-provider-img--1"></div><div class="sn-provider-info"><div class="sn-provider-name-row"><span class="sn-provider-title">${snEsc(provider.full_name)}</span><span class="sn-rating">${Number(provider.rating || 4.8).toFixed(1)}</span></div>
  ${snBadge(provider)}
  <div class="sn-provider-loc">${snEsc(provider.address || 'Angeles City')}</div>
  ${provider.recommendation_reason? `<div class="sn-recommend-reason">${snEsc(provider.recommendation_reason)}</div>`: ''}
- <div class="sn-provider-meta"><span class="sn-provider-tag">${snEsc(provider.service || providerCategory || 'Service')}</span><span class="sn-provider-price">Starts at <strong>${snMoney(provider.starting_price || 350)}</strong></span></div></div></div>
+ <div class="sn-provider-meta"><span class="sn-provider-tag">${snEsc(provider.service || providerCategory || 'Service')}</span><span class="sn-provider-price">Starts at <strong>${snMoney(provider.starting_price || 350)}</strong></span></div>
+ <div class="sn-provider-actions"><a class="sn-provider-action sn-provider-action--outline" href="${snEsc(profileUrl)}">View Profile</a><a class="sn-provider-action sn-provider-action--primary" href="${snEsc(bookingUrl)}">Book Now</a></div></div></div>
  `;
 }
 
@@ -497,14 +514,36 @@ document.addEventListener('click', async (event) => {
 });
 
 function renderCustomerBooking(booking) {
- const status = String(booking.status || '').toLowerCase();
- const canCancel = ['pending', 'upcoming', 'ongoing'].includes(status);
+ const statusInfo = snBookingStatusInfo(booking.status);
+ const canCancel = ['pending', 'upcoming', 'in-progress'].includes(statusInfo.key);
   const cancelButton = canCancel
   ? `<button class="sn-btn sn-btn-danger" type="button" data-booking-action="cancel" data-booking-id="${snEsc(booking.id)}">Cancel Booking</button>`
   : '';
  return `
- <div class="sn-booking-group" data-status="${snEsc(snBookingGroupStatus(booking.status))}" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon">&#128197;</div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(booking.scheduled_time)}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Payment: ${snEsc(booking.payment_method || 'cash')}</span></div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.amount)}</strong><div style="margin:8px 0">${snStatusPill(booking.status)}</div><button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div></div>
+ <div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon">&#128197;</div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(booking.scheduled_time)}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Payment: ${snEsc(booking.payment_method || 'cash')}</span><span>Status: ${snEsc(statusInfo.description)}</span></div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.amount)}</strong><div class="sn-booking-status-wrap">${snStatusPill(booking.status)}<small>${snEsc(statusInfo.description)}</small></div><button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div>
  `;
+}
+
+function renderCustomerBookingGroup(statusInfo, bookings) {
+ return `
+ <section class="sn-booking-group sn-booking-group--${snEsc(statusInfo.key)}" data-status="${snEsc(statusInfo.key)}">
+  <div class="sn-group-label"><span></span><strong>${snEsc(statusInfo.label)}</strong><small>${snEsc(statusInfo.description)}</small></div>
+  ${bookings.map(renderCustomerBooking).join('')}
+ </section>
+ `;
+}
+
+function renderCustomerBookings(bookings = []) {
+ const grouped = bookings.reduce((acc, booking) => {
+  const info = snBookingStatusInfo(booking.status);
+  acc[info.key] = acc[info.key] || [];
+  acc[info.key].push(booking);
+  return acc;
+ }, {});
+ return SN_BOOKING_STATUS_FLOW
+  .filter(statusInfo => grouped[statusInfo.key]?.length)
+  .map(statusInfo => renderCustomerBookingGroup(statusInfo, grouped[statusInfo.key]))
+  .join('');
 }
 
 function renderCustomerRows(items, emptyText) {
@@ -627,7 +666,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  const bookings = document.getElementById('sn-bookings');
  if (bookings && data.bookings) {
  window.snCustomerBookings = data.bookings;
- bookings.innerHTML = data.bookings.map(renderCustomerBooking).join('') || '<div class="sn-customer-card"><p>No bookings yet.</p></div>';
+ bookings.innerHTML = renderCustomerBookings(data.bookings) || '<div class="sn-customer-card"><p>No bookings yet.</p></div>';
  document.dispatchEvent(new CustomEvent('sn:customer-bookings-rendered', { detail: { bookings: data.bookings } }));
  }
 

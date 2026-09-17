@@ -388,10 +388,30 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   font-family: var(--font-heading);
   font-weight: 800;
   font-size: 1rem;
   color: var(--blue-dark);
+}
+.sn-group-label > span {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--orange);
+}
+.sn-group-label small {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+.sn-booking-group--cancelled {
+  padding-top: 12px;
+  border-top: 1.5px dashed var(--border);
+}
+.sn-booking-group--cancelled .sn-group-label > span {
+  background: #dc2626;
 }
 
 .sn-customer-booking-card {
@@ -442,6 +462,17 @@
   color: var(--blue-dark);
   font-family: var(--font-heading);
   font-size: 1.1rem;
+}
+.sn-booking-status-wrap {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  margin: 8px 0;
+}
+.sn-booking-status-wrap small {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 800;
 }
 
 /* â”€â”€ Booking Section (category header + card) â”€â”€ */
@@ -628,6 +659,9 @@
   .sn-customer-booking-amount {
     justify-items: stretch;
     text-align: left;
+  }
+  .sn-booking-status-wrap {
+    justify-items: start;
   }
   .sn-booking-actions { flex-direction: row; }
 }
