@@ -55,14 +55,35 @@
       return `${ADMIN_API_BASE}/uploads/${folder}/${encodeURIComponent(filename)}`;
     }
 
+    function providerFileName(filename) {
+      return String(filename || '')
+        .replace(/^\d+-\d+-/, '')
+        .replace(/[-_]+/g, ' ')
+        .trim() || 'Uploaded file';
+    }
+
+    function providerFileLink(folder, filename, label) {
+      if (!filename) return '';
+      return `
+        <a class="admin-file-link" href="${providerUploadUrl(folder, filename)}" target="_blank" rel="noopener noreferrer">
+          <span>${adminEscape(label)}</span>
+          <strong>${adminEscape(providerFileName(filename))}</strong>
+        </a>
+      `;
+    }
+
     function providerDocumentLinks(provider) {
-      const docs = Array.isArray(provider.documents_files) ? provider.documents_files : [];
-      const links = [
-        provider.id_front_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_front_file)}" target="_blank" rel="noopener noreferrer">Front ID</a>` : '',
-        provider.id_back_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_back_file)}" target="_blank" rel="noopener noreferrer">Back ID</a>` : '',
-        ...docs.map((filename, index) => `<a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">Document ${index + 1}</a>`),
+      const docs = (Array.isArray(provider.documents_files) ? provider.documents_files : []).filter(Boolean);
+      const idLinks = [
+        providerFileLink('customer-ids', provider.id_front_file, 'Front ID'),
+        providerFileLink('customer-ids', provider.id_back_file, 'Back ID'),
       ].filter(Boolean);
-      return links.length ? links.join(' ') : 'No file';
+      const documentLinks = docs.map((filename, index) => providerFileLink('provider-docs', filename, `Document ${index + 1}`));
+      const groups = [
+        idLinks.length ? `<div class="admin-file-group"><span class="admin-file-heading">Identity uploads</span><div class="admin-file-grid">${idLinks.join('')}</div></div>` : '',
+        documentLinks.length ? `<div class="admin-file-group"><span class="admin-file-heading">Supporting documents / resume</span><div class="admin-file-grid">${documentLinks.join('')}</div></div>` : '',
+      ].filter(Boolean);
+      return groups.length ? `<div class="admin-provider-files">${groups.join('')}</div>` : '<span class="admin-file-empty">No files uploaded</span>';
     }
 
     function setProviderMessage(text, type = 'info') {
@@ -91,11 +112,14 @@
         document.getElementById('provider-list').innerHTML = (providers.length ? providers : [{ full_name: 'No provider registrations yet', category: '-', service: '-', verification_status: 'pending' }]).map(provider => `
         ${(() => { const status = adminVerificationStatus(provider.verification_status); return `
         <div class="admin-list-item">
-          <div>
+          <div class="admin-provider-main">
             <strong>${adminEscape(provider.full_name)}</strong>
             <span>${adminEscape(adminCategoryLabel(provider.category) || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
             <span>Assessment: ${provider.assessment_score ?? 0}% - Experience: ${adminEscape(provider.experience_years || '-')} - Badge: ${adminEscape(provider.badge_status || 'Needs Reassessment')}</span>
-            <span>Uploaded files: ${providerDocumentLinks(provider)}</span>
+            <div class="admin-upload-block">
+              <span class="admin-upload-title">Uploaded files</span>
+              ${providerDocumentLinks(provider)}
+            </div>
           </div>
           <div class="admin-actions">
             <span class="status-badge ${status.className}">${status.label}</span>
