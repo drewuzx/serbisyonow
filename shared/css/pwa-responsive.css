@@ -42,6 +42,16 @@ button {
   max-width: 100%;
 }
 
+.sn-shell .sn-topbar > .sn-topbar-search,
+.sn-shell--provider .sn-topbar > .sn-topbar-search {
+  display: none !important;
+}
+
+.sn-shell .sn-topbar .sn-hamburger--top,
+.sn-shell--provider .sn-topbar .sn-hamburger--top {
+  margin-left: 0;
+}
+
 @supports (padding: max(0px)) {
   body {
     padding-left: env(safe-area-inset-left);
