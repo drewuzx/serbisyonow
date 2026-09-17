@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v28';
+const SW_VERSION = 'serbisyonow-pwa-v29';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
@@ -79,6 +79,8 @@ const APP_SHELL_URLS = [
   '/pages/auth/loginChoice.html',
   '/pages/auth/customerLogin.html',
   '/pages/auth/customerRegister.html',
+  '/pages/auth/providerLogin.html',
+  '/pages/auth/providerRegister.html',
   '/pages/auth/forgotPassword.html',
   '/pages/auth/googleAuthBridge.html',
   '/pages/auth/resetPassword.html',

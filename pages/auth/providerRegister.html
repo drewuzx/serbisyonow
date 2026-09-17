@@ -193,28 +193,38 @@
       }
     }
 
-    const questionBank = [
-      { q: 'A client complains about low water pressure in the faucet. What is the most likely cause to check first?', a: 'Blockage or valve problem', o: ['Paint issue', 'Blockage or valve problem', 'Roof leak', 'Door alignment'] },
-      { q: 'A client reports that a light is flickering frequently. What is the best first step in diagnosing the issue?', a: 'Check connections and power source', o: ['Replace all wires', 'Check connections and power source', 'Turn off the house electricity', 'Ignore it'] },
-      { q: 'You are called to fix a leaking pipe under a sink. What should you do first before starting the repair?', a: 'Turn off the water supply', o: ['Start replacing the pipe', 'Add sealant immediately', 'Turn off the water supply', 'Ignore the leak'] },
-      { q: 'A refrigerator is not keeping food cold enough. What should you check first?', a: 'Thermostat setting inside the refrigerator', o: ['Door alignment and seal condition', 'Thermostat setting inside the refrigerator', 'Frequency of door opening', 'Placement near heat sources'] },
-      { q: 'An air conditioner is running but not cooling properly. What is the most likely issue to check first?', a: 'Dirty air filter or restricted airflow', o: ['Thermostat setting is too high', 'Power supply is completely off', 'Remote control battery is low', 'Dirty air filter or restricted airflow'] },
-      { q: 'An appliance frequently trips the circuit breaker when turned on. What is the most appropriate action?', a: 'Check for electrical fault or overload', o: ['Reset breaker repeatedly', 'Check for electrical fault or overload', 'Use extension cord', 'None of the above'] },
-      { q: 'A wooden door is difficult to close because it rubs against the frame. What is the best solution?', a: 'Adjust or sand the edges', o: ['Force it closed', 'Adjust or sand the edges', 'Remove the handle', 'Replace all hinges immediately'] },
-      { q: 'A power outlet suddenly stops working while other appliances are still functioning. What is the likely cause?', a: 'Tripped circuit or faulty outlet', o: ['Tripped circuit or faulty outlet', 'Broken appliance', 'No electricity in house', 'None of the above'] },
-      { q: 'A refrigerator freezer works, but the lower compartment is not cooling properly. What is the likely issue?', a: 'Blocked air vents between compartments', o: ['Dirty or clogged condenser coils', 'Frequent door opening causing temperature fluctuation', 'Faulty thermostat settings', 'Blocked air vents between compartments'] },
-      { q: 'Rust is forming on exposed pipes. What does this indicate?', a: 'Pipe may be deteriorating and needs replacement', o: ['Pipe may be deteriorating and needs replacement', 'Natural oxidation due to moisture exposure', 'Mineral buildup from water flow', 'Surface discoloration from chemical reactions'] },
-      { q: 'What should be done before cleaning a ceiling fan or appliance?', a: 'Disconnect the power source', o: ['Spray water immediately', 'Disconnect the power source', 'Pull the fan blades down', 'Use metal tools first'] },
-      { q: 'A tile sounds hollow when tapped. What can this indicate?', a: 'Poor bonding or loose tile', o: ['Perfect installation', 'Poor bonding or loose tile', 'Normal paint issue', 'Electrical problem'] },
-      { q: 'What is the safest first step before repairing an electrical switch?', a: 'Turn off the circuit breaker', o: ['Touch the wire to test it', 'Turn off the circuit breaker', 'Use wet hands', 'Replace the bulb only'] },
-      { q: 'A washing machine vibrates heavily during spin. What should you check first?', a: 'Load balance and machine leveling', o: ['Paint color', 'Load balance and machine leveling', 'Drain smell only', 'Door handle'] },
+    const fallbackQuestionBank = [
       { q: 'Which document best proves service experience?', a: 'Certificate, portfolio, or client feedback', o: ['Random receipt', 'Certificate, portfolio, or client feedback', 'Blank paper', 'Unreadable photo'] },
       { q: 'What should you do if a client asks for work outside your skill level?', a: 'Decline or refer to a qualified provider', o: ['Guess the repair', 'Decline or refer to a qualified provider', 'Charge extra and try', 'Ignore safety rules'] },
       { q: 'What is important when entering a customer home?', a: 'Respect property and communicate clearly', o: ['Move items without asking', 'Respect property and communicate clearly', 'Ignore the customer', 'Start unrelated work'] },
-      { q: 'A drain is slow but not fully blocked. What is a reasonable first check?', a: 'Inspect trap or visible blockage', o: ['Break the pipe', 'Inspect trap or visible blockage', 'Replace the roof', 'Turn on all appliances'] },
       { q: 'What should be included before starting paid service work?', a: 'Scope, price, and expected completion', o: ['Only verbal guessing', 'Scope, price, and expected completion', 'No discussion', 'Hidden fees'] },
       { q: 'What is the best response after finishing a repair?', a: 'Test the work and explain what was done', o: ['Leave immediately', 'Test the work and explain what was done', 'Hide old parts', 'Avoid questions'] },
     ];
+
+    const assessmentQuestionBanks = {
+      'Repair Services': [
+        { q: 'A client complains about low water pressure in the faucet. What is the most likely cause to check first?', a: 'Blockage or valve problem', o: ['Paint issue', 'Blockage or valve problem', 'Roof leak', 'Door alignment'] },
+        { q: 'A client reports that a light is flickering frequently. What is the best first step in diagnosing the issue?', a: 'Check connections and power source', o: ['Replace all wires', 'Check connections and power source', 'Turn off the house electricity completely', 'Replace the light fixture immediately'] },
+        { q: 'You are called to fix a leaking pipe under a sink. What should you do first before starting the repair?', a: 'Turn off the water supply', o: ['Start replacing the pipe', 'Add sealant immediately', 'Turn off the water supply', 'Remove the entire sink'] },
+        { q: 'While inspecting a refrigerator, you notice that it is not keeping food cold enough. What should you check first?', a: 'Door alignment and seal condition', o: ['Door alignment and seal condition', 'Thermostat setting inside the refrigerator', 'Frequency of door opening', 'Placement near heat sources'] },
+        { q: 'A client reports that their air conditioner is running but not cooling properly. What is the most likely issue to check first?', a: 'Dirty air filter or restricted airflow', o: ['Thermostat setting is too high', 'Power supply is completely off', 'Remote control battery is low', 'Dirty air filter or restricted airflow'] },
+        { q: 'An appliance frequently trips the circuit breaker when turned on. What is the most appropriate action?', a: 'Check for an electrical fault or overload', o: ['Reset the breaker repeatedly', 'Check for an electrical fault or overload', 'Connect the appliance to an extension cord', 'Continue using the appliance until the breaker remains on'] },
+        { q: 'A wooden door is difficult to close because it rubs against the frame. What is the best solution?', a: 'Adjust or sand the affected edges', o: ['Force it closed several times', 'Adjust or sand the affected edges', 'Remove the door handle', 'Replace the entire door immediately'] },
+        { q: 'A power outlet suddenly stops working while other appliances are still functioning. What is the likely cause?', a: 'Tripped circuit or faulty outlet', o: ['Tripped circuit or faulty outlet', 'Damaged appliance connected elsewhere', 'Complete loss of electricity in the house', 'Low water pressure in the plumbing system'] },
+        { q: 'A refrigerator freezer is working, but the lower compartment is not cooling properly. What is the likely issue?', a: 'Blocked air vents between compartments', o: ['Dirty or clogged condenser coils', 'Frequent door opening causing temperature fluctuation', 'Faulty thermostat settings', 'Blocked air vents between compartments'] },
+        { q: 'Rust is forming on exposed pipes. What does this indicate?', a: 'The pipe may be deteriorating and may need replacement', o: ['The pipe may be deteriorating and may need replacement', 'Natural oxidation caused by moisture exposure', 'Mineral buildup caused by normal water flow', 'Surface discoloration caused by cleaning chemicals'] },
+        { q: 'A customer asks you to repair a damaged electrical outlet, but you discover signs of overheating around the wiring. What is the most appropriate response?', a: 'Isolate the electrical hazard and refer the work to a qualified electrical professional if it exceeds your competence', o: ['Replace the outlet cover and continue the repair', 'Remove the visible discoloration and proceed with the work', 'Cover the damaged area with electrical tape', 'Isolate the electrical hazard and refer the work to a qualified electrical professional if it exceeds your competence'] },
+        { q: 'When repairing a door that does not close properly, which should normally be assessed before replacing the door?', a: 'The alignment, hinges, frame condition, and possible obstructions', o: ['The color and finish of the door', 'The alignment, hinges, frame condition, and possible obstructions', "The customer's preferred replacement brand", 'The thickness and style of the door handle'] },
+        { q: 'A cabinet door is sagging and scraping against the lower frame. Which repair is most appropriate as an initial approach?', a: 'Inspect and adjust the hinges and mounting points before considering replacement', o: ['Remove the entire cabinet door', 'Add screws to several random locations', 'Inspect and adjust the hinges and mounting points before considering replacement', 'Sand the entire door until it clears the frame'] },
+        { q: 'A customer asks you to mount a heavy shelf on a partition wall. What factor is most important before selecting the mounting hardware?', a: 'The wall construction and expected load', o: ['The color and appearance of the hardware', 'The length and design of the shelf', "The customer's preferred screw type", 'The wall construction and expected load'] },
+        { q: 'During a plumbing repair, you tighten a fitting, but the connection continues to leak. What should you do before tightening it further?', a: 'Determine whether the fitting, seal, or connection method is appropriate and inspect for damage', o: ['Determine whether the fitting, seal, or connection method is appropriate and inspect for damage', 'Apply more force using a longer wrench', 'Wrap the entire fitting with additional tape without inspection', 'Continue tightening until the fitting stops moving'] },
+        { q: 'A customer asks you to repair a leaking roof during heavy rain. What is the most appropriate professional response?', a: 'Explain the safety concern and arrange the repair when conditions allow safe access, while addressing any immediate interior protection that can be done safely', o: ['Climb onto the roof immediately because the leak is urgent', 'Continue the repair if the customer agrees to additional payment', 'Explain the safety concern and arrange the repair when conditions allow safe access, while addressing any immediate interior protection that can be done safely', 'Apply sealant over the visible ceiling stain from inside the house'] },
+        { q: 'Which situation most strongly indicates that a home repair should be referred to a specialist?', a: "A structural issue that may affect the building's stability", o: ['A loose cabinet handle', 'A minor paint chip on the wall', 'A slightly misaligned drawer', "A structural issue that may affect the building's stability"] },
+        { q: 'A customer tells you that a repaired pipe has started leaking again several days after the service. What is the best professional response?', a: 'Review the previous repair, inspect the current condition, and determine whether further corrective work is required', o: ['Explain that plumbing leaks can happen unexpectedly', 'Ask the customer to repair the problem themselves', 'Review the previous repair, inspect the current condition, and determine whether further corrective work is required', 'Replace unrelated plumbing components to prevent future leaks'] },
+        { q: 'When using a ladder for a home repair, which practice is most appropriate?', a: 'Set it on a stable surface and use it according to its intended operating instructions', o: ['Place it on any available surface if the task will only take a few minutes', 'Stand on the highest step when additional reach is needed', 'Set it on a stable surface and use it according to its intended operating instructions', "Have another person hold it while disregarding the ladder's operating limits"] },
+        { q: 'Which sequence best represents a professional approach to a repair request?', a: 'Inspect the problem, identify the cause, explain the required work, perform the repair, and verify the result', o: ['Repair the issue, inspect the result, diagnose the cause, then discuss the work', 'Inspect the problem, identify the cause, explain the required work, perform the repair, and verify the result', 'Estimate the cost, begin the repair, and determine the problem afterward', 'Replace components first and inspect the issue only if the repair is unsuccessful'] },
+      ],
+    };
 
     const servicesByCategory = {
       'Repair Services': [
@@ -285,9 +295,11 @@
       return [...items].sort(() => Math.random() - 0.5);
     }
 
-    function renderAssessment() {
-      activeAssessmentQuestions = shuffle(questionBank).slice(0, 10);
+    function renderAssessment(categoryName = '') {
+      const category = categoryName || document.getElementById('category')?.value || '';
+      const questionBank = assessmentQuestionBanks[category] || fallbackQuestionBank;
       const list = document.getElementById('assessment-list');
+      activeAssessmentQuestions = shuffle(questionBank).slice(0, 10);
       list.innerHTML = activeAssessmentQuestions.map((item, index) => `
         <fieldset class="assessment-question">
           <legend>${index + 1}. ${item.q}</legend>
@@ -305,6 +317,8 @@
       const category = document.getElementById('category')?.value || '';
       const serviceField = document.getElementById('service');
       if (!serviceField) return;
+      activeAssessmentQuestions = [];
+      latestAssessmentScore = 0;
       const services = servicesByCategory[category] || [];
       serviceField.innerHTML = services.length
         ? '<option value="" disabled selected>Choose a service</option>' + services.map(service => `<option>${service}</option>`).join('')
@@ -379,6 +393,9 @@
     }
 
     function validateAssessment() {
+      if (!activeAssessmentQuestions.length) {
+        renderAssessment(document.getElementById('category')?.value || '');
+      }
       const answers = activeAssessmentQuestions.map((item, index) => {
         const selected = document.querySelector(`input[name="assessment-${index}"]:checked`);
         return { question: item.q, answer: selected?.value || '', correct: item.a };
@@ -395,7 +412,10 @@
     function nextStep(e, to) {
       e.preventDefault();
       if (to === 2 && !validateStep1()) return;
-      if (to === 3 && !validateStep2()) return;
+      if (to === 3) {
+        if (!validateStep2()) return;
+        renderAssessment(document.getElementById('category')?.value || '');
+      }
       showStep(to);
     }
 
@@ -585,7 +605,6 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       sessionStorage.removeItem('sn_provider_register_success');
-      renderAssessment();
       document.getElementById('category')?.addEventListener('change', updateServiceOptions);
       updateServiceOptions();
       applyGooglePrefill();
