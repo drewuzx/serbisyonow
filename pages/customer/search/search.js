@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     topSearch.closest('.sn-topbar-search').style.display = 'none';
   }
 
-  const categories = ['All', 'Home Repair', 'Cleaning', 'Personal Care', 'Appliance Maintenance', 'Home Installation'];
+  const categories = ['All', 'Repair Services', 'Cleaning', 'Personal Care', 'Appliance Maintenance', 'Installation Services', 'Outdoor and Property Maintenance'];
   const sortPanel = document.createElement('div');
   sortPanel.className = 'sn-sort-summary';
   sortPanel.innerHTML = `

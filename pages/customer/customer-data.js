@@ -143,7 +143,7 @@ function snAttachUniversalCustomerFilter(customer) {
   if (oldSearchWrap) oldSearchWrap.appendChild(filterButton);
  }
 
- const categories = ['All', 'Home Repair', 'Cleaning', 'Personal Care', 'Appliance Maintenance', 'Home Installation'];
+ const categories = ['All', 'Repair Services', 'Cleaning', 'Personal Care', 'Appliance Maintenance', 'Installation Services', 'Outdoor and Property Maintenance'];
  const panel = document.createElement('section');
  panel.id = 'sn-universal-filter-panel';
  panel.className = 'sn-universal-filter-panel sn-unlocked-control';
@@ -512,12 +512,12 @@ document.addEventListener('DOMContentLoaded', async () => {
  snAttachTopbarRealtime(customer, data);
 
  const dashboardCatalog = [
-  { name: 'Home Repair', description: 'Plumbing, electrical, appliance, carpentry, roofing, painting, and welding.', image: 'Repairs.png', services: ['Plumbing', 'Electrical', 'Appliance', 'Carpentry', 'Roofing', 'Painting', 'Welding'] },
-  { name: 'Cleaning', description: 'House cleaning, laundry, drains, and move-in or move-out cleaning.', image: 'Cleaning.png', services: ['House Cleaning', 'Deep Cleaning', 'Laundry Service', 'Drain Cleaning', 'Move-in / Move-out Cleaning'] },
-  { name: 'Personal Care', description: 'Massage, nail care, grooming, and wellness services.', image: 'Personal Care.png', services: ['Massage Therapy', 'Nail Care', 'Haircut and Grooming', 'Home Wellness Care'] },
-  { name: 'Appliance Maintenance', description: 'Refrigerator, aircon, washing machine, and appliance installation services.', image: 'Appliance Maintenance.png', services: ['Refrigerator Repair', 'Aircon Cleaning', 'Washing Machine Repair', 'Small Appliance Repair', 'Appliance Installation'] },
-  { name: 'Home Installation', description: 'Pipes, fixtures, shelves, curtains, blinds, and general installations.', image: 'Installationn.png', services: ['Pipe Installation', 'Light Fixture Installation', 'Shelf Installation', 'Curtain and Blinds Installation', 'General Fixture Installation'] },
-  { name: 'Outdoor & Property Maintenance', description: 'Grass cutting, garden cleanup, gutters, outdoor repairs, and property maintenance.', image: 'Outdoor & Property Repair.png', services: ['Grass Cutting', 'Garden Cleanup', 'Gutter Cleaning', 'Outdoor Repair', 'Property Maintenance'] },
+  { name: 'Repair Services', description: 'Services related to fixing or maintaining household facilities.', image: 'Repairs.png', services: ['Plumbing services', 'Electrical repair', 'Appliance repair', 'Carpentry', 'Roof repair', 'Furniture repair', 'Painting services', 'Door and window repair'] },
+  { name: 'Cleaning', description: 'Services focused on cleaning and sanitation of homes.', image: 'Cleaning.png', services: ['General house cleaning', 'Deep cleaning', 'Bathroom cleaning', 'Kitchen cleaning', 'Sofa and upholstery cleaning', 'Carpet cleaning', 'Window cleaning', 'Laundry Services'] },
+  { name: 'Personal Care', description: 'Services related to health, relaxation, and personal care.', image: 'Personal Care.png', services: ['Massage therapy', 'Home spa services', 'Haircut', 'Nail Care', 'Eyelash Care', 'Grooming'] },
+  { name: 'Appliance Maintenance', description: 'Services focused on maintaining household appliances.', image: 'Appliance Maintenance.png', services: ['Aircon', 'Refrigerator', 'Washing Machine', 'Microwave', 'TV / Electronics', 'Small Appliances'] },
+  { name: 'Installation Services', description: 'Services that improve or upgrade household facilities.', image: 'Installationn.png', services: ['Furniture assembly', 'Cabinet installation', 'Curtain or blinds installation', 'Lighting installation', 'CCTV installation', 'Internet or router setup', 'Appliance Installation'] },
+  { name: 'Outdoor and Property Maintenance', description: 'Services related to the maintenance of outdoor spaces.', image: 'Outdoor & Property Repair.png', services: ['Gardening services', 'Lawn mowing', 'Landscape maintenance', 'Tree trimming', 'Fence repair'] },
  ];
  const verifiedProviders = data.providers || [];
  const categoryData = new Map((data.categories || []).map(category => [category.name, category]));
@@ -545,12 +545,16 @@ document.addEventListener('DOMContentLoaded', async () => {
  const hasRealProviderIds = [...providerGrid.querySelectorAll('.sn-fav-btn')].some(button => button.dataset.providerId);
  const providerTitle = providerGrid.closest('.sn-section')?.querySelector('.sn-section-head h2');
   const chipRow = document.querySelector('.sn-chips');
-  const allLandingServices = ['Plumbing', 'Electrical', 'Appliance', 'Carpentry', 'Roofing', 'Painting', 'Welding'];
+  const allLandingServices = ['Plumbing services', 'Electrical repair', 'Appliance repair', 'Carpentry', 'Roof repair', 'Furniture repair', 'Painting services', 'Door and window repair'];
   const fallbackServices = Object.fromEntries(dashboardCatalog.map(category => [category.name, category.services]));
   const categoryServices = new Map((data.categories || []).map(category => [category.name, category.services || []]));
   const categoryAliases = {
-   'Home Installations': 'Home Installation',
-   'Outdoor & Property': 'Outdoor & Property Maintenance',
+   'Home Repair': 'Repair Services',
+   'Home Installations': 'Installation Services',
+   'Home Installation': 'Installation Services',
+   'Outdoor & Property': 'Outdoor and Property Maintenance',
+   'Outdoor & Property Maintenance': 'Outdoor and Property Maintenance',
+   'Outdoor Maintenance': 'Outdoor and Property Maintenance',
   };
  if (providerTitle && data.recommendations?.length) providerTitle.textContent = 'Recommended For You';
  const emptyText = 'No providers match this selection yet.';

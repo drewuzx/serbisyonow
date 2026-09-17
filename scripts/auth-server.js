@@ -188,55 +188,7 @@ function googleDashboardPath(role) {
 }
 
 async function buildRegistrationPasswordHash(req) {
-  if (req.body.authProvider === 'google') {
-    return buildGoogleOnlyPasswordHash(req.body.email);
-  }
   return bcrypt.hash(req.body.password, 12);
-}
-
-async function buildGoogleOnlyPasswordHash(email) {
-  return bcrypt.hash(`google-only:${email}:${crypto.randomBytes(24).toString('hex')}`, 12);
-}
-
-function googleProfileName(profile) {
-  return String(profile?.fullName || profile?.email || 'Google User').trim();
-}
-
-async function createGoogleCustomerAccount(profile) {
-  const passwordHash = await buildGoogleOnlyPasswordHash(profile.email);
-  const result = await db.query(
-    `INSERT INTO customers
-      (full_name, address, gender, contact, dob, email, password_hash, id_type, id_address, auth_provider, google_sub)
-     VALUES ($1, '', 'Prefer not to say', '', '1900-01-01', lower($2), $3, NULL, NULL, 'google', $4)
-     RETURNING *`,
-    [
-      googleProfileName(profile),
-      profile.email,
-      passwordHash,
-      profile.googleSub || null,
-    ]
-  );
-  return result.rows[0];
-}
-
-async function createGoogleProviderAccount(profile) {
-  const passwordHash = await buildGoogleOnlyPasswordHash(profile.email);
-  const result = await db.query(
-    `INSERT INTO providers
-      (full_name, address, gender, contact, dob, email, password_hash, category, service,
-       experience, experience_years, experience_certification, auth_provider, google_sub)
-     VALUES ($1, '', 'Prefer not to say', '', '1900-01-01', lower($2), $3, 'Profile Setup',
-       'Complete service details', 'Google signup pending profile completion.', 'Not provided',
-       'Pending profile completion', 'google', $4)
-     RETURNING *`,
-    [
-      googleProfileName(profile),
-      profile.email,
-      passwordHash,
-      profile.googleSub || null,
-    ]
-  );
-  return result.rows[0];
 }
 
 async function ensureUniqueAccountEmail(email) {
@@ -1164,15 +1116,72 @@ async function ensureAdminSupportTables() {
   `);
 
   await db.query(`
+    UPDATE providers
+    SET category = CASE
+      WHEN category IN ('Home Repair') THEN 'Repair Services'
+      WHEN category IN ('Home Installation', 'Home Installations') THEN 'Installation Services'
+      WHEN category IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance') THEN 'Outdoor and Property Maintenance'
+      ELSE category
+    END;
+
+    UPDATE provider_services
+    SET category = CASE
+      WHEN category IN ('Home Repair') THEN 'Repair Services'
+      WHEN category IN ('Home Installation', 'Home Installations') THEN 'Installation Services'
+      WHEN category IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance') THEN 'Outdoor and Property Maintenance'
+      ELSE category
+    END;
+
+    UPDATE provider_skill_assessments
+    SET category = CASE
+      WHEN category IN ('Home Repair') THEN 'Repair Services'
+      WHEN category IN ('Home Installation', 'Home Installations') THEN 'Installation Services'
+      WHEN category IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance') THEN 'Outdoor and Property Maintenance'
+      ELSE category
+    END;
+
+    DELETE FROM service_categories
+    WHERE name = 'Home Repair'
+      AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Repair Services');
+    DELETE FROM service_categories
+    WHERE name = 'Home Installations'
+      AND EXISTS (SELECT 1 FROM service_categories WHERE name IN ('Home Installation', 'Installation Services'));
+    DELETE FROM service_categories
+    WHERE name IN ('Home Installation', 'Home Installations')
+      AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Installation Services');
+    DELETE FROM service_categories
+    WHERE name IN ('Outdoor & Property', 'Outdoor Maintenance')
+      AND EXISTS (SELECT 1 FROM service_categories WHERE name IN ('Outdoor & Property Maintenance', 'Outdoor and Property Maintenance'));
+    DELETE FROM service_categories
+    WHERE name = 'Outdoor Maintenance'
+      AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Outdoor & Property');
+    DELETE FROM service_categories
+    WHERE name IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance')
+      AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Outdoor and Property Maintenance');
+
+    UPDATE service_categories
+    SET name = 'Repair Services'
+    WHERE name = 'Home Repair';
+    UPDATE service_categories
+    SET name = 'Installation Services'
+    WHERE name IN ('Home Installation', 'Home Installations');
+    UPDATE service_categories
+    SET name = 'Outdoor and Property Maintenance'
+    WHERE name IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance');
+
     INSERT INTO service_categories (name, description, services)
     VALUES
-      ('Home Repair', 'Plumbing, electrical, carpentry, roofing, painting.', ARRAY['Plumbing','Electrical','Carpentry','Roofing','Painting']),
-      ('Cleaning', 'General cleaning, deep cleaning, and laundry assistance.', ARRAY['General Cleaning','Deep Cleaning','Laundry Assistance']),
-      ('Personal Care', 'Nail care, massage therapy, grooming services.', ARRAY['Nail Care','Massage Therapy','Grooming']),
-      ('Appliance Maintenance', 'AC, refrigerator, washer, and small appliance support.', ARRAY['AC Service','Refrigerator Repair','Washer Repair']),
-      ('Home Installation', 'Fixtures, shelves, lights, and small installations.', ARRAY['Light Installation','Fixture Setup','Shelf Mounting']),
-      ('Outdoor & Property Maintenance', 'Garden cleanup, grass cutting, and property upkeep.', ARRAY['Grass Cutting','Garden Cleanup','Property Upkeep'])
-    ON CONFLICT (name) DO NOTHING
+      ('Repair Services', 'Services related to fixing or maintaining household facilities.', ARRAY['Plumbing services','Electrical repair','Appliance repair','Carpentry','Roof repair','Furniture repair','Painting services','Door and window repair']),
+      ('Cleaning', 'Services focused on cleaning and sanitation of homes.', ARRAY['General house cleaning','Deep cleaning','Bathroom cleaning','Kitchen cleaning','Sofa and upholstery cleaning','Carpet cleaning','Window cleaning','Laundry Services']),
+      ('Personal Care', 'Services related to health, relaxation, and personal care.', ARRAY['Massage therapy','Home spa services','Haircut','Nail Care','Eyelash Care','Grooming']),
+      ('Appliance Maintenance', 'Services focused on maintaining household appliances.', ARRAY['Aircon','Refrigerator','Washing Machine','Microwave','TV / Electronics','Small Appliances']),
+      ('Installation Services', 'Services that improve or upgrade household facilities.', ARRAY['Furniture assembly','Cabinet installation','Curtain or blinds installation','Lighting installation','CCTV installation','Internet or router setup','Appliance Installation']),
+      ('Outdoor and Property Maintenance', 'Services related to the maintenance of outdoor spaces.', ARRAY['Gardening services','Lawn mowing','Landscape maintenance','Tree trimming','Fence repair'])
+    ON CONFLICT (name) DO UPDATE
+    SET description = EXCLUDED.description,
+        services = EXCLUDED.services,
+        is_active = TRUE,
+        updated_at = NOW()
   `);
 
   await backfillUploadedFilesFromDisk();
@@ -1684,16 +1693,11 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
     });
   }
 
-  const createdAccount = role === 'provider'
-    ? await createGoogleProviderAccount(profile)
-    : await createGoogleCustomerAccount(profile);
-
-  res.status(201).json({
-    action: 'login',
+  res.status(200).json({
+    action: 'register',
     role,
-    redirect: googleDashboardPath(role),
-    is_new_google_account: true,
-    user: role === 'provider' ? providerRow(createdAccount) : customerRow(createdAccount),
+    redirect: googleRegisterPath(role),
+    profile,
   });
 }));
 
@@ -1863,8 +1867,7 @@ app.post('/api/auth/customer/register', upload.fields([
 ]), asyncRoute(async (req, res) => {
   const isGoogleAuth = req.body.authProvider === 'google';
   requireFields(req.body, [
-    'fullName', 'address', 'gender', 'contact', 'dob', 'email',
-    ...(isGoogleAuth ? [] : ['password']),
+    'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
   ]);
   await ensureUniqueAccountEmail(req.body.email);
   await persistRequestUploads(req);
@@ -2425,8 +2428,7 @@ app.post('/api/auth/provider/register', upload.fields([
 ]), asyncRoute(async (req, res) => {
   const isGoogleAuth = req.body.authProvider === 'google';
   requireFields(req.body, [
-    'fullName', 'address', 'gender', 'contact', 'dob', 'email',
-    ...(isGoogleAuth ? [] : ['password']),
+    'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
     'category', 'service', 'experience', 'experienceYears', 'experienceCertification',
   ]);
   await ensureUniqueAccountEmail(req.body.email);

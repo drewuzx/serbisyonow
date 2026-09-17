@@ -1,48 +1,57 @@
 'use strict';
 
 const landingServicesByCategory = {
-  homeRepair: [
-    'Plumbing',
-    'Electrical',
+  repairServices: [
+    'Plumbing services',
+    'Electrical repair',
+    'Appliance repair',
     'Carpentry',
-    'Roof Repair',
-    'Furniture Repair',
-    'Painting Services',
-    'Door and Window Repair',
+    'Roof repair',
+    'Furniture repair',
+    'Painting services',
+    'Door and window repair',
   ],
   cleaning: [
-    'House Cleaning',
-    'Deep Cleaning',
-    'Laundry Service',
-    'Drain Cleaning',
-    'Move-in / Move-out Cleaning',
+    'General house cleaning',
+    'Deep cleaning',
+    'Bathroom cleaning',
+    'Kitchen cleaning',
+    'Sofa and upholstery cleaning',
+    'Carpet cleaning',
+    'Window cleaning',
+    'Laundry Services',
   ],
   personalCare: [
-    'Massage Therapy',
+    'Massage therapy',
+    'Home spa services',
+    'Haircut',
     'Nail Care',
-    'Haircut and Grooming',
-    'Home Wellness Care',
+    'Eyelash Care',
+    'Grooming',
   ],
   applianceMaintenance: [
-    'Refrigerator Repair',
-    'Aircon Cleaning',
-    'Washing Machine Repair',
-    'Small Appliance Repair',
+    'Aircon',
+    'Refrigerator',
+    'Washing Machine',
+    'Microwave',
+    'TV / Electronics',
+    'Small Appliances',
+  ],
+  installationServices: [
+    'Furniture assembly',
+    'Cabinet installation',
+    'Curtain or blinds installation',
+    'Lighting installation',
+    'CCTV installation',
+    'Internet or router setup',
     'Appliance Installation',
   ],
-  homeInstallation: [
-    'Pipe Installation',
-    'Light Fixture Installation',
-    'Shelf Installation',
-    'Curtain and Blinds Installation',
-    'General Fixture Installation',
-  ],
   outdoorMaintenance: [
-    'Grass Cutting',
-    'Garden Cleanup',
-    'Gutter Cleaning',
-    'Outdoor Repair',
-    'Property Maintenance',
+    'Gardening services',
+    'Lawn mowing',
+    'Landscape maintenance',
+    'Tree trimming',
+    'Fence repair',
   ],
 };
 
@@ -50,7 +59,7 @@ function renderLandingServiceTags(category) {
   const tags = document.getElementById('landing-service-tags');
   if (!tags) return;
 
-  const services = landingServicesByCategory[category] || landingServicesByCategory.homeRepair;
+  const services = landingServicesByCategory[category] || landingServicesByCategory.repairServices;
   tags.innerHTML = services.map((service, index) => (
     `<button class="service-tag${index === 0 ? ' active' : ''}" type="button">${service}</button>`
   )).join('');
@@ -83,5 +92,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  renderLandingServiceTags(document.querySelector('.service-cat-card.active')?.dataset.category || 'homeRepair');
+  renderLandingServiceTags(document.querySelector('.service-cat-card.active')?.dataset.category || 'repairServices');
 });

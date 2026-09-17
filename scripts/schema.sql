@@ -212,12 +212,69 @@ CREATE TABLE IF NOT EXISTS provider_skill_assessments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+UPDATE providers
+SET category = CASE
+  WHEN category IN ('Home Repair') THEN 'Repair Services'
+  WHEN category IN ('Home Installation', 'Home Installations') THEN 'Installation Services'
+  WHEN category IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance') THEN 'Outdoor and Property Maintenance'
+  ELSE category
+END;
+
+UPDATE provider_services
+SET category = CASE
+  WHEN category IN ('Home Repair') THEN 'Repair Services'
+  WHEN category IN ('Home Installation', 'Home Installations') THEN 'Installation Services'
+  WHEN category IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance') THEN 'Outdoor and Property Maintenance'
+  ELSE category
+END;
+
+UPDATE provider_skill_assessments
+SET category = CASE
+  WHEN category IN ('Home Repair') THEN 'Repair Services'
+  WHEN category IN ('Home Installation', 'Home Installations') THEN 'Installation Services'
+  WHEN category IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance') THEN 'Outdoor and Property Maintenance'
+  ELSE category
+END;
+
+DELETE FROM service_categories
+WHERE name = 'Home Repair'
+  AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Repair Services');
+DELETE FROM service_categories
+WHERE name = 'Home Installations'
+  AND EXISTS (SELECT 1 FROM service_categories WHERE name IN ('Home Installation', 'Installation Services'));
+DELETE FROM service_categories
+WHERE name IN ('Home Installation', 'Home Installations')
+  AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Installation Services');
+DELETE FROM service_categories
+WHERE name IN ('Outdoor & Property', 'Outdoor Maintenance')
+  AND EXISTS (SELECT 1 FROM service_categories WHERE name IN ('Outdoor & Property Maintenance', 'Outdoor and Property Maintenance'));
+DELETE FROM service_categories
+WHERE name = 'Outdoor Maintenance'
+  AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Outdoor & Property');
+DELETE FROM service_categories
+WHERE name IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance')
+  AND EXISTS (SELECT 1 FROM service_categories WHERE name = 'Outdoor and Property Maintenance');
+
+UPDATE service_categories
+SET name = 'Repair Services'
+WHERE name = 'Home Repair';
+UPDATE service_categories
+SET name = 'Installation Services'
+WHERE name IN ('Home Installation', 'Home Installations');
+UPDATE service_categories
+SET name = 'Outdoor and Property Maintenance'
+WHERE name IN ('Outdoor & Property Maintenance', 'Outdoor & Property', 'Outdoor Maintenance');
+
 INSERT INTO service_categories (name, description, services)
 VALUES
-  ('Home Repair', 'Plumbing, electrical, carpentry, roofing, painting.', ARRAY['Plumbing','Electrical','Carpentry','Roofing','Painting']),
-  ('Cleaning', 'General cleaning, deep cleaning, and laundry assistance.', ARRAY['General Cleaning','Deep Cleaning','Laundry Assistance']),
-  ('Personal Care', 'Nail care, massage therapy, grooming services.', ARRAY['Nail Care','Massage Therapy','Grooming']),
-  ('Appliance Maintenance', 'AC, refrigerator, washer, and small appliance support.', ARRAY['AC Service','Refrigerator Repair','Washer Repair']),
-  ('Home Installation', 'Fixtures, shelves, lights, and small installations.', ARRAY['Light Installation','Fixture Setup','Shelf Mounting']),
-  ('Outdoor & Property Maintenance', 'Garden cleanup, grass cutting, and property upkeep.', ARRAY['Grass Cutting','Garden Cleanup','Property Upkeep'])
-ON CONFLICT (name) DO NOTHING;
+  ('Repair Services', 'Services related to fixing or maintaining household facilities.', ARRAY['Plumbing services','Electrical repair','Appliance repair','Carpentry','Roof repair','Furniture repair','Painting services','Door and window repair']),
+  ('Cleaning', 'Services focused on cleaning and sanitation of homes.', ARRAY['General house cleaning','Deep cleaning','Bathroom cleaning','Kitchen cleaning','Sofa and upholstery cleaning','Carpet cleaning','Window cleaning','Laundry Services']),
+  ('Personal Care', 'Services related to health, relaxation, and personal care.', ARRAY['Massage therapy','Home spa services','Haircut','Nail Care','Eyelash Care','Grooming']),
+  ('Appliance Maintenance', 'Services focused on maintaining household appliances.', ARRAY['Aircon','Refrigerator','Washing Machine','Microwave','TV / Electronics','Small Appliances']),
+  ('Installation Services', 'Services that improve or upgrade household facilities.', ARRAY['Furniture assembly','Cabinet installation','Curtain or blinds installation','Lighting installation','CCTV installation','Internet or router setup','Appliance Installation']),
+  ('Outdoor and Property Maintenance', 'Services related to the maintenance of outdoor spaces.', ARRAY['Gardening services','Lawn mowing','Landscape maintenance','Tree trimming','Fence repair'])
+ON CONFLICT (name) DO UPDATE
+SET description = EXCLUDED.description,
+    services = EXCLUDED.services,
+    is_active = TRUE,
+    updated_at = NOW();

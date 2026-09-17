@@ -873,7 +873,7 @@ async function saveService(service) {
   if (!provider?.id) return;
   const modalTitle = service?.id ? 'Edit service' : 'Add service';
   const categoryOptions = await getAvailableServiceCategories();
-  const defaultCategory = service?.category || provider.category || categoryOptions[0] || 'Home Repair';
+  const defaultCategory = service?.category || provider.category || categoryOptions[0] || 'Repair Services';
 
   const title = await openProviderModal({
     title: modalTitle,

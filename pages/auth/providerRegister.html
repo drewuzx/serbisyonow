@@ -81,7 +81,7 @@
         <div id="form-s2" autocomplete="off">
           <div class="provider-verification-grid">
             <div>
-              <div class="form-group"><label>Choose Service Category</label><select class="form-control" id="category" required><option value="" disabled selected>Choose a category</option><option>Home Repair</option><option>Cleaning</option><option>Personal Care</option><option>Appliance Maintenance</option><option>Home Installation</option><option>Outdoor & Property Maintenance</option><option>Others</option></select></div>
+              <div class="form-group"><label>Choose Service Category</label><select class="form-control" id="category" required><option value="" disabled selected>Choose a category</option><option>Repair Services</option><option>Cleaning</option><option>Personal Care</option><option>Appliance Maintenance</option><option>Installation Services</option><option>Outdoor and Property Maintenance</option><option>Others</option></select></div>
               <div class="form-group"><label>Select Services</label><select class="form-control" id="service" required disabled><option value="" disabled selected>Select a category first</option></select></div>
               <div class="form-group"><label>Years of Experience</label><select id="experience-years" class="form-control" required><option value="" disabled selected>Enter your years of experience</option><option>1 year below</option><option>2-3 years</option><option>3 years and higher</option></select></div>
               <div class="form-group"><label>Skill Verification</label><p class="field-note">(Certificates, Recognition, Portfolio, Feedbacks, Photos, etc.)</p><label class="upload-pill" id="docs-box"><span id="docs-label">Upload Supporting Documents</span><strong>+</strong><input id="docs" type="file" multiple accept="image/*,.pdf" required onchange="handleUpload(this,'docs-label','docs-box')"/></label></div>
@@ -150,7 +150,7 @@
       <div class="footer-col">
         <h4>Services</h4>
         <ul>
-          <li><a href="#">Home Repair</a></li>
+          <li><a href="#">Repair Services</a></li>
           <li><a href="#">Cleaning</a></li>
           <li><a href="#">Personal Care</a></li>
           <li><a href="#">Appliance Maintenance</a></li>
@@ -216,53 +216,57 @@
     ];
 
     const servicesByCategory = {
-      'Home Repair': [
-        'Plumbing',
-        'Electrical',
+      'Repair Services': [
+        'Plumbing services',
+        'Electrical repair',
+        'Appliance repair',
         'Carpentry',
-        'Roof Repair',
-        'Painting',
-        'Door and Window Repair',
-        'Others',
+        'Roof repair',
+        'Furniture repair',
+        'Painting services',
+        'Door and window repair',
       ],
       'Cleaning': [
-        'House Cleaning',
-        'Deep Cleaning',
-        'Laundry Service',
-        'Drain Cleaning',
-        'Move-in / Move-out Cleaning',
-        'Others',
+        'General house cleaning',
+        'Deep cleaning',
+        'Bathroom cleaning',
+        'Kitchen cleaning',
+        'Sofa and upholstery cleaning',
+        'Carpet cleaning',
+        'Window cleaning',
+        'Laundry Services',
       ],
       'Personal Care': [
-        'Massage Therapy',
+        'Massage therapy',
+        'Home spa services',
+        'Haircut',
         'Nail Care',
-        'Haircut and Grooming',
-        'Home Wellness Care',
-        'Others',
+        'Eyelash Care',
+        'Grooming',
       ],
       'Appliance Maintenance': [
-        'Refrigerator Repair',
-        'Aircon Cleaning',
-        'Washing Machine Repair',
-        'Small Appliance Repair',
+        'Aircon',
+        'Refrigerator',
+        'Washing Machine',
+        'Microwave',
+        'TV / Electronics',
+        'Small Appliances',
+      ],
+      'Installation Services': [
+        'Furniture assembly',
+        'Cabinet installation',
+        'Curtain or blinds installation',
+        'Lighting installation',
+        'CCTV installation',
+        'Internet or router setup',
         'Appliance Installation',
-        'Others',
       ],
-      'Home Installation': [
-        'Pipe Installation',
-        'Light Fixture Installation',
-        'Shelf Installation',
-        'Curtain and Blinds Installation',
-        'General Fixture Installation',
-        'Others',
-      ],
-      'Outdoor & Property Maintenance': [
-        'Grass Cutting',
-        'Garden Cleanup',
-        'Gutter Cleaning',
-        'Outdoor Repair',
-        'Property Maintenance',
-        'Others',
+      'Outdoor and Property Maintenance': [
+        'Gardening services',
+        'Lawn mowing',
+        'Landscape maintenance',
+        'Tree trimming',
+        'Fence repair',
       ],
       'Others': [
         'Others',
@@ -340,7 +344,6 @@
     }
 
     function validateStep1() {
-      const googleMode = isGoogleRegistration();
       const valid = validateForm(document.getElementById('form-s1'), {
         fullname: 'What is your full name?',
         address: 'Enter your address.',
@@ -352,7 +355,6 @@
         'confirm-pw': 'Confirm your password.',
       });
       if (!valid) return SN.toast.error('Please complete all required fields before continuing.'), false;
-      if (googleMode) return true;
       if (document.getElementById('password').value !== document.getElementById('confirm-pw').value) {
         showFieldError(document.getElementById('confirm-pw'), 'Passwords do not match.');
         SN.toast.error('Passwords do not match.');
@@ -454,10 +456,10 @@
       if (passwordField && confirmField) {
         passwordField.value = '';
         confirmField.value = '';
-        passwordField.required = false;
-        confirmField.required = false;
-        passwordField.closest('.form-group')?.classList.add('sn-google-hidden-field');
-        confirmField.closest('.form-group')?.classList.add('sn-google-hidden-field');
+        passwordField.required = true;
+        confirmField.required = true;
+        passwordField.closest('.form-group')?.classList.remove('sn-google-hidden-field');
+        confirmField.closest('.form-group')?.classList.remove('sn-google-hidden-field');
       }
 
       const warning = document.getElementById('step-1-warning');
@@ -469,12 +471,12 @@
       redirectExistingGoogleProvider(profile)
         .then(() => {
           if (warning?.textContent?.includes('Checking')) {
-            warning.textContent = 'New Gmail verified. Complete this provider application once; future Gmail logins go straight to your provider dashboard.';
+            warning.textContent = 'New Gmail verified. Complete this provider application and create a password. Future Gmail logins will go straight to your provider dashboard.';
           }
         })
         .catch(() => {
           if (warning) {
-            warning.textContent = 'New Gmail verified. Complete this provider application once; future Gmail logins go straight to your provider dashboard.';
+            warning.textContent = 'New Gmail verified. Complete this provider application and create a password. Future Gmail logins will go straight to your provider dashboard.';
           }
         });
     }
@@ -540,12 +542,11 @@
       payload.append('contact', document.getElementById('contact').value.trim());
       payload.append('dob', document.getElementById('dob').value);
       payload.append('email', document.getElementById('email').value.trim());
+      payload.append('password', document.getElementById('password').value);
       if (isGoogleRegistration()) {
         const profile = JSON.parse(localStorage.getItem('sn_google_prefill_provider') || 'null');
         payload.append('authProvider', 'google');
         payload.append('googleSub', profile?.googleSub || '');
-      } else {
-        payload.append('password', document.getElementById('password').value);
       }
       payload.append('category', document.getElementById('category').value);
       payload.append('service', document.getElementById('service').value);
