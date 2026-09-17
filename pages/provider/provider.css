@@ -1765,6 +1765,127 @@ body {
   font-size: var(--text-sm);
 }
 
+.sn-reassessment-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1.5px solid #d8e4f7;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+}
+
+.sn-reassessment-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sn-reassessment-head h3 {
+  margin: 0 0 4px;
+  color: var(--blue-dark);
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+}
+
+.sn-reassessment-head p,
+.sn-reassessment-intro p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.sn-reassessment-score {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  min-width: 128px;
+  color: var(--blue-dark);
+  text-align: right;
+}
+
+.sn-reassessment-score span {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.sn-reassessment-score strong {
+  color: var(--sn-action-green-dark);
+  font-size: var(--text-xs);
+}
+
+.sn-reassessment-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sn-reassessment-form {
+  display: grid;
+  gap: 14px;
+}
+
+.sn-reassessment-list {
+  display: grid;
+  gap: 12px;
+}
+
+.sn-reassessment-question {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1.5px solid #d8e4f7;
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.sn-reassessment-question legend {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  color: var(--blue-dark);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.sn-reassessment-question legend span {
+  color: var(--blue-main);
+}
+
+.sn-reassessment-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #f8fbff;
+  color: var(--blue-dark);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.sn-reassessment-option:has(input:checked) {
+  border-color: var(--blue-main);
+  background: var(--blue-pale);
+}
+
+.sn-reassessment-option input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: var(--blue-main);
+}
+
 .sn-profile-status {
   margin: 12px 0 0;
   padding: 10px 12px;
@@ -2025,5 +2146,21 @@ textarea.sn-modal-input {
   .sn-provider-history-layout .sn-completion-banner {
     margin-left: 18px;
     margin-right: 18px;
+  }
+
+  .sn-reassessment-head,
+  .sn-reassessment-intro {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sn-reassessment-score {
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .sn-reassessment-question {
+    padding: 12px;
   }
 }

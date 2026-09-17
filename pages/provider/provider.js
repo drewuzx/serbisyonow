@@ -79,6 +79,40 @@ function money(value) {
   return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
 }
 
+let activeProviderReassessmentQuestions = [];
+
+function providerAssessmentBanks() {
+  return {
+    fallback: window.SN_PROVIDER_ASSESSMENT_FALLBACK || [],
+    banks: window.SN_PROVIDER_ASSESSMENT_BANKS || {},
+  };
+}
+
+function providerAssessmentBank(category) {
+  const { fallback, banks } = providerAssessmentBanks();
+  const normalized = String(category || '').trim();
+  const aliases = {
+    'Home Repair': 'Repair Services',
+    'Home Repairs': 'Repair Services',
+    Repairs: 'Repair Services',
+    Cleaning: 'Cleaning',
+    'Cleaning Services': 'Cleaning',
+    'Personal Care': 'Personal Care',
+    'Appliance Repair': 'Appliance Maintenance',
+    'Appliance Maintenance': 'Appliance Maintenance',
+    'Home Installation': 'Installation Services',
+    Installation: 'Installation Services',
+    'Installation Services': 'Installation Services',
+    'Outdoor Maintenance': 'Outdoor and Property Maintenance',
+    'Outdoor and Property Maintenance': 'Outdoor and Property Maintenance',
+  };
+  return banks[normalized] || banks[aliases[normalized]] || fallback;
+}
+
+function shuffleProviderAssessment(items) {
+  return [...items].sort(() => Math.random() - 0.5);
+}
+
 function shortDate(value) {
   if (!value) return '-';
   return new Date(value).toLocaleDateString('en-PH', { month: 'short', day: '2-digit', year: 'numeric' });
@@ -521,7 +555,7 @@ async function loadProviderDatabase() {
     if (path.includes('/assessment/')) renderAssessment(data.assessment, data.metrics);
     if (path.includes('/reviews/')) renderReviews(data.reviews || [], data.metrics);
     if (path.includes('/history/')) renderHistory(data.history_bookings || data.bookings || []);
-    if (path.includes('/profile/')) renderProfile(data.provider || provider, data.metrics);
+    if (path.includes('/profile/')) renderProfile(data.provider || provider, data.metrics, data.assessment);
   } catch (error) {
     console.warn(error.message || error);
   }
@@ -2004,7 +2038,125 @@ function renderProviderHistoryDetail(booking) {
   `;
 }
 
-function renderProfile(provider, metrics) {
+function renderProviderReassessmentSection(provider, metrics, assessment) {
+  const category = provider.category || assessment?.category || 'General';
+  const currentScore = Number(assessment?.score ?? provider.assessment_score ?? 0);
+  const currentBadge = assessment?.badge || metrics?.badge_status || provider.badge_status || 'Needs Reassessment';
+  const questionCount = providerAssessmentBank(category).length;
+  const hasQuestionBank = questionCount >= 10;
+
+  return `
+    <section class="sn-reassessment-section">
+      <div class="sn-reassessment-head">
+        <div>
+          <h3>Skill Reassessment</h3>
+          <p>Retake the ${esc(category)} exam if you failed or want to improve your badge.</p>
+        </div>
+        <div class="sn-reassessment-score">
+          <span>${currentScore}%</span>
+          <strong>${esc(currentBadge)}</strong>
+        </div>
+      </div>
+      <div class="sn-reassessment-intro" id="sn-provider-reassessment-intro">
+        <p>${hasQuestionBank
+          ? 'You will receive 10 shuffled questions from your current provider category. Your newest score will be used for badge and admin verification checks.'
+          : 'No category-specific exam is available for this category yet.'}</p>
+        <button class="btn btn-primary" id="sn-provider-start-reassessment" type="button" ${hasQuestionBank ? '' : 'disabled'}>Retake Assessment</button>
+      </div>
+      <div class="sn-reassessment-form" id="sn-provider-reassessment-form" hidden>
+        <div class="sn-reassessment-list" id="sn-provider-reassessment-list"></div>
+        <div class="sn-actions-row">
+          <button class="btn btn-primary" id="sn-provider-submit-reassessment" type="button">Submit Reassessment</button>
+          <button class="btn btn-outline" id="sn-provider-cancel-reassessment" type="button">Cancel</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function startProviderReassessment(provider) {
+  const category = provider.category || 'General';
+  const list = document.getElementById('sn-provider-reassessment-list');
+  const form = document.getElementById('sn-provider-reassessment-form');
+  const intro = document.getElementById('sn-provider-reassessment-intro');
+  const bank = providerAssessmentBank(category);
+  if (!list || !form || !bank.length) {
+    setProviderProfileStatus('No reassessment questions are available for this category yet.', 'error');
+    return;
+  }
+
+  activeProviderReassessmentQuestions = shuffleProviderAssessment(bank).slice(0, 10);
+  list.innerHTML = activeProviderReassessmentQuestions.map((item, index) => `
+    <fieldset class="sn-reassessment-question">
+      <legend><span>${index + 1}.</span><strong>${esc(item.q)}</strong></legend>
+      ${item.o.map((option, optionIndex) => `
+        <label class="sn-reassessment-option">
+          <input type="radio" name="provider-reassessment-${index}" value="${optionIndex}">
+          <span>${esc(option)}</span>
+        </label>
+      `).join('')}
+    </fieldset>
+  `).join('');
+  intro.hidden = true;
+  form.hidden = false;
+  setProviderProfileStatus('', 'info');
+}
+
+function cancelProviderReassessment() {
+  activeProviderReassessmentQuestions = [];
+  const form = document.getElementById('sn-provider-reassessment-form');
+  const intro = document.getElementById('sn-provider-reassessment-intro');
+  if (form) form.hidden = true;
+  if (intro) intro.hidden = false;
+  setProviderProfileStatus('', 'info');
+}
+
+async function submitProviderReassessment(provider) {
+  if (!provider?.id || !activeProviderReassessmentQuestions.length) return;
+  const button = document.getElementById('sn-provider-submit-reassessment');
+  const answers = activeProviderReassessmentQuestions.map((item, index) => {
+    const selected = document.querySelector(`input[name="provider-reassessment-${index}"]:checked`);
+    const selectedIndex = Number(selected?.value);
+    return {
+      question: item.q,
+      answer: Number.isInteger(selectedIndex) ? item.o[selectedIndex] : '',
+      correct: item.a,
+    };
+  });
+
+  if (answers.some((item) => !item.answer)) {
+    setProviderProfileStatus('Please answer all reassessment questions before submitting.', 'error');
+    return;
+  }
+
+  const correctCount = answers.filter((item) => item.answer === item.correct).length;
+  const score = Math.round((correctCount / answers.length) * 100);
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Submitting...';
+  }
+
+  try {
+    const data = await providerSend(`/api/provider/${provider.id}/reassessment`, 'POST', {
+      category: provider.category || 'General',
+      score,
+      answers,
+    });
+    if (data.user) localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    activeProviderReassessmentQuestions = [];
+    await loadProviderDatabase();
+    setProviderProfileStatus(`Reassessment submitted. New score: ${score}% (${data.assessment?.badge || data.user?.badge_status || 'updated'}).`, score >= 60 ? 'success' : 'error');
+  } catch (error) {
+    setProviderProfileStatus(error.message || 'Unable to submit reassessment.', 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Submit Reassessment';
+    }
+  }
+}
+
+function renderProfile(provider, metrics, assessment) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
   const accuracyLabel = provider.location_accuracy_m ? ` (+/- ${Math.round(provider.location_accuracy_m)}m)` : '';
@@ -2028,6 +2180,7 @@ function renderProfile(provider, metrics) {
       <div class="sn-form-field full"><label>GPS Service Location</label><input id="sn-provider-gps-label" value="${esc(locationLabel)}" readonly /></div>
     </div>
     <div class="sn-provider-documents">${documentLinks}</div>
+    ${renderProviderReassessmentSection(provider, metrics, assessment)}
     <p class="sn-profile-status" id="sn-provider-profile-status" hidden></p>
     <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-save-profile" type="button">Save Profile</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button><button class="btn btn-outline" id="sn-provider-upload-credentials" type="button">Upload Credentials</button></div>
   `;
@@ -2035,6 +2188,9 @@ function renderProfile(provider, metrics) {
   document.getElementById('sn-provider-save-gps')?.addEventListener('click', saveProviderGpsLocation);
   document.getElementById('sn-provider-live-gps')?.addEventListener('click', toggleProviderLiveTracking);
   document.getElementById('sn-provider-upload-credentials')?.addEventListener('click', uploadProviderCredentials);
+  document.getElementById('sn-provider-start-reassessment')?.addEventListener('click', () => startProviderReassessment(provider));
+  document.getElementById('sn-provider-cancel-reassessment')?.addEventListener('click', cancelProviderReassessment);
+  document.getElementById('sn-provider-submit-reassessment')?.addEventListener('click', () => submitProviderReassessment(provider));
 }
 
 function providerUploadUrl(folder, filename) {

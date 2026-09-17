@@ -2565,6 +2565,49 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   res.json({ user: providerRow(result.rows[0]) });
 }));
 
+app.post('/api/provider/:id/reassessment', asyncRoute(async (req, res) => {
+  requireFields(req.body, ['category', 'score', 'answers']);
+  const providerResult = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
+  const provider = providerResult.rows[0];
+  if (!provider) return res.status(404).json({ message: 'Provider not found.' });
+
+  const answers = Array.isArray(req.body.answers) ? req.body.answers : [];
+  if (!answers.length) {
+    return res.status(400).json({ message: 'Assessment answers are required.' });
+  }
+
+  const score = clampScore(req.body.score);
+  const category = String(req.body.category || provider.category || 'General').trim() || 'General';
+  const badge = calculateProviderBadge(score, provider.experience_years);
+  const experience = `Assessment score: ${score}%. Answers: ${JSON.stringify(answers)}`;
+
+  const assessmentResult = await db.query(`
+    INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
+    VALUES ($1, $2, $3, $4)
+    RETURNING *
+  `, [req.params.id, category, score, badge]);
+
+  const updatedProvider = await db.query(`
+    UPDATE providers
+    SET experience = $2,
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+  `, [req.params.id, experience]);
+
+  res.json({
+    assessment: {
+      ...assessmentResult.rows[0],
+      badge,
+    },
+    user: providerRow({
+      ...updatedProvider.rows[0],
+      assessment_score: score,
+      assessment_badge: badge,
+    }),
+  });
+}));
+
 app.patch('/api/provider/:id/credentials', upload.fields([
   { name: 'docs', maxCount: 10 },
   { name: 'idFront', maxCount: 1 },
