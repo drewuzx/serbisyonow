@@ -128,6 +128,37 @@
     }
 
     const AUTH_API_BASE = getAuthApiBase();
+    const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
+
+    function isAllowedCustomerRedirect(target) {
+      const value = String(target || '').trim();
+      if (!value) return false;
+      if (value.startsWith('../customer/')) return true;
+      if (value.startsWith('/pages/customer/')) return true;
+
+      try {
+        const url = new URL(value, window.location.origin);
+        return url.origin === window.location.origin && url.pathname.startsWith('/pages/customer/');
+      } catch {
+        return false;
+      }
+    }
+
+    function consumePendingCustomerRedirect() {
+      let target = '';
+      try {
+        target = sessionStorage.getItem(CUSTOMER_AFTER_LOGIN_KEY) || '';
+      } catch {
+        target = '';
+      }
+      if (!isAllowedCustomerRedirect(target)) return '';
+      try {
+        sessionStorage.removeItem(CUSTOMER_AFTER_LOGIN_KEY);
+      } catch {
+        // Nothing else to do.
+      }
+      return target;
+    }
 
     function setMessage(title, message, state = 'error') {
       document.body.classList.toggle('is-error', state === 'error');
@@ -170,12 +201,13 @@
         const loginRole = data.role === 'provider' ? 'provider' : 'customer';
         localStorage.removeItem(`sn_google_prefill_${loginRole}`);
         localStorage.setItem(loginRole === 'provider' ? 'sn_provider_user' : 'sn_customer_user', JSON.stringify(data.user));
-        window.location.href = `../..${data.redirect}`;
+        const pendingCustomerRedirect = loginRole === 'customer' ? consumePendingCustomerRedirect() : '';
+        window.location.href = pendingCustomerRedirect || `../..${data.redirect}`;
         return;
       }
 
       localStorage.setItem(`sn_google_prefill_${role}`, JSON.stringify(data.profile));
-      setMessage('Continue Registration', 'No account is registered with this Gmail yet. Complete the required details next. No password is needed for Gmail sign-up.', 'success');
+      setMessage('Continue Registration', 'No account is registered with this Gmail yet. Complete the registration form and create a password next.', 'success');
       setTimeout(() => {
         window.location.href = `${data.redirect}?google=1`;
       }, 600);

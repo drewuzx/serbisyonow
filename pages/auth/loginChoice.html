@@ -118,6 +118,35 @@
       </div>
     </div>
   </footer>
+  <script>
+    (function () {
+      const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
+      const params = new URLSearchParams(window.location.search);
+      const source = params.get('from') || '';
+      const query = (params.get('q') || '').trim();
+      const category = (params.get('category') || '').trim();
+      if (!['search', 'service'].includes(source) || (!query && !category)) return;
+
+      const targetParams = new URLSearchParams();
+      if (query) targetParams.set('q', query);
+      if (category) targetParams.set('category', category);
+      const target = `../customer/search/search.html?${targetParams}`;
+
+      try {
+        sessionStorage.setItem(CUSTOMER_AFTER_LOGIN_KEY, target);
+      } catch {
+        // Continue without session storage; the customer login URL keeps the query.
+      }
+
+      const customerLogin = document.querySelector('a[href="customerLogin.html"]');
+      if (customerLogin) {
+        const nextParams = new URLSearchParams({ from: source });
+        if (query) nextParams.set('q', query);
+        if (category) nextParams.set('category', category);
+        customerLogin.href = `customerLogin.html?${nextParams}`;
+      }
+    })();
+  </script>
   <script src="../../shared/js/app.js?v=20260915-api"></script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>

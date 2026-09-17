@@ -2,6 +2,61 @@
 'use strict';
 
 const AUTH_API_BASE = SN.utils.apiBase();
+const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
+
+function buildCustomerSearchRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const source = params.get('from') || '';
+  const query = (params.get('q') || '').trim();
+  const category = (params.get('category') || '').trim();
+  if (!['search', 'service'].includes(source) || (!query && !category)) return '';
+
+  const targetParams = new URLSearchParams();
+  if (query) targetParams.set('q', query);
+  if (category) targetParams.set('category', category);
+  return `../customer/search/search.html?${targetParams}`;
+}
+
+function isAllowedCustomerRedirect(target) {
+  const value = String(target || '').trim();
+  if (!value) return false;
+  if (value.startsWith('../customer/')) return true;
+  if (value.startsWith('/pages/customer/')) return true;
+
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.origin === window.location.origin && url.pathname.startsWith('/pages/customer/');
+  } catch {
+    return false;
+  }
+}
+
+function savePendingCustomerRedirect() {
+  const redirect = buildCustomerSearchRedirect();
+  if (!redirect) return;
+  try {
+    sessionStorage.setItem(CUSTOMER_AFTER_LOGIN_KEY, redirect);
+  } catch {
+    // Session storage can be unavailable in strict/private browsing.
+  }
+}
+
+function consumePendingCustomerRedirect() {
+  let target = '';
+  try {
+    target = sessionStorage.getItem(CUSTOMER_AFTER_LOGIN_KEY) || '';
+  } catch {
+    target = '';
+  }
+
+  if (!isAllowedCustomerRedirect(target)) return '../customer/dashboard/dashboard.html';
+  try {
+    sessionStorage.removeItem(CUSTOMER_AFTER_LOGIN_KEY);
+  } catch {
+    // Nothing else to do.
+  }
+  return target;
+}
 
 function clearFieldError(field) {
   if (!field) return;
@@ -106,7 +161,8 @@ function handleLogin(e) {
       localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
       if (data.user?.is_verified) SN.toast.success('Login successful! Redirecting...');
       else SN.toast.warning('Account pending verification. Limited dashboard access only.');
-      setTimeout(() => window.location.href = '../customer/dashboard/dashboard.html', 700);
+      const redirect = consumePendingCustomerRedirect();
+      setTimeout(() => window.location.href = redirect, 700);
     })
     .catch((error) => {
       const message = error.message || 'Login failed.';
@@ -124,10 +180,12 @@ function handleLogin(e) {
 }
 
 function googleLogin() {
+  savePendingCustomerRedirect();
   window.location.href = `${AUTH_API_BASE}/api/auth/google/start?role=customer`;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  savePendingCustomerRedirect();
   const emailField = document.getElementById('email');
   const passField = document.getElementById('password');
 

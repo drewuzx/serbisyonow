@@ -3,6 +3,37 @@
 
 const AUTH_API_BASE = SN.utils.apiBase();
 const CUSTOMER_REGISTER_SUCCESS_KEY = 'sn_customer_register_success';
+const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
+
+function isAllowedCustomerRedirect(target) {
+  const value = String(target || '').trim();
+  if (!value) return false;
+  if (value.startsWith('../customer/')) return true;
+  if (value.startsWith('/pages/customer/')) return true;
+
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.origin === window.location.origin && url.pathname.startsWith('/pages/customer/');
+  } catch {
+    return false;
+  }
+}
+
+function consumePendingCustomerRedirect() {
+  let target = '';
+  try {
+    target = sessionStorage.getItem(CUSTOMER_AFTER_LOGIN_KEY) || '';
+  } catch {
+    target = '';
+  }
+  if (!isAllowedCustomerRedirect(target)) return '';
+  try {
+    sessionStorage.removeItem(CUSTOMER_AFTER_LOGIN_KEY);
+  } catch {
+    // Nothing else to do.
+  }
+  return target;
+}
 
 function isGoogleRegistration() {
   if (new URLSearchParams(window.location.search).get('google') !== '1') return false;
@@ -82,7 +113,6 @@ function validateForm(form, messages = {}) {
 
 function validateStep1() {
   const form = document.getElementById('form-step1');
-  const googleMode = isGoogleRegistration();
   setStepWarning('step-1-warning', '');
   const messages = {
     fullname: 'What is your full name?',
@@ -98,8 +128,6 @@ function validateStep1() {
     SN.toast.error('Please complete all required fields before continuing.');
     return false;
   }
-
-  if (googleMode) return true;
 
   const pass = document.getElementById('password').value;
   const conf = document.getElementById('confirm-password').value;
@@ -234,7 +262,7 @@ async function redirectExistingGoogleCustomer(profile) {
   if (data.action === 'login' && data.user && data.redirect) {
     localStorage.removeItem('sn_google_prefill_customer');
     localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
-    window.location.replace(data.redirect);
+    window.location.replace(consumePendingCustomerRedirect() || data.redirect);
   }
 }
 
@@ -254,12 +282,11 @@ function submitRegister(e) {
   payload.append('contact', document.getElementById('contact').value.trim());
   payload.append('dob', document.getElementById('dob').value);
   payload.append('email', document.getElementById('email').value.trim());
+  payload.append('password', document.getElementById('password').value);
   if (isGoogleRegistration()) {
     const profile = JSON.parse(localStorage.getItem('sn_google_prefill_customer') || 'null');
     payload.append('authProvider', 'google');
     payload.append('googleSub', profile?.googleSub || '');
-  } else {
-    payload.append('password', document.getElementById('password').value);
   }
   payload.append('idType', document.getElementById('id-type').value);
   payload.append('idAddress', address);
@@ -322,10 +349,10 @@ function applyGooglePrefill() {
   if (passwordField && confirmField) {
     passwordField.value = '';
     confirmField.value = '';
-    passwordField.required = false;
-    confirmField.required = false;
-    passwordField.closest('.form-group')?.classList.add('sn-google-hidden-field');
-    confirmField.closest('.form-group')?.classList.add('sn-google-hidden-field');
+    passwordField.required = true;
+    confirmField.required = true;
+    passwordField.closest('.form-group')?.classList.remove('sn-google-hidden-field');
+    confirmField.closest('.form-group')?.classList.remove('sn-google-hidden-field');
   }
 
   const warning = document.getElementById('step-1-warning');
@@ -337,12 +364,12 @@ function applyGooglePrefill() {
   redirectExistingGoogleCustomer(profile)
     .then(() => {
       if (warning?.textContent?.includes('Checking')) {
-        warning.textContent = 'New Gmail verified. Complete these details once; after approval, future Gmail logins go straight to your customer dashboard.';
+        warning.textContent = 'New Gmail verified. Complete registration and create a password. Future Gmail logins will go straight to your customer dashboard.';
       }
     })
     .catch(() => {
       if (warning) {
-        warning.textContent = 'New Gmail verified. Complete these details once; after approval, future Gmail logins go straight to your customer dashboard.';
+        warning.textContent = 'New Gmail verified. Complete registration and create a password. Future Gmail logins will go straight to your customer dashboard.';
       }
     });
 }
