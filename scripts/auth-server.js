@@ -187,8 +187,30 @@ function googleDashboardPath(role) {
     : '/pages/customer/dashboard/dashboard.html';
 }
 
+function registrationPassword(value) {
+  const password = String(value || '');
+  if (password.length < 8) {
+    const error = new Error('Password must be at least 8 characters.');
+    error.statusCode = 400;
+    error.field = 'password';
+    throw error;
+  }
+  return password;
+}
+
+function normalizeContactNumber(value) {
+  const contact = String(value || '').trim();
+  if (!/^\d{11}$/.test(contact)) {
+    const error = new Error('Contact number must be exactly 11 digits.');
+    error.statusCode = 400;
+    error.field = 'contact';
+    throw error;
+  }
+  return contact;
+}
+
 async function buildRegistrationPasswordHash(req) {
-  return bcrypt.hash(req.body.password, 12);
+  return bcrypt.hash(registrationPassword(req.body.password), 12);
 }
 
 async function ensureUniqueAccountEmail(email) {
@@ -1877,6 +1899,7 @@ app.post('/api/auth/customer/register', upload.fields([
   await ensureUniqueAccountEmail(req.body.email);
   await persistRequestUploads(req);
 
+  const contact = normalizeContactNumber(req.body.contact);
   const passwordHash = await buildRegistrationPasswordHash(req);
   const result = await db.query(
     `INSERT INTO customers
@@ -1887,7 +1910,7 @@ app.post('/api/auth/customer/register', upload.fields([
       req.body.fullName.trim(),
       req.body.address.trim(),
       req.body.gender,
-      req.body.contact.trim(),
+      contact,
       req.body.dob,
       req.body.email.trim(),
       passwordHash,
@@ -1958,6 +1981,7 @@ app.patch('/api/customer/:id/location', asyncRoute(async (req, res) => {
 
 app.patch('/api/auth/customer/update', asyncRoute(async (req, res) => {
   requireFields(req.body, ['id', 'full_name', 'contact', 'address', 'gender', 'dob']);
+  const contact = normalizeContactNumber(req.body.contact);
   const result = await db.query(
     `UPDATE customers
      SET full_name = $2, contact = $3, address = $4, gender = $5, dob = $6, updated_at = NOW()
@@ -1966,7 +1990,7 @@ app.patch('/api/auth/customer/update', asyncRoute(async (req, res) => {
     [
       req.body.id,
       req.body.full_name.trim(),
-      req.body.contact.trim(),
+      contact,
       req.body.address.trim(),
       req.body.gender,
       req.body.dob,
@@ -2012,7 +2036,7 @@ app.patch('/api/auth/customer/change-password', asyncRoute(async (req, res) => {
   if (!customer || !await bcrypt.compare(req.body.currentPassword, customer.password_hash)) {
     return res.status(401).json({ message: 'Current password is incorrect.' });
   }
-  const passwordHash = await bcrypt.hash(req.body.newPassword, 12);
+  const passwordHash = await bcrypt.hash(registrationPassword(req.body.newPassword), 12);
   await db.query('UPDATE customers SET password_hash = $2, updated_at = NOW() WHERE id = $1', [req.body.id, passwordHash]);
   res.json({ ok: true });
 }));
@@ -2455,6 +2479,7 @@ app.post('/api/auth/provider/register', upload.fields([
   }
   await ensureUniqueAccountEmail(req.body.email);
 
+  const contact = normalizeContactNumber(req.body.contact);
   const passwordHash = await buildRegistrationPasswordHash(req);
   const docs = (req.files?.docs || []).map((file) => file.filename);
   const result = await db.query(
@@ -2467,7 +2492,7 @@ app.post('/api/auth/provider/register', upload.fields([
       req.body.fullName.trim(),
       req.body.address.trim(),
       req.body.gender,
-      req.body.contact.trim(),
+      contact,
       req.body.dob,
       req.body.email.trim(),
       passwordHash,
@@ -2516,6 +2541,7 @@ app.get('/api/auth/provider/status/:id', asyncRoute(async (req, res) => {
 
 app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   requireFields(req.body, ['full_name', 'contact', 'address', 'category', 'service']);
+  const contact = normalizeContactNumber(req.body.contact);
   const result = await db.query(`
     UPDATE providers
     SET full_name = $2,
@@ -2529,7 +2555,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   `, [
     req.params.id,
     String(req.body.full_name || '').trim(),
-    String(req.body.contact || '').trim(),
+    contact,
     String(req.body.address || '').trim(),
     String(req.body.category || '').trim(),
     String(req.body.service || '').trim(),

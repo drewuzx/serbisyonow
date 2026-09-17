@@ -57,11 +57,11 @@
             <div class="form-group"><label>Full Name</label><input class="form-control" id="fullname" type="text" placeholder="Enter your Full Name" required/></div>
             <div class="form-group"><label>Address</label><input class="form-control" id="address" type="text" placeholder="Enter your Address or Location" required/></div>
             <div class="form-group"><label>Gender</label><select class="form-control" id="gender" required><option value="" disabled selected>Select</option><option>Male</option><option>Female</option><option>Prefer not to say</option></select></div>
-            <div class="form-group"><label>Contact Number</label><input class="form-control" id="contact" type="tel" placeholder="Enter your Contact Number" required/></div>
+            <div class="form-group"><label>Contact Number</label><input class="form-control" id="contact" type="tel" placeholder="09XXXXXXXXX" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" required/></div>
             <div class="form-group"><label>Date of Birth</label><input class="form-control" id="dob" type="date" required/></div>
             <div class="form-group"><label>Email Address</label><input class="form-control" id="email" type="email" placeholder="Enter your Email Address" autocomplete="email" required/></div>
-            <div class="form-group"><label>Create password</label><input class="form-control" id="password" type="password" placeholder="Enter password" autocomplete="new-password" required/></div>
-            <div class="form-group"><label>Confirm password</label><input class="form-control" id="confirm-pw" type="password" placeholder="Confirm password" autocomplete="new-password" required/></div>
+            <div class="form-group"><label>Create password</label><input class="form-control" id="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required/></div>
+            <div class="form-group"><label>Confirm password</label><input class="form-control" id="confirm-pw" type="password" placeholder="Confirm password" autocomplete="new-password" minlength="8" required/></div>
           </div>
           <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" onclick="nextStep(event,2)">Next<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></button></div>
         </div>
@@ -450,9 +450,26 @@
       error.textContent = message;
     }
 
+    function clearFieldError(field) {
+      if (!field) return;
+      field.classList.remove('error');
+      field.closest('.form-group')?.querySelector('.field-error')?.remove();
+    }
+
     function clearFormErrors(form) {
       form?.querySelectorAll('.field-error').forEach(err => err.remove());
       form?.querySelectorAll('.form-control').forEach(field => field.classList.remove('error'));
+    }
+
+    function contactDigits(value) {
+      return String(value || '').replace(/\D/g, '').slice(0, 11);
+    }
+
+    function normalizeContactField(field) {
+      if (!field) return '';
+      const digits = contactDigits(field.value);
+      field.value = digits;
+      return digits;
     }
 
     function validateForm(form, messages = {}) {
@@ -480,8 +497,26 @@
         'confirm-pw': 'Confirm your password.',
       });
       if (!valid) return SN.toast.error('Please complete all required fields before continuing.'), false;
-      if (document.getElementById('password').value !== document.getElementById('confirm-pw').value) {
-        showFieldError(document.getElementById('confirm-pw'), 'Passwords do not match.');
+      const contactField = document.getElementById('contact');
+      const contact = normalizeContactField(contactField);
+      if (!/^\d{11}$/.test(contact)) {
+        showFieldError(contactField, 'Enter exactly 11 digits.');
+        SN.toast.error('Contact number must be exactly 11 digits.');
+        contactField?.focus();
+        return false;
+      }
+
+      const passwordField = document.getElementById('password');
+      const confirmField = document.getElementById('confirm-pw');
+      if (passwordField.value.length < 8) {
+        showFieldError(passwordField, 'Password must be at least 8 characters.');
+        SN.toast.error('Password must be at least 8 characters.');
+        passwordField?.focus();
+        return false;
+      }
+
+      if (passwordField.value !== confirmField.value) {
+        showFieldError(confirmField, 'Passwords do not match.');
         SN.toast.error('Passwords do not match.');
         return false;
       }
@@ -668,7 +703,7 @@
       payload.append('fullName', document.getElementById('fullname').value.trim());
       payload.append('address', document.getElementById('address').value.trim());
       payload.append('gender', document.getElementById('gender').value);
-      payload.append('contact', document.getElementById('contact').value.trim());
+      payload.append('contact', normalizeContactField(document.getElementById('contact')));
       payload.append('dob', document.getElementById('dob').value);
       payload.append('email', document.getElementById('email').value.trim());
       payload.append('password', document.getElementById('password').value);
@@ -715,6 +750,11 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       sessionStorage.removeItem('sn_provider_register_success');
+      const contactField = document.getElementById('contact');
+      contactField?.addEventListener('input', () => {
+        normalizeContactField(contactField);
+        clearFieldError(contactField);
+      });
       document.getElementById('category')?.addEventListener('change', updateServiceOptions);
       updateServiceOptions();
       applyGooglePrefill();

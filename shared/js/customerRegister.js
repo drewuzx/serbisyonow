@@ -84,6 +84,17 @@ function clearFormErrors(form) {
   form.querySelectorAll('.form-control').forEach(field => field.classList.remove('error'));
 }
 
+function contactDigits(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 11);
+}
+
+function normalizeContactField(field) {
+  if (!field) return '';
+  const digits = contactDigits(field.value);
+  field.value = digits;
+  return digits;
+}
+
 function setStepWarning(stepId, message) {
   const warningEl = document.getElementById(stepId);
   if (!warningEl) return;
@@ -131,6 +142,23 @@ function validateStep1() {
 
   const pass = document.getElementById('password').value;
   const conf = document.getElementById('confirm-password').value;
+  const contactField = document.getElementById('contact');
+  const contact = normalizeContactField(contactField);
+  if (!/^\d{11}$/.test(contact)) {
+    SN.toast.error('Contact number must be exactly 11 digits.');
+    showFieldError(contactField, 'Enter exactly 11 digits.');
+    contactField.focus();
+    return false;
+  }
+
+  if (pass.length < 8) {
+    SN.toast.error('Password must be at least 8 characters.');
+    const passwordField = document.getElementById('password');
+    showFieldError(passwordField, 'Password must be at least 8 characters.');
+    passwordField.focus();
+    return false;
+  }
+
   if (pass !== conf) {
     SN.toast.error('Passwords do not match.');
     const confirmField = document.getElementById('confirm-password');
@@ -279,7 +307,7 @@ function submitRegister(e) {
   payload.append('fullName', document.getElementById('fullname').value.trim());
   payload.append('address', address);
   payload.append('gender', document.getElementById('gender').value);
-  payload.append('contact', document.getElementById('contact').value.trim());
+  payload.append('contact', normalizeContactField(document.getElementById('contact')));
   payload.append('dob', document.getElementById('dob').value);
   payload.append('email', document.getElementById('email').value.trim());
   payload.append('password', document.getElementById('password').value);
@@ -376,6 +404,11 @@ function applyGooglePrefill() {
 
 document.addEventListener('DOMContentLoaded', () => {
   applyGooglePrefill();
+  const contactField = document.getElementById('contact');
+  contactField?.addEventListener('input', () => {
+    normalizeContactField(contactField);
+    clearFieldError(contactField);
+  });
   if (sessionStorage.getItem(CUSTOMER_REGISTER_SUCCESS_KEY) === '1') {
     showCustomerSuccess();
   }
