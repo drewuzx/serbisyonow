@@ -79,6 +79,17 @@ function money(value) {
   return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
 }
 
+function providerCategoryLabel(value) {
+  const label = String(value || '').trim();
+  const aliases = {
+    'home repair': 'Repair Services',
+    'home repairs': 'Repair Services',
+    'home installation': 'Installation Services',
+    'home installations': 'Installation Services',
+  };
+  return aliases[label.toLowerCase()] || label;
+}
+
 let activeProviderReassessmentQuestions = [];
 
 function providerAssessmentBanks() {
@@ -90,17 +101,14 @@ function providerAssessmentBanks() {
 
 function providerAssessmentBank(category) {
   const { fallback, banks } = providerAssessmentBanks();
-  const normalized = String(category || '').trim();
+  const normalized = providerCategoryLabel(category);
   const aliases = {
-    'Home Repair': 'Repair Services',
-    'Home Repairs': 'Repair Services',
     Repairs: 'Repair Services',
     Cleaning: 'Cleaning',
     'Cleaning Services': 'Cleaning',
     'Personal Care': 'Personal Care',
     'Appliance Repair': 'Appliance Maintenance',
     'Appliance Maintenance': 'Appliance Maintenance',
-    'Home Installation': 'Installation Services',
     Installation: 'Installation Services',
     'Installation Services': 'Installation Services',
     'Outdoor Maintenance': 'Outdoor and Property Maintenance',
@@ -2039,7 +2047,7 @@ function renderProviderHistoryDetail(booking) {
 }
 
 function renderProviderReassessmentSection(provider, metrics, assessment) {
-  const category = provider.category || assessment?.category || 'General';
+  const category = providerCategoryLabel(provider.category || assessment?.category || 'General');
   const currentScore = Number(assessment?.score ?? provider.assessment_score ?? 0);
   const currentBadge = assessment?.badge || metrics?.badge_status || provider.badge_status || 'Needs Reassessment';
   const questionCount = providerAssessmentBank(category).length;
@@ -2075,7 +2083,7 @@ function renderProviderReassessmentSection(provider, metrics, assessment) {
 }
 
 function startProviderReassessment(provider) {
-  const category = provider.category || 'General';
+  const category = providerCategoryLabel(provider.category || 'General');
   const list = document.getElementById('sn-provider-reassessment-list');
   const form = document.getElementById('sn-provider-reassessment-form');
   const intro = document.getElementById('sn-provider-reassessment-intro');
@@ -2138,7 +2146,7 @@ async function submitProviderReassessment(provider) {
 
   try {
     const data = await providerSend(`/api/provider/${provider.id}/reassessment`, 'POST', {
-      category: provider.category || 'General',
+      category: providerCategoryLabel(provider.category || 'General'),
       score,
       answers,
     });
@@ -2170,7 +2178,7 @@ function renderProfile(provider, metrics, assessment) {
     <div class="sn-form-grid">
       <div class="sn-form-field"><label>Business or Display Name</label><input id="sn-provider-full-name" value="${esc(provider.full_name || '')}" /></div>
       <div class="sn-form-field"><label>Contact Number</label><input id="sn-provider-contact" value="${esc(provider.contact || '')}" /></div>
-      <div class="sn-form-field"><label>Primary Category</label><input id="sn-provider-category" value="${esc(provider.category || '')}" /></div>
+      <div class="sn-form-field"><label>Primary Category</label><input id="sn-provider-category" value="${esc(providerCategoryLabel(provider.category) || '')}" /></div>
       <div class="sn-form-field"><label>Main Service</label><input id="sn-provider-service" value="${esc(provider.service || '')}" /></div>
       <div class="sn-form-field"><label>Verification Badge</label><input value="${esc(metrics?.badge_status || provider.verification_status || '')}" readonly /></div>
       <div class="sn-form-field"><label>Supporting Documents</label><input id="sn-provider-docs" type="file" multiple accept="image/*,.pdf,.doc,.docx" /></div>

@@ -114,7 +114,7 @@ function ppRenderProvider(provider) {
           <ul class="sn-profile-list">
             <li>"Professional, punctual, and very clean with every service call."</li>
             <li>"Quick response and clear communication from booking to completion."</li>
-            <li>"Very reasonable pricing and good workmanship for home repairs."</li>
+            <li>"Very reasonable pricing and good workmanship for repair services."</li>
           </ul>
         </section>
       </div>

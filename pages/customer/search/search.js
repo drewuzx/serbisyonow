@@ -22,6 +22,17 @@ function money(value) {
   return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
 }
 
+function categoryLabel(value) {
+  const label = String(value || '').trim();
+  const aliases = {
+    'home repair': 'Repair Services',
+    'home repairs': 'Repair Services',
+    'home installation': 'Installation Services',
+    'home installations': 'Installation Services',
+  };
+  return aliases[label.toLowerCase()] || label;
+}
+
 function providerBadge(provider) {
   const tier = provider.verified_tier || (provider.badge_status || '').toLowerCase();
   if (String(tier).includes('top')) return '<div class="sn-provider-badge sn-badge--top">Top-Tier Verified</div>';
@@ -474,7 +485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         icon: makeLeafletIcon('provider', index + 1, accurate, selected),
       }).bindPopup(`
         <strong>${esc(provider.full_name)}</strong><br>
-        ${esc(provider.service || provider.category || 'Service provider')}<br>
+        ${esc(provider.service || categoryLabel(provider.category) || 'Service provider')}<br>
         ${Number(provider.distance_km || 0).toFixed(1)} km away<br>
         ${accurate ? `Accurate GPS saved${provider.location_accuracy_m ? ` (+/- ${Math.round(provider.location_accuracy_m)}m)` : ''}` : 'Estimated from address'}
       `).addTo(searchMapLayer);
@@ -596,7 +607,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <span>${Number(provider.recommendation_score || 0).toFixed(0)} score</span>
             <span>${provider.proximity_score >= 3 ? 'Location match' : provider.proximity_score >= 2 ? 'Nearby match' : 'Service match'}</span>
           </div>
-          <p class="sn-result-desc">${esc(provider.service || provider.category || 'Home service')} near ${esc(provider.address || 'Angeles City')}.</p>
+          <p class="sn-result-desc">${esc(provider.service || categoryLabel(provider.category) || 'Home service')} near ${esc(provider.address || 'Angeles City')}.</p>
           <div class="sn-result-loc">${esc(provider.address || 'Location unavailable')}</div>
         </div>
         <div class="sn-result-actions">

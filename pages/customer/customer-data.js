@@ -31,6 +31,17 @@ function snMoney(value) {
  return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
 }
 
+function snCategoryLabel(value) {
+ const label = String(value || '').trim();
+ const aliases = {
+  'home repair': 'Repair Services',
+  'home repairs': 'Repair Services',
+  'home installation': 'Installation Services',
+  'home installations': 'Installation Services',
+ };
+ return aliases[label.toLowerCase()] || label;
+}
+
 function snDate(value) {
  if (!value) return '-';
  return new Date(value).toLocaleDateString('en-PH', { month: 'short', day: '2-digit', year: 'numeric' });
@@ -442,12 +453,13 @@ if (messageButton) {
 function renderProviderCard(provider, favoriteIds = new Set()) {
  const providerId = String(provider.id);
  const isFavorite = favoriteIds.has(providerId);
+ const providerCategory = snCategoryLabel(provider.category);
  return `
  <div class="sn-provider-card"><button class="sn-fav-btn ${isFavorite ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${snEsc(providerId)}" aria-label="${isFavorite ? 'Saved to favorites' : 'Favorite provider'}">♥</button><div class="sn-provider-img sn-provider-img--1"></div><div class="sn-provider-info"><div class="sn-provider-name-row"><span class="sn-provider-title">${snEsc(provider.full_name)}</span><span class="sn-rating">${Number(provider.rating || 4.8).toFixed(1)}</span></div>
  ${snBadge(provider)}
  <div class="sn-provider-loc">${snEsc(provider.address || 'Angeles City')}</div>
  ${provider.recommendation_reason? `<div class="sn-recommend-reason">${snEsc(provider.recommendation_reason)}</div>`: ''}
- <div class="sn-provider-meta"><span class="sn-provider-tag">${snEsc(provider.service || provider.category || 'Service')}</span><span class="sn-provider-price">Starts at <strong>${snMoney(provider.starting_price || 350)}</strong></span></div></div></div>
+ <div class="sn-provider-meta"><span class="sn-provider-tag">${snEsc(provider.service || providerCategory || 'Service')}</span><span class="sn-provider-price">Starts at <strong>${snMoney(provider.starting_price || 350)}</strong></span></div></div></div>
  `;
 }
 
@@ -522,7 +534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  const verifiedProviders = data.providers || [];
  const categoryData = new Map((data.categories || []).map(category => [category.name, category]));
  const providerCountForCategory = (categoryName) => verifiedProviders.filter(provider => {
-  const providerCategory = String(provider.category || '').trim().toLowerCase();
+  const providerCategory = snCategoryLabel(provider.category).toLowerCase();
   return providerCategory === categoryName.trim().toLowerCase();
  }).length;
  const categoryGrid = document.querySelector('.sn-categories,.sn-category-list');
@@ -548,14 +560,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const allLandingServices = ['Plumbing services', 'Electrical repair', 'Appliance repair', 'Carpentry', 'Roof repair', 'Furniture repair', 'Painting services', 'Door and window repair'];
   const fallbackServices = Object.fromEntries(dashboardCatalog.map(category => [category.name, category.services]));
   const categoryServices = new Map((data.categories || []).map(category => [category.name, category.services || []]));
-  const categoryAliases = {
-   'Home Repair': 'Repair Services',
-   'Home Installations': 'Installation Services',
-   'Home Installation': 'Installation Services',
-   'Outdoor & Property': 'Outdoor and Property Maintenance',
-   'Outdoor & Property Maintenance': 'Outdoor and Property Maintenance',
-   'Outdoor Maintenance': 'Outdoor and Property Maintenance',
-  };
  if (providerTitle && data.recommendations?.length) providerTitle.textContent = 'Recommended For You';
  const emptyText = 'No providers match this selection yet.';
  const assignStaticFavoriteIds = () => {
@@ -585,7 +589,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
  const renderServiceChips = (category = '') => {
   if (!chipRow) return;
-  const canonicalCategory = categoryAliases[category] || category;
+  const categoryAliases = {
+   'Outdoor & Property': 'Outdoor and Property Maintenance',
+   'Outdoor & Property Maintenance': 'Outdoor and Property Maintenance',
+   'Outdoor Maintenance': 'Outdoor and Property Maintenance',
+  };
+  const canonicalCategory = categoryAliases[category] || snCategoryLabel(category);
   const services = fallbackServices[canonicalCategory] || categoryServices.get(canonicalCategory) || allLandingServices;
   chipRow.innerHTML = services.map((service, index) => `<button class="sn-chip${index === 0 ? ' active' : ''}" type="button">${snEsc(service)}</button>`).join('');
   chipRow.querySelectorAll('.sn-chip').forEach(button => button.addEventListener('click', () => {
@@ -601,7 +610,12 @@ document.addEventListener('DOMContentLoaded', async () => {
  };
  document.querySelectorAll('.sn-cat').forEach(button => button.addEventListener('click', () => {
   const label = button.dataset.category || '';
-  const selectedCategory = categoryAliases[label] || label;
+  const categoryAliases = {
+   'Outdoor & Property': 'Outdoor and Property Maintenance',
+   'Outdoor & Property Maintenance': 'Outdoor and Property Maintenance',
+   'Outdoor Maintenance': 'Outdoor and Property Maintenance',
+  };
+  const selectedCategory = categoryAliases[label] || snCategoryLabel(label);
   renderServiceChips(selectedCategory);
   filterDashboardProviders(button, selectedCategory);
  }));

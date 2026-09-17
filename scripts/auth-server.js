@@ -76,6 +76,17 @@ const FIELD_LABELS = {
   message: 'Message',
 };
 
+function canonicalCategoryName(value) {
+  const name = String(value || '').trim();
+  const aliases = {
+    'home repair': 'Repair Services',
+    'home repairs': 'Repair Services',
+    'home installation': 'Installation Services',
+    'home installations': 'Installation Services',
+  };
+  return aliases[name.toLowerCase()] || name;
+}
+
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
@@ -944,7 +955,7 @@ function providerRow(row) {
     contact: row.contact,
     dob: row.dob,
     email: row.email,
-    category: row.category,
+    category: canonicalCategoryName(row.category),
     service: row.service,
     experience: row.experience,
     experience_years: row.experience_years,
@@ -1239,7 +1250,7 @@ function categoryRow(row) {
   ].filter(Boolean);
   return {
     id: row.id,
-    name: row.name,
+    name: canonicalCategoryName(row.name),
     description: row.description,
     services: [...new Set(services)],
     is_active: row.is_display_active ?? row.is_active,
@@ -1249,7 +1260,7 @@ function categoryRow(row) {
 }
 
 async function upsertServiceCategory(name, service = '') {
-  const categoryName = String(name || '').trim();
+  const categoryName = canonicalCategoryName(name);
   const serviceName = String(service || '').trim();
   if (!categoryName) return;
   const description = `${categoryName} services offered by registered providers.`;
@@ -1272,7 +1283,7 @@ async function upsertServiceCategory(name, service = '') {
 async function ensureProviderProfileService(provider) {
   if (!provider?.id) return;
   const title = String(provider.service || provider.category || '').trim();
-  const category = String(provider.category || 'General').trim();
+  const category = canonicalCategoryName(provider.category || 'General');
   if (!title) return;
 
   await db.query(`
@@ -2482,6 +2493,7 @@ app.post('/api/auth/provider/register', upload.fields([
   const contact = normalizeContactNumber(req.body.contact);
   const passwordHash = await buildRegistrationPasswordHash(req);
   const docs = (req.files?.docs || []).map((file) => file.filename);
+  const category = canonicalCategoryName(req.body.category);
   const result = await db.query(
     `INSERT INTO providers
       (full_name, address, gender, contact, dob, email, password_hash, category, service,
@@ -2496,7 +2508,7 @@ app.post('/api/auth/provider/register', upload.fields([
       req.body.dob,
       req.body.email.trim(),
       passwordHash,
-      req.body.category,
+      category,
       req.body.service,
       req.body.experience.trim(),
       req.body.experienceYears,
@@ -2515,7 +2527,7 @@ app.post('/api/auth/provider/register', upload.fields([
   await db.query(`
     INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
     VALUES ($1, $2, $3, $4)
-  `, [result.rows[0].id, req.body.category || 'General', assessmentScore, badge]);
+  `, [result.rows[0].id, category || 'General', assessmentScore, badge]);
   await ensureProviderProfileService(result.rows[0]);
 
   res.status(201).json({ user: providerRow(result.rows[0]) });
@@ -2557,7 +2569,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
     String(req.body.full_name || '').trim(),
     contact,
     String(req.body.address || '').trim(),
-    String(req.body.category || '').trim(),
+    canonicalCategoryName(req.body.category),
     String(req.body.service || '').trim(),
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
@@ -2577,7 +2589,7 @@ app.post('/api/provider/:id/reassessment', asyncRoute(async (req, res) => {
   }
 
   const score = clampScore(req.body.score);
-  const category = String(req.body.category || provider.category || 'General').trim() || 'General';
+  const category = canonicalCategoryName(req.body.category || provider.category || 'General') || 'General';
   const badge = calculateProviderBadge(score, provider.experience_years);
   const experience = `Assessment score: ${score}%. Answers: ${JSON.stringify(answers)}`;
 
@@ -3041,7 +3053,7 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
     availability: availability.rows,
     assessment: assessmentRecord ? { ...assessmentRecord, badge: computedBadge } : {
       provider_id: Number(providerId),
-      category: providerRecord.category || 'General',
+      category: canonicalCategoryName(providerRecord.category || 'General'),
       score: assessmentScore,
       badge: computedBadge,
     },
@@ -3050,6 +3062,7 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
 
 app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
   requireFields(req.body, ['title', 'category']);
+  const category = canonicalCategoryName(req.body.category);
   const result = await db.query(`
     INSERT INTO provider_services
       (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active)
@@ -3059,7 +3072,7 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
     req.params.id,
     req.body.title.trim(),
     String(req.body.description || '').trim(),
-    req.body.category.trim(),
+    category,
     req.body.starting_price || 0,
     req.body.max_price || req.body.starting_price || 0,
     req.body.accepts_cash !== false,
@@ -3067,11 +3080,12 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
     Boolean(req.body.accepts_other),
     req.body.is_active !== false,
   ]);
-  await upsertServiceCategory(req.body.category, req.body.title);
+  await upsertServiceCategory(category, req.body.title);
   res.status(201).json({ service: providerServiceRow(result.rows[0]) });
 }));
 
 app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req, res) => {
+  const category = req.body.category === undefined ? undefined : canonicalCategoryName(req.body.category);
   const result = await db.query(`
     UPDATE provider_services
     SET title = COALESCE($3, title),
@@ -3091,7 +3105,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     req.params.serviceId,
     req.body.title?.trim(),
     req.body.description?.trim(),
-    req.body.category?.trim(),
+    category,
     req.body.starting_price ?? null,
     req.body.max_price ?? null,
     req.body.accepts_cash ?? null,
@@ -3400,6 +3414,7 @@ app.post('/api/admin/categories', asyncRoute(async (req, res) => {
     .map((service) => service.trim())
     .filter(Boolean);
   const categoryName = String(req.body.name).trim();
+  const canonicalName = canonicalCategoryName(categoryName);
   const result = await db.query(`
     INSERT INTO service_categories (name, description, services, is_active)
     VALUES ($1, $2, $3, TRUE)
@@ -3416,8 +3431,8 @@ app.post('/api/admin/categories', asyncRoute(async (req, res) => {
         updated_at = NOW()
     RETURNING *, 0::int AS provider_count, ARRAY[]::TEXT[] AS provider_services
   `, [
-    categoryName,
-    String(req.body.description || `${categoryName} services.`).trim(),
+    canonicalName,
+    String(req.body.description || `${canonicalName} services.`).trim(),
     services,
   ]);
   res.status(201).json({ category: categoryRow(result.rows[0]) });

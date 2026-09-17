@@ -32,7 +32,7 @@
       document.getElementById('category-summary').innerHTML = (categorySummary.length ? categorySummary : [{ name: 'No provider categories yet', count: 0 }]).map(item => `<div class="admin-chart-row"><span>${adminEscape(item.name)}</span><div class="admin-chart-track"><div class="admin-chart-fill" style="width:${Math.round((Number(item.count) / max) * 100)}%"></div></div><strong>${item.count}</strong></div>`).join('');
       document.getElementById('top-providers').innerHTML = topProviders.map(provider => {
         const status = adminVerificationStatus(provider.verification_status);
-        return `<div class="admin-list-item"><div><strong>${adminEscape(provider.full_name)}</strong><span>${adminEscape(provider.category || '-')} - ${adminEscape(provider.service || '-')}</span></div><span class="status-badge ${status.className}">${status.label}</span></div>`;
+        return `<div class="admin-list-item"><div><strong>${adminEscape(provider.full_name)}</strong><span>${adminEscape(adminCategoryLabel(provider.category) || '-')} - ${adminEscape(provider.service || '-')}</span></div><span class="status-badge ${status.className}">${status.label}</span></div>`;
       }).join('') || '<div class="admin-list-item"><strong>No providers yet</strong></div>';
     });
   </script>

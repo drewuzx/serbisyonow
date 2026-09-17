@@ -38,6 +38,17 @@ function adminEscape(value = '') {
   }[char]));
 }
 
+function adminCategoryLabel(value = '') {
+  const label = String(value || '').trim();
+  const aliases = {
+    'home repair': 'Repair Services',
+    'home repairs': 'Repair Services',
+    'home installation': 'Installation Services',
+    'home installations': 'Installation Services',
+  };
+  return aliases[label.toLowerCase()] || label;
+}
+
 function adminVerificationStatus(status = 'pending') {
   const normalized = String(status || 'pending').toLowerCase();
   if (normalized === 'rejected') return { className: 'rejected', label: 'Declined' };

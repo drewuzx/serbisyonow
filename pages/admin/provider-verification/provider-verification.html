@@ -93,7 +93,7 @@
         <div class="admin-list-item">
           <div>
             <strong>${adminEscape(provider.full_name)}</strong>
-            <span>${adminEscape(provider.category || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
+            <span>${adminEscape(adminCategoryLabel(provider.category) || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
             <span>Assessment: ${provider.assessment_score ?? 0}% - Experience: ${adminEscape(provider.experience_years || '-')} - Badge: ${adminEscape(provider.badge_status || 'Needs Reassessment')}</span>
             <span>Uploaded files: ${providerDocumentLinks(provider)}</span>
           </div>
