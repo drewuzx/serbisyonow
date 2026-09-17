@@ -735,6 +735,11 @@
 }
 
 .assessment-question legend {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  width: 100%;
   color: #111827;
   font-size: 0.86rem;
   font-weight: 700;
@@ -742,11 +747,19 @@
   margin-bottom: 12px;
 }
 
+.assessment-question-number {
+  color: #1d4ed8;
+  font-weight: 800;
+  text-align: right;
+}
+
 .assessment-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 9px 0 0 18px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 12px;
+  margin: 9px 0 0 0;
+  padding-left: 2.2rem;
   color: #111827;
   font-size: 0.86rem;
   line-height: 1.35;
@@ -756,7 +769,12 @@
   width: 17px;
   height: 17px;
   accent-color: #0b5ea8;
-  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.assessment-option-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .submitted-step {
@@ -915,6 +933,15 @@
 
   .assessment-panel {
     padding: 22px 18px;
+  }
+
+  .assessment-question legend {
+    grid-template-columns: 1.8rem minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .assessment-option {
+    padding-left: 1.8rem;
   }
 }
 

@@ -412,11 +412,11 @@
       activeAssessmentQuestions = shuffle(questionBank).slice(0, 10);
       list.innerHTML = activeAssessmentQuestions.map((item, index) => `
         <fieldset class="assessment-question">
-          <legend>${index + 1}. ${item.q}</legend>
+          <legend><span class="assessment-question-number">${index + 1}.</span><span>${item.q}</span></legend>
           ${item.o.map(option => `
             <label class="assessment-option">
               <input type="radio" name="assessment-${index}" value="${option}" required>
-              <span>${option}</span>
+              <span class="assessment-option-text">${option}</span>
             </label>
           `).join('')}
         </fieldset>
