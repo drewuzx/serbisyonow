@@ -1,5 +1,7 @@
 'use strict';
 
+const SERVICE_LOGIN_URL = '../auth/loginChoice.html?from=service';
+
 const landingServicesByCategory = {
   repairServices: [
     'Plumbing services',
@@ -55,41 +57,34 @@ const landingServicesByCategory = {
   ],
 };
 
+function redirectToServiceLogin() {
+  window.location.href = SERVICE_LOGIN_URL;
+}
+
 function renderLandingServiceTags(category) {
   const tags = document.getElementById('landing-service-tags');
   if (!tags) return;
 
   const services = landingServicesByCategory[category] || landingServicesByCategory.repairServices;
   tags.innerHTML = services.map((service, index) => (
-    `<button class="service-tag${index === 0 ? ' active' : ''}" type="button">${service}</button>`
+    `<a class="service-tag${index === 0 ? ' active' : ''}" href="${SERVICE_LOGIN_URL}">${service}</a>`
   )).join('');
-
-  tags.querySelectorAll('.service-tag').forEach(tag => {
-    tag.addEventListener('click', () => {
-      tags.querySelectorAll('.service-tag').forEach(item => item.classList.remove('active'));
-      tag.classList.add('active');
-    });
-  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const categoryCards = document.querySelectorAll('.service-cat-card[data-category]');
   categoryCards.forEach(card => {
     card.addEventListener('click', () => {
-      categoryCards.forEach(item => {
-        item.classList.remove('active');
-        item.querySelector('.active-indicator')?.remove();
-      });
-
-      card.classList.add('active');
-      if (!card.querySelector('.active-indicator')) {
-        const indicator = document.createElement('div');
-        indicator.className = 'active-indicator';
-        card.appendChild(indicator);
-      }
-
-      renderLandingServiceTags(card.dataset.category);
+      redirectToServiceLogin();
     });
+  });
+
+  const heroSearchInput = document.querySelector('.hero-search input');
+  const heroSearchButton = document.querySelector('.hero-search-btn');
+
+  heroSearchButton?.addEventListener('click', redirectToServiceLogin);
+  heroSearchInput?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') redirectToServiceLogin();
   });
 
   renderLandingServiceTags(document.querySelector('.service-cat-card.active')?.dataset.category || 'repairServices');

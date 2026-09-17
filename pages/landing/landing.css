@@ -222,6 +222,7 @@
   background: var(--white);
   font-size: var(--text-sm); font-weight: 500;
   color: var(--text-secondary); cursor: pointer;
+  text-decoration: none;
   transition: all var(--transition-fast);
 }
 .service-tag:hover, .service-tag.active {
