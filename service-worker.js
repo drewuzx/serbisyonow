@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v26';
+const SW_VERSION = 'serbisyonow-pwa-v27';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
@@ -74,6 +74,8 @@ const APP_SHELL_URLS = [
   '/pages/landing/index.html',
   '/pages/landing/landing.css',
   '/pages/landing/js/landing.js',
+  '/pages/legal/privacy-policy.html',
+  '/pages/legal/terms-of-services.html',
   '/pages/auth/loginChoice.html',
   '/pages/auth/customerLogin.html',
   '/pages/auth/customerRegister.html',
