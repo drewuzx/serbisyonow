@@ -99,9 +99,8 @@ function providerAssessmentBanks() {
   };
 }
 
-function providerAssessmentBank(category) {
-  const { fallback, banks } = providerAssessmentBanks();
-  const normalized = providerCategoryLabel(category);
+function providerAssessmentCanonicalCategory(value) {
+  const normalized = providerCategoryLabel(value);
   const aliases = {
     Repairs: 'Repair Services',
     Cleaning: 'Cleaning',
@@ -114,7 +113,55 @@ function providerAssessmentBank(category) {
     'Outdoor Maintenance': 'Outdoor and Property Maintenance',
     'Outdoor and Property Maintenance': 'Outdoor and Property Maintenance',
   };
-  return banks[normalized] || banks[aliases[normalized]] || fallback;
+  return aliases[normalized] || normalized;
+}
+
+function normalizeProviderAssessmentText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function providerAssessmentCategoryFromService(value) {
+  const target = normalizeProviderAssessmentText(value);
+  const servicesByCategory = window.SN_PROVIDER_SERVICES_BY_CATEGORY || {};
+  if (!target) return '';
+
+  for (const [category, services] of Object.entries(servicesByCategory)) {
+    const categoryText = normalizeProviderAssessmentText(category);
+    if (categoryText === target) return category;
+
+    const match = (Array.isArray(services) ? services : []).some((service) => {
+      const serviceText = normalizeProviderAssessmentText(service);
+      return serviceText === target || serviceText.includes(target) || target.includes(serviceText);
+    });
+    if (match) return category;
+  }
+  return '';
+}
+
+function resolveProviderAssessmentCategory(provider = {}, assessment = {}) {
+  const { banks } = providerAssessmentBanks();
+  const candidates = [
+    provider.category,
+    assessment?.category,
+    provider.service,
+  ].map(providerAssessmentCanonicalCategory).filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (banks[candidate]) return candidate;
+  }
+
+  for (const value of [provider.category, assessment?.category, provider.service]) {
+    const category = providerAssessmentCategoryFromService(value);
+    if (category && banks[category]) return category;
+  }
+
+  return candidates[0] || 'General';
+}
+
+function providerAssessmentBank(category) {
+  const { fallback, banks } = providerAssessmentBanks();
+  const normalized = providerAssessmentCanonicalCategory(category);
+  return banks[normalized] || fallback;
 }
 
 function shuffleProviderAssessment(items) {
@@ -2047,7 +2094,7 @@ function renderProviderHistoryDetail(booking) {
 }
 
 function renderProviderReassessmentSection(provider, metrics, assessment) {
-  const category = providerCategoryLabel(provider.category || assessment?.category || 'General');
+  const category = resolveProviderAssessmentCategory(provider, assessment);
   const currentScore = Number(assessment?.score ?? provider.assessment_score ?? 0);
   const currentBadge = assessment?.badge || metrics?.badge_status || provider.badge_status || 'Needs Reassessment';
   const questionCount = providerAssessmentBank(category).length;
@@ -2069,7 +2116,7 @@ function renderProviderReassessmentSection(provider, metrics, assessment) {
         <p>${hasQuestionBank
           ? 'You will receive 10 shuffled questions from your current provider category. Your newest score will be used for badge and admin verification checks.'
           : 'No category-specific exam is available for this category yet.'}</p>
-        <button class="btn btn-primary" id="sn-provider-start-reassessment" type="button" ${hasQuestionBank ? '' : 'disabled'}>Retake Assessment</button>
+        <button class="btn btn-primary" id="sn-provider-start-reassessment" type="button">Retake Assessment</button>
       </div>
       <div class="sn-reassessment-form" id="sn-provider-reassessment-form" hidden>
         <div class="sn-reassessment-list" id="sn-provider-reassessment-list"></div>
@@ -2083,13 +2130,13 @@ function renderProviderReassessmentSection(provider, metrics, assessment) {
 }
 
 function startProviderReassessment(provider) {
-  const category = providerCategoryLabel(provider.category || 'General');
+  const category = resolveProviderAssessmentCategory(provider);
   const list = document.getElementById('sn-provider-reassessment-list');
   const form = document.getElementById('sn-provider-reassessment-form');
   const intro = document.getElementById('sn-provider-reassessment-intro');
   const bank = providerAssessmentBank(category);
-  if (!list || !form || !bank.length) {
-    setProviderProfileStatus('No reassessment questions are available for this category yet.', 'error');
+  if (!list || !form || bank.length < 10) {
+    setProviderProfileStatus('No reassessment questions are available for this category yet. Please set your Primary Category to one of the main service categories first.', 'error');
     return;
   }
 
@@ -2146,7 +2193,7 @@ async function submitProviderReassessment(provider) {
 
   try {
     const data = await providerSend(`/api/provider/${provider.id}/reassessment`, 'POST', {
-      category: providerCategoryLabel(provider.category || 'General'),
+      category: resolveProviderAssessmentCategory(provider),
       score,
       answers,
     });
