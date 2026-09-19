@@ -9,6 +9,117 @@ function getCurrentCustomer() {
 const BOOKING_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
 let bookingDeviceCoords = null;
 let bookingProviderServices = [];
+let bookingProviderProfile = null;
+
+const REPAIR_SERVICE_CONFIGS = {
+ 'plumbing services': {
+  title: 'Plumbing Services',
+  pricingType: 'provider_quote',
+  baseRange: [500, 1500],
+  note: 'Provider will assess the actual condition before confirming the final price.',
+  fields: [
+   { key: 'problem_type', label: 'Problem type', type: 'select', options: ['Leaking faucet', 'Leaking pipe', 'Clogged drain', 'Clogged toilet', 'Low water pressure', 'Broken/loose fixture', 'Other plumbing issue'] },
+   { key: 'location', label: 'Location', type: 'select', options: ['Kitchen', 'Bathroom', 'Laundry area', 'Outdoor', 'Other'] },
+   { key: 'severity', label: 'Severity', type: 'select', options: ['Minor', 'Moderate', 'Major / urgent'] },
+   { key: 'affected_fixtures', label: 'Number of affected fixtures', type: 'select', options: ['1', '2', '3+'] },
+   { key: 'accessible', label: 'Can the issue be seen/accessed easily?', type: 'select', options: ['Yes', 'No'] },
+   { key: 'replacement_parts', label: 'Does the customer have replacement parts/materials?', type: 'select', options: ['Yes', 'No', 'Not sure'] },
+  ],
+ },
+ 'electrical repair': {
+  title: 'Electrical Repair',
+  pricingType: 'provider_quote',
+  baseRange: [600, 1800],
+  note: 'Estimated range only. Provider confirms the safe final quote after assessment.',
+  fields: [
+   { key: 'problem_type', label: 'What is the problem?', type: 'select', options: ['No electricity in an area', 'Flickering lights', 'Outlet problem', 'Switch problem', 'Circuit breaker issue', 'Wiring issue', 'Other'] },
+   { key: 'location', label: 'Location', type: 'select', options: ['Bedroom', 'Kitchen', 'Living room', 'Bathroom', 'Outdoor', 'Other'] },
+   { key: 'affected_units', label: 'Number of affected outlets/lights', type: 'select', options: ['1', '2', '3+'] },
+   { key: 'burning_smell', label: 'Is there an electrical burning smell/smoke?', type: 'select', options: ['No', 'Yes'] },
+   { key: 'without_power', label: 'Is the affected area currently without power?', type: 'select', options: ['No', 'Yes'] },
+  ],
+ },
+ 'appliance repair': {
+  title: 'Appliance Repair',
+  pricingType: 'provider_quote',
+  baseRange: [500, 2000],
+  note: 'Estimated diagnostic/service range. Provider quotation follows after checking the unit.',
+  fields: [
+   { key: 'appliance_type', label: 'Appliance type', type: 'text', placeholder: 'Aircon, refrigerator, washer, TV, etc.' },
+   { key: 'brand', label: 'Brand', type: 'text', placeholder: 'Brand name' },
+   { key: 'model', label: 'Model (optional)', type: 'text', required: false, placeholder: 'Model number if available' },
+   { key: 'problem_symptom', label: 'Problem/symptom', type: 'textarea', placeholder: 'Describe what is happening' },
+   { key: 'turning_on', label: 'Is the appliance turning on?', type: 'select', options: ['Yes', 'No', 'Sometimes'] },
+   { key: 'intermittent', label: 'Is the problem intermittent or continuous?', type: 'select', options: ['Intermittent', 'Continuous', 'Not sure'] },
+   { key: 'started', label: 'When did the problem start?', type: 'select', options: ['Today', 'This week', 'This month', 'Longer than a month'] },
+   { key: 'visible_damage', label: 'Is there visible damage?', type: 'select', options: ['No', 'Yes', 'Not sure'] },
+  ],
+ },
+ carpentry: {
+  title: 'Carpentry',
+  pricingType: 'provider_quote',
+  baseRange: [700, 2500],
+  note: 'Estimated range. Provider confirms materials/labor and final quote.',
+  fields: [
+   { key: 'work_type', label: 'Type of work', type: 'select', options: ['Repair', 'Replacement', 'Custom work', 'Installation'] },
+   { key: 'item_area', label: 'Item/area', type: 'select', options: ['Door', 'Cabinet', 'Table', 'Chair', 'Wall/partition', 'Other'] },
+   { key: 'dimensions', label: 'Approximate dimensions', type: 'text', placeholder: 'Example: 2ft x 4ft' },
+   { key: 'material', label: 'Material involved', type: 'text', placeholder: 'Wood, plywood, metal frame, etc.' },
+   { key: 'quantity', label: 'Quantity', type: 'number', min: 1, placeholder: '1' },
+  ],
+ },
+ 'roof repair': {
+  title: 'Roof Repair',
+  pricingType: 'provider_quote',
+  baseRange: [800, 3000],
+  note: 'Estimated range. Inspection is needed before final quotation.',
+  fields: [
+   { key: 'problem_type', label: 'Problem', type: 'select', options: ['Leak', 'Damaged roofing', 'Loose sheet', 'Broken tile', 'Gutter issue', 'Other'] },
+   { key: 'roof_size', label: 'Approximate roof size', type: 'select', options: ['Small area', 'Medium area', 'Large area', 'Not sure'] },
+   { key: 'affected_areas', label: 'Number of affected areas', type: 'select', options: ['1', '2', '3+'] },
+   { key: 'roofing_type', label: 'Type of roofing', type: 'text', placeholder: 'Metal sheet, tile, etc.' },
+   { key: 'severity', label: 'Severity', type: 'select', options: ['Minor', 'Moderate', 'Major / urgent'] },
+  ],
+ },
+ 'furniture repair': {
+  title: 'Furniture Repair',
+  pricingType: 'provider_quote',
+  baseRange: [400, 1500],
+  note: 'Provider will confirm the final quote based on actual materials and labor.',
+  fields: [
+   { key: 'furniture_type', label: 'Furniture type', type: 'text', placeholder: 'Chair, table, cabinet, sofa, etc.' },
+   { key: 'problem_type', label: 'Problem', type: 'select', options: ['Broken', 'Loose', 'Scratch/damage', 'Needs reinforcement', 'Other'] },
+   { key: 'material', label: 'Material', type: 'text', placeholder: 'Wood, metal, fabric, etc.' },
+   { key: 'size', label: 'Size', type: 'select', options: ['Small', 'Medium', 'Large'] },
+   { key: 'quantity', label: 'Quantity', type: 'number', min: 1, placeholder: '1' },
+  ],
+ },
+ 'painting services': {
+  title: 'Painting Services',
+  pricingType: 'calculated',
+  note: 'Calculated estimate based on selected area, size, rooms, coats, and surface.',
+  fields: [
+   { key: 'area', label: 'Area', type: 'select', options: ['Bedroom', 'Living room', 'Kitchen', 'Exterior', 'Whole house'] },
+   { key: 'room_size', label: 'Approximate area/room size', type: 'select', options: ['Small', 'Medium', 'Large', 'Custom square meters'] },
+   { key: 'custom_sqm', label: 'Custom square meters', type: 'number', min: 1, required: false, placeholder: 'Example: 20' },
+   { key: 'rooms', label: 'Number of rooms', type: 'number', min: 1, placeholder: '1' },
+   { key: 'coats', label: 'Number of coats', type: 'select', options: ['1', '2', '3'] },
+   { key: 'surface', label: 'Surface', type: 'select', options: ['Walls only', 'Walls + ceiling'] },
+  ],
+ },
+ 'door and window repair': {
+  title: 'Door and Window Repair',
+  pricingType: 'provider_quote',
+  baseRange: [400, 1800],
+  note: 'Provider confirms final quote after checking the unit and material.',
+  fields: [
+   { key: 'unit_type', label: 'Door/window', type: 'select', options: ['Door', 'Window'] },
+   { key: 'material', label: 'Material', type: 'select', options: ['Wood', 'Aluminum', 'Glass', 'Metal'] },
+   { key: 'problem_type', label: 'Problem', type: 'select', options: ['Broken', 'Loose', 'Difficult to open', 'Lock issue', 'Glass damage'] },
+   { key: 'units', label: 'Number of units', type: 'number', min: 1, placeholder: '1' },
+  ],
+ },
+};
 
 function bookingEsc(value) {
  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -46,6 +157,238 @@ function bookingSlotLabel(slot) {
 
 function bookingMoney(value) {
  return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+}
+
+function normalizeBookingText(value) {
+ return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function selectedBookingService() {
+ const serviceSelect = document.getElementById('sn-booking-service');
+ const selectedOption = serviceSelect?.options?.[serviceSelect.selectedIndex];
+ const service = bookingProviderServices[Number(selectedOption?.dataset.index || 0)] || null;
+ return {
+  title: selectedOption?.value || service?.title || bookingProviderProfile?.service || '',
+  category: service?.category || bookingProviderProfile?.category || '',
+  service,
+ };
+}
+
+function isRepairSelection(selection) {
+ const values = [selection?.title, selection?.category, bookingProviderProfile?.category, bookingProviderProfile?.service]
+  .map(normalizeBookingText);
+ return values.includes('repair services') || values.some(value => Boolean(REPAIR_SERVICE_CONFIGS[value]));
+}
+
+function repairServiceKeyFromSelection(selection) {
+ const direct = normalizeBookingText(selection?.title);
+ if (REPAIR_SERVICE_CONFIGS[direct]) return direct;
+ const fallback = normalizeBookingText(bookingProviderProfile?.service);
+ if (REPAIR_SERVICE_CONFIGS[fallback]) return fallback;
+ return document.getElementById('sn-repair-specific-service')?.value || 'plumbing services';
+}
+
+function repairFieldName(key) {
+ return `repair_${key}`;
+}
+
+function repairFieldValue(key) {
+ const field = document.querySelector(`[name="${repairFieldName(key)}"]`);
+ return field?.value?.trim() || '';
+}
+
+function repairQuestionField(field) {
+ const required = field.required === false ? '' : ' required';
+ const placeholder = field.placeholder ? ` placeholder="${bookingEsc(field.placeholder)}"` : '';
+ const min = field.min ? ` min="${bookingEsc(field.min)}"` : '';
+ const name = repairFieldName(field.key);
+ if (field.type === 'select') {
+  return `
+   <label><span>${bookingEsc(field.label)}</span><select name="${bookingEsc(name)}"${required}>
+    ${field.options.map(option => `<option value="${bookingEsc(option)}">${bookingEsc(option)}</option>`).join('')}
+   </select></label>
+  `;
+ }
+ if (field.type === 'textarea') {
+  return `<label class="full"><span>${bookingEsc(field.label)}</span><textarea name="${bookingEsc(name)}"${placeholder}${required}></textarea></label>`;
+ }
+ return `<label><span>${bookingEsc(field.label)}</span><input name="${bookingEsc(name)}" type="${field.type || 'text'}"${min}${placeholder}${required} /></label>`;
+}
+
+function calculateRepairEstimate(config) {
+ const key = config.key;
+ if (key === 'painting services') {
+  const area = repairFieldValue('area');
+  const size = repairFieldValue('room_size');
+  const customSqm = Number(repairFieldValue('custom_sqm'));
+  const rooms = Math.max(1, Number(repairFieldValue('rooms')) || 1);
+  const coats = Math.max(1, Number(repairFieldValue('coats')) || 1);
+  const surface = repairFieldValue('surface');
+  const areaRates = {
+   Bedroom: 650,
+   'Living room': 900,
+   Kitchen: 800,
+   Exterior: 1800,
+   'Whole house': 3500,
+  };
+  const sizeMultipliers = {
+   Small: 1,
+   Medium: 1.35,
+   Large: 1.8,
+   'Custom square meters': Number.isFinite(customSqm) && customSqm > 0 ? Math.max(1, customSqm / 12) : 1,
+  };
+  const surfaceMultiplier = surface === 'Walls + ceiling' ? 1.25 : 1;
+  const base = areaRates[area] || 650;
+  const total = Math.round(base * (sizeMultipliers[size] || 1) * rooms * coats * surfaceMultiplier);
+  return { min: total, max: total, amount: total, pricingType: 'calculated' };
+ }
+
+ const [baseMin, baseMax] = config.baseRange || [500, 1500];
+ const severity = repairFieldValue('severity').toLowerCase();
+ const units = repairFieldValue('affected_fixtures') || repairFieldValue('affected_units') || repairFieldValue('affected_areas') || repairFieldValue('units') || repairFieldValue('quantity');
+ const inaccessible = repairFieldValue('accessible') === 'No';
+ const highRisk = ['Yes', 'Major / urgent', 'Large area'].some(value => [
+  repairFieldValue('burning_smell'),
+  repairFieldValue('without_power'),
+  repairFieldValue('visible_damage'),
+  repairFieldValue('roof_size'),
+ ].includes(value));
+ let min = baseMin;
+ let max = baseMax;
+ if (severity.includes('moderate')) {
+  min += 250;
+  max += 500;
+ }
+ if (severity.includes('major')) {
+  min += 650;
+  max += 1200;
+ }
+ if (String(units).includes('2')) {
+  min += 150;
+  max += 300;
+ }
+ if (String(units).includes('3')) {
+  min += 400;
+  max += 700;
+ }
+ if (inaccessible) {
+  min += 200;
+  max += 500;
+ }
+ if (highRisk) {
+  min += 250;
+  max += 700;
+ }
+ return { min, max, amount: min, pricingType: 'provider_quote' };
+}
+
+function updateRepairEstimateDisplay() {
+ const panel = document.getElementById('sn-repair-assessment');
+ if (!panel || panel.hidden) return null;
+ const key = panel.dataset.serviceKey;
+ const config = REPAIR_SERVICE_CONFIGS[key];
+ if (!config) return null;
+ const estimate = calculateRepairEstimate({ ...config, key });
+ const summary = document.getElementById('sn-repair-price-summary');
+ const amountInput = document.getElementById('sn-booking-custom-amount');
+ if (amountInput) amountInput.value = estimate.amount;
+ if (summary) {
+  const priceText = estimate.pricingType === 'calculated' || estimate.min === estimate.max
+   ? `Calculated estimated price: ${bookingMoney(estimate.amount)}`
+   : `Estimated service range: ${bookingMoney(estimate.min)} - ${bookingMoney(estimate.max)}`;
+  summary.innerHTML = `
+   <strong>${bookingEsc(priceText)}</strong>
+   <span>${bookingEsc(config.note)}</span>
+  `;
+ }
+ return estimate;
+}
+
+function setManualAmountVisible(visible) {
+ const amountChoice = document.getElementById('sn-booking-amount-choice')?.closest('label');
+ const amountInput = document.getElementById('sn-booking-custom-amount')?.closest('label');
+ if (amountChoice) amountChoice.hidden = !visible;
+ if (amountInput) amountInput.hidden = !visible;
+}
+
+function renderRepairAssessment() {
+ const host = document.getElementById('sn-repair-assessment');
+ if (!host) return;
+ const selection = selectedBookingService();
+ const showAssessment = isRepairSelection(selection);
+ setManualAmountVisible(!showAssessment);
+ if (!showAssessment) {
+  host.hidden = true;
+  host.innerHTML = '';
+  return;
+ }
+
+ const directKey = normalizeBookingText(selection.title);
+ const needsSpecific = !REPAIR_SERVICE_CONFIGS[directKey];
+ const selectedKey = repairServiceKeyFromSelection(selection);
+ const config = REPAIR_SERVICE_CONFIGS[selectedKey] || REPAIR_SERVICE_CONFIGS['plumbing services'];
+ host.hidden = false;
+ host.dataset.serviceKey = selectedKey;
+ host.innerHTML = `
+  <div class="sn-repair-assessment-head">
+   <div>
+    <h4>Repair Services Assessment</h4>
+    <p>Select the specific work and answer the service questions. The system will prepare the estimate for the provider.</p>
+   </div>
+   <span>${bookingEsc(config.pricingType === 'calculated' ? 'Calculated Price' : 'Assessment / Quote')}</span>
+  </div>
+  <div class="sn-repair-assessment-grid">
+   ${needsSpecific ? `
+    <label><span>Specific repair work</span><select id="sn-repair-specific-service">
+     ${Object.entries(REPAIR_SERVICE_CONFIGS).map(([key, item]) => `<option value="${bookingEsc(key)}"${key === selectedKey ? ' selected' : ''}>${bookingEsc(item.title)}</option>`).join('')}
+    </select></label>
+   ` : ''}
+   ${config.fields.map(repairQuestionField).join('')}
+   <label class="full"><span>Photo/video (optional)</span><input id="sn-repair-media" name="assessmentMedia" type="file" accept="image/*,video/*" multiple /><small>Upload up to 3 files if it helps the provider inspect the problem.</small></label>
+  </div>
+  <div class="sn-repair-price-summary" id="sn-repair-price-summary"></div>
+ `;
+ document.getElementById('sn-repair-specific-service')?.addEventListener('change', () => renderRepairAssessment());
+ host.querySelectorAll('input, select, textarea').forEach((field) => {
+  if (field.id !== 'sn-repair-specific-service') {
+   field.addEventListener('input', updateRepairEstimateDisplay);
+   field.addEventListener('change', updateRepairEstimateDisplay);
+  }
+ });
+ updateRepairEstimateDisplay();
+}
+
+function collectRepairAssessment(form) {
+ const panel = document.getElementById('sn-repair-assessment');
+ if (!panel || panel.hidden) return null;
+ const key = panel.dataset.serviceKey;
+ const config = REPAIR_SERVICE_CONFIGS[key];
+ if (!config) return null;
+ const estimate = updateRepairEstimateDisplay() || calculateRepairEstimate({ ...config, key });
+ const answers = {};
+ config.fields.forEach((field) => {
+  answers[field.label] = repairFieldValue(field.key);
+ });
+ const mediaInput = form.querySelector('#sn-repair-media');
+ const mediaFiles = [...(mediaInput?.files || [])].slice(0, 3);
+ return {
+  amount: estimate.amount,
+  estimatedMin: estimate.min,
+  estimatedMax: estimate.max,
+  pricingType: estimate.pricingType,
+  mediaFiles,
+  details: {
+   category: 'Repair Services',
+   service_type: config.title,
+   pricing_type: estimate.pricingType,
+   estimate_label: estimate.pricingType === 'calculated' || estimate.min === estimate.max
+    ? `Calculated estimated price: ${bookingMoney(estimate.amount)}`
+    : `Estimated service range: ${bookingMoney(estimate.min)} - ${bookingMoney(estimate.max)}`,
+   note: config.note,
+   answers,
+   media_files: mediaFiles.map(file => ({ name: file.name, type: file.type || '' })),
+  },
+ };
 }
 
 function bookingServiceOptions(provider) {
@@ -254,6 +597,27 @@ function bookingDetailRow(label, value) {
  `;
 }
 
+function bookingEstimateLabel(booking) {
+ const min = Number(booking?.estimated_min || 0);
+ const max = Number(booking?.estimated_max || 0);
+ const type = booking?.pricing_type || booking?.service_details?.pricing_type || '';
+ if (type === 'calculated' || (min && max && min === max)) return bookingMoney(booking.amount || min);
+ if (min && max) return `${bookingMoney(min)} - ${bookingMoney(max)}`;
+ if (min) return `Starts at ${bookingMoney(min)}`;
+ return bookingMoney(booking?.amount || 0);
+}
+
+function bookingServiceDetailRows(details = {}) {
+ const rows = [];
+ if (details.service_type) rows.push(bookingDetailRow('Specific work', details.service_type));
+ if (details.estimate_label) rows.push(bookingDetailRow('Estimate', details.estimate_label));
+ const answers = details.answers && typeof details.answers === 'object' ? details.answers : {};
+ Object.entries(answers).forEach(([label, value]) => {
+  if (value) rows.push(bookingDetailRow(label, value));
+ });
+ return rows.join('');
+}
+
 function closeBookingModal(modal) {
  modal?.remove();
  document.body.classList.remove('sn-modal-open');
@@ -285,11 +649,12 @@ async function showBookingDetails(booking) {
     ${bookingDetailRow('Status', item.status)}
     ${bookingDetailRow('Date', bookingDisplayDate(item.scheduled_date))}
     ${bookingDetailRow('Time', item.scheduled_time)}
-    ${bookingDetailRow('Amount', bookingMoney(item.amount))}
+    ${bookingDetailRow('Amount / estimate', bookingEstimateLabel(item))}
     ${bookingDetailRow('Payment', item.payment_method || 'cash')}
     ${bookingDetailRow('Service address', item.address)}
     ${bookingDetailRow('Customer pin', customerPin)}
     ${bookingDetailRow('Provider GPS', providerLocation)}
+    ${bookingServiceDetailRows(item.service_details)}
    </div>
    <div class="sn-booking-track-note">${bookingEsc(trackingMessage)}</div>
    <div class="sn-modal-actions">
@@ -462,8 +827,9 @@ async function renderBookingRequestForm(customer) {
 
  let provider = null;
  try {
-  const data = await bookingFetch(`/api/auth/provider/status/${providerId}`);
+ const data = await bookingFetch(`/api/auth/provider/status/${providerId}`);
   provider = data.user;
+  bookingProviderProfile = provider;
  } catch (error) {
   console.warn(error.message || error);
  }
@@ -490,6 +856,7 @@ async function renderBookingRequestForm(customer) {
    <label><span>Date</span><input id="sn-booking-date" name="scheduled_date" type="date" value="${todayInputValue()}" required /></label>
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
   <label><span>Payment Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash Payment</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">To be paid directly to the service provider after the service.</small></label>
+   <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
    <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>
@@ -505,7 +872,11 @@ async function renderBookingRequestForm(customer) {
  pageHeader.insertAdjacentElement('afterend', form);
 
  updateBookingPaymentChoices();
- document.getElementById('sn-booking-service')?.addEventListener('change', updateBookingPaymentChoices);
+ renderRepairAssessment();
+ document.getElementById('sn-booking-service')?.addEventListener('change', () => {
+  updateBookingPaymentChoices();
+  renderRepairAssessment();
+ });
  document.getElementById('sn-booking-payment')?.addEventListener('change', (event) => {
   const note = document.getElementById('sn-booking-payment-note');
   if (note) note.textContent = event.target.value === 'gcash'
@@ -640,14 +1011,19 @@ async function submitBookingRequest(event, customer, providerId) {
  const form = event.currentTarget;
  const submit = form.querySelector('[type="submit"]');
  const formData = new FormData(form);
+ const repairAssessment = collectRepairAssessment(form);
  const body = {
   provider_id: Number(providerId),
-  service: formData.get('service'),
+  service: repairAssessment?.details?.service_type || formData.get('service'),
   scheduled_date: formData.get('scheduled_date'),
   scheduled_time: formData.get('scheduled_time'),
   address: formData.get('address'),
  payment_method: formData.get('payment_method'),
- amount: Number(formData.get('amount') || 0),
+ amount: repairAssessment?.amount ?? Number(formData.get('amount') || 0),
+ pricing_type: repairAssessment?.pricingType || 'provider_quote',
+ estimated_min: repairAssessment?.estimatedMin ?? Number(formData.get('amount') || 0),
+ estimated_max: repairAssessment?.estimatedMax ?? Number(formData.get('amount') || 0),
+ service_details: repairAssessment?.details || {},
  ...(bookingDeviceCoords || {}),
  };
 
@@ -655,14 +1031,14 @@ async function submitBookingRequest(event, customer, providerId) {
  const selectedService = bookingProviderServices[Number(selectedServiceOption?.dataset.index || 0)] || null;
  const minPrice = Number(selectedService?.starting_price || 0);
  const maxPrice = Number(selectedService?.max_price || minPrice || 0);
- if (minPrice && body.amount < minPrice) {
+ if (!repairAssessment && minPrice && body.amount < minPrice) {
   await bookingAlert(`Cash amount must be at least ${bookingMoney(minPrice)} for this service.`, {
    title: 'Invalid Cash Amount',
    type: 'warning',
   });
   return;
  }
- if (maxPrice && body.amount > maxPrice) {
+ if (!repairAssessment && maxPrice && body.amount > maxPrice) {
   await bookingAlert(`Cash amount cannot exceed ${bookingMoney(maxPrice)} for this service.`, {
    title: 'Invalid Cash Amount',
    type: 'warning',
@@ -672,11 +1048,24 @@ async function submitBookingRequest(event, customer, providerId) {
 
  if (submit) submit.textContent = 'Submitting...';
  try {
-  await bookingFetch(`/api/customer/${customer.id}/bookings`, {
-   method: 'POST',
-   headers: { 'Content-Type': 'application/json' },
-   body: JSON.stringify(body),
-  });
+  if (repairAssessment?.mediaFiles?.length) {
+   const payload = new FormData();
+   Object.entries(body).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    payload.append(key, key === 'service_details' ? JSON.stringify(value) : String(value));
+   });
+   repairAssessment.mediaFiles.slice(0, 3).forEach((file) => payload.append('assessmentMedia', file));
+   await bookingFetch(`/api/customer/${customer.id}/bookings`, {
+    method: 'POST',
+    body: payload,
+   });
+  } else {
+   await bookingFetch(`/api/customer/${customer.id}/bookings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+   });
+  }
   if (submit) submit.textContent = 'Booking Submitted';
   window.setTimeout(() => window.location.href = './bookings.html', 700);
  } catch (error) {

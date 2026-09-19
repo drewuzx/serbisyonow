@@ -28,13 +28,18 @@ const passwordResetTtlMinutes = Math.max(10, Number(process.env.PASSWORD_RESET_T
 for (const dir of [
   path.join(uploadDir, 'customer-ids'),
   path.join(uploadDir, 'provider-docs'),
+  path.join(uploadDir, 'booking-media'),
 ]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
   destination(req, file, cb) {
-    const folder = file.fieldname === 'docs' ? 'provider-docs' : 'customer-ids';
+    const folder = file.fieldname === 'docs'
+      ? 'provider-docs'
+      : file.fieldname === 'assessmentMedia'
+        ? 'booking-media'
+        : 'customer-ids';
     cb(null, path.join(uploadDir, folder));
   },
   filename(req, file, cb) {
@@ -51,7 +56,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-const UPLOAD_FOLDERS = new Set(['customer-ids', 'provider-docs']);
+const UPLOAD_FOLDERS = new Set(['customer-ids', 'provider-docs', 'booking-media']);
 
 const FIELD_LABELS = {
   provider_id: 'Service provider',
@@ -833,7 +838,9 @@ function geoPointFromRow(row) {
 }
 
 function uploadedFileFolder(file) {
-  return file?.fieldname === 'docs' ? 'provider-docs' : 'customer-ids';
+  if (file?.fieldname === 'docs') return 'provider-docs';
+  if (file?.fieldname === 'assessmentMedia') return 'booking-media';
+  return 'customer-ids';
 }
 
 function requestUploadedFiles(req) {
@@ -873,6 +880,32 @@ async function persistRequestUploads(req, owner = {}) {
   const files = requestUploadedFiles(req);
   if (!files.length) return;
   await Promise.all(files.map((file) => persistUploadedFile(file, owner)));
+}
+
+function parseObjectField(value, fallback = {}) {
+  if (!value) return fallback;
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string') return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function positiveMoney(value, fallback = 0) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : fallback;
+}
+
+function bookingMediaFiles(req) {
+  return (req.files?.assessmentMedia || []).filter(Boolean).map((file) => ({
+    name: file.originalname || file.filename,
+    filename: file.filename,
+    type: file.mimetype || '',
+    url: `/uploads/booking-media/${file.filename}`,
+  }));
 }
 
 async function backfillUploadFolderFromDisk(folder) {
@@ -1112,6 +1145,10 @@ async function ensureAdminSupportTables() {
       location_updated_at TIMESTAMPTZ,
       amount NUMERIC(10,2) NOT NULL DEFAULT 0,
       payment_method TEXT NOT NULL DEFAULT 'cash',
+      service_details JSONB NOT NULL DEFAULT '{}'::jsonb,
+      pricing_type TEXT NOT NULL DEFAULT 'provider_quote',
+      estimated_min NUMERIC(10,2) NOT NULL DEFAULT 0,
+      estimated_max NUMERIC(10,2) NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'upcoming', 'ongoing', 'completed', 'cancelled')),
       provider_closed BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1125,6 +1162,10 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,7),
       ADD COLUMN IF NOT EXISTS location_accuracy_m NUMERIC(10,2),
       ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS service_details JSONB NOT NULL DEFAULT '{}'::jsonb,
+      ADD COLUMN IF NOT EXISTS pricing_type TEXT NOT NULL DEFAULT 'provider_quote',
+      ADD COLUMN IF NOT EXISTS estimated_min NUMERIC(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS estimated_max NUMERIC(10,2) NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS provider_closed BOOLEAN NOT NULL DEFAULT FALSE;
 
     ALTER TABLE customers
@@ -1400,6 +1441,10 @@ function customerBookingRow(row) {
     provider_location_updated_at: row.provider_location_updated_at || null,
     amount: Number(row.amount || 0),
     payment_method: row.payment_method || 'cash',
+    service_details: row.service_details || {},
+    pricing_type: row.pricing_type || 'provider_quote',
+    estimated_min: Number(row.estimated_min || 0),
+    estimated_max: Number(row.estimated_max || 0),
     status: row.status,
     provider_closed: Boolean(row.provider_closed),
     created_at: row.created_at,
@@ -1616,6 +1661,10 @@ function providerBookingRow(row) {
     address: row.address,
     amount: Number(row.amount || 0),
     payment_method: row.payment_method || 'cash',
+    service_details: row.service_details || {},
+    pricing_type: row.pricing_type || 'provider_quote',
+    estimated_min: Number(row.estimated_min || 0),
+    estimated_max: Number(row.estimated_max || 0),
     status: row.status,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -3058,12 +3107,25 @@ app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
   });
 }));
 
-app.post('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
+app.post('/api/customer/:id/bookings', upload.fields([
+  { name: 'assessmentMedia', maxCount: 3 },
+]), asyncRoute(async (req, res) => {
   requireFields(req.body, ['provider_id', 'service', 'scheduled_date', 'scheduled_time', 'address']);
   const latitude = Number(req.body.latitude);
   const longitude = Number(req.body.longitude);
   const accuracy = Number(req.body.accuracy);
   const hasBookingGps = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const serviceDetails = parseObjectField(req.body.service_details);
+  const mediaFiles = bookingMediaFiles(req);
+  if (mediaFiles.length) {
+    serviceDetails.media_files = mediaFiles;
+  }
+  const pricingType = String(req.body.pricing_type || serviceDetails.pricing_type || 'provider_quote')
+    .trim()
+    .slice(0, 40) || 'provider_quote';
+  const estimatedMin = positiveMoney(req.body.estimated_min);
+  const estimatedMax = positiveMoney(req.body.estimated_max, estimatedMin);
+  const bookingAmount = positiveMoney(req.body.amount, estimatedMin);
 
   const availability = await db.query(`
     SELECT id FROM provider_availability
@@ -3103,9 +3165,13 @@ app.post('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
       location_updated_at,
       amount,
       payment_method,
+      service_details,
+      pricing_type,
+      estimated_min,
+      estimated_max,
       status
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${hasBookingGps ? 'NOW()' : 'NULL'}, COALESCE($10, 0), COALESCE($11, 'cash'), 'pending')
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${hasBookingGps ? 'NOW()' : 'NULL'}, COALESCE($10, 0), COALESCE($11, 'cash'), $12::jsonb, $13, COALESCE($14, 0), COALESCE($15, 0), 'pending')
     RETURNING *
   `, [
     req.params.id,
@@ -3117,9 +3183,15 @@ app.post('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
     hasBookingGps ? latitude : null,
     hasBookingGps ? longitude : null,
     Number.isFinite(accuracy) ? accuracy : null,
-    req.body.amount || 0,
+    bookingAmount,
     req.body.payment_method || 'cash',
+    JSON.stringify(serviceDetails),
+    pricingType,
+    estimatedMin,
+    estimatedMax,
   ]);
+
+  await persistRequestUploads(req, { role: 'booking', id: result.rows[0].id });
 
   await db.query(`
     UPDATE provider_availability

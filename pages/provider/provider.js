@@ -1049,6 +1049,44 @@ async function removeService(serviceId) {
   loadProviderDatabase();
 }
 
+function providerMoney(value) {
+  return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+}
+
+function providerBookingEstimateLabel(booking) {
+  const min = Number(booking?.estimated_min || 0);
+  const max = Number(booking?.estimated_max || 0);
+  const type = booking?.pricing_type || booking?.service_details?.pricing_type || '';
+  if (type === 'calculated' || (min && max && min === max)) return providerMoney(booking.amount || min);
+  if (min && max) return `${providerMoney(min)} - ${providerMoney(max)}`;
+  if (min) return `Starts at ${providerMoney(min)}`;
+  return providerMoney(booking?.amount || 0);
+}
+
+function renderProviderBookingAssessment(booking) {
+  const details = booking?.service_details || {};
+  const answers = details.answers && typeof details.answers === 'object' ? details.answers : {};
+  const answerRows = Object.entries(answers)
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<li><span>${esc(label)}</span><strong>${esc(value)}</strong></li>`)
+    .join('');
+  const mediaRows = (details.media_files || [])
+    .map((file) => file?.url ? `<a href="${esc(file.url)}" target="_blank" rel="noopener">${esc(file.name || 'Uploaded file')}</a>` : '')
+    .join('');
+  if (!details.service_type && !answerRows && !mediaRows && !booking?.estimated_min) return '';
+  return `
+    <div class="sn-booking-assessment">
+      <div class="sn-booking-assessment-head">
+        <strong>${esc(details.service_type || booking.service || 'Service assessment')}</strong>
+        <span>${esc(providerBookingEstimateLabel(booking))}</span>
+      </div>
+      ${details.note ? `<p>${esc(details.note)}</p>` : ''}
+      ${answerRows ? `<ul>${answerRows}</ul>` : ''}
+      ${mediaRows ? `<div class="sn-booking-assessment-files">${mediaRows}</div>` : ''}
+    </div>
+  `;
+}
+
 function renderRequests(bookings, provider) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
@@ -1067,6 +1105,7 @@ function renderRequests(bookings, provider) {
               <strong>${esc(booking.service)}</strong>
               <span>${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)} - ${esc(booking.scheduled_time)}</span>
               <small>${esc(booking.address || 'Customer address unavailable')}</small>
+              ${renderProviderBookingAssessment(booking)}
             </div>
             <div class="sn-booking-request-side" data-booking-id="${booking.id}">
               ${statusPill(booking.status)}

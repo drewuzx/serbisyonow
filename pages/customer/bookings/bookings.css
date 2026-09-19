@@ -85,6 +85,81 @@
   line-height: 1.4;
 }
 
+.sn-repair-assessment {
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  background: #f8fbff;
+  padding: 16px;
+}
+
+.sn-repair-assessment[hidden] {
+  display: none;
+}
+
+.sn-repair-assessment-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.sn-repair-assessment-head h4 {
+  margin: 0 0 4px;
+  color: var(--blue-dark);
+  font-family: var(--font-heading);
+}
+
+.sn-repair-assessment-head p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.sn-repair-assessment-head > span {
+  align-self: flex-start;
+  border-radius: var(--radius-full);
+  background: var(--orange-pale);
+  color: var(--orange-dark);
+  padding: 7px 12px;
+  font-size: var(--text-xs);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.sn-repair-assessment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sn-repair-assessment-grid small {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.sn-repair-price-summary {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  border-radius: 14px;
+  background: var(--white);
+  border: 1.5px solid #c8d8f6;
+  padding: 12px 14px;
+}
+
+.sn-repair-price-summary strong {
+  color: var(--blue-dark);
+  font-family: var(--font-heading);
+}
+
+.sn-repair-price-summary span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
 .sn-booking-create-grid input,
 .sn-booking-create-grid select,
 .sn-booking-create-grid textarea {
@@ -635,8 +710,13 @@
 @media (max-width: 600px) {
   .sn-booking-create-grid,
   .sn-booking-location-row,
+  .sn-repair-assessment-grid,
   .sn-booking-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sn-repair-assessment-head {
+    display: grid;
   }
 
   .sn-calendar-weekdays {
