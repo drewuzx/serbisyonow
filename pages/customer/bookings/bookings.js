@@ -313,33 +313,36 @@ function setManualAmountVisible(visible) {
  amountInput?.querySelectorAll('input, select').forEach(field => { field.disabled = !visible; });
 }
 
-function cleaningSelection() {
- const pricing = window.SNCleaningPricing;
- const selection = selectedBookingService();
- const direct = pricing.serviceKey(selection.title);
- return { ...selection, key: direct, isCleaning: Boolean(direct || pricing.isCategory(selection.title)) };
+function calculatedBookingCategories() {
+ const service = selectedBookingService().service;
+ return [
+  { id: 'cleaning', prefix: 'cleaning', title: 'Cleaning Services', pricing: window.SNCleaningPricing,
+   context: { pickupDelivery: service?.laundry_pickup_delivery === true } },
+  { id: 'personal-care', prefix: 'personal_care', title: 'Personal Care', pricing: window.SNPersonalCarePricing,
+   context: { massageTypes: service?.massage_types || [] } },
+ ];
 }
 
-function cleaningContext() {
- return { pickupDelivery: selectedBookingService().service?.laundry_pickup_delivery === true };
+function calculatedFields(category, key, inputs = {}) {
+ return category.pricing.fields?.(key, category.context, inputs) || category.pricing.configs[key].fields;
 }
 
-function cleaningInputs() {
- const panel = document.getElementById('sn-cleaning-assessment');
- const config = window.SNCleaningPricing.configs[panel?.dataset.serviceKey];
+function calculatedInputs(category) {
+ const panel = document.getElementById(`sn-${category.id}-assessment`);
+ const config = category.pricing.configs[panel?.dataset.serviceKey];
  if (!config) return {};
  return Object.fromEntries(config.fields.map(field => {
-  const controls = [...panel.querySelectorAll(`[name="cleaning_${field.key}"]`)];
+  const controls = [...panel.querySelectorAll(`[name="${category.prefix}_${field.key}"]`)];
   return [field.key, field.type === 'checkboxes' ? controls.filter(input => input.checked).map(input => input.value) : controls[0]?.value || ''];
  }));
 }
 
-function cleaningQuestionField(field, defaults) {
- const name = `cleaning_${field.key}`;
+function calculatedQuestionField(field, defaults, category) {
+ const name = `${category.prefix}_${field.key}`;
  const id = `sn-${name}`;
- const wrapper = `data-cleaning-field="${field.key}"`;
+ const wrapper = `data-service-field="${field.key}"`;
  if (field.type === 'checkboxes') {
-  return `<fieldset class="sn-cleaning-areas full" ${wrapper}><legend>${bookingEsc(field.label)}</legend><div>${field.options.map((option, i) =>
+  return `<fieldset class="sn-calculated-areas full" ${wrapper}><legend>${bookingEsc(field.label)}</legend><div>${field.options.map((option, i) =>
    `<label for="${id}-${i}"><input id="${id}-${i}" type="checkbox" name="${name}" value="${bookingEsc(option)}" /><span>${bookingEsc(option)}</span></label>`).join('')}</div></fieldset>`;
  }
  const control = field.type === 'select'
@@ -348,25 +351,34 @@ function cleaningQuestionField(field, defaults) {
  return `<label ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span>${control}</label>`;
 }
 
-function updateCleaningEstimateDisplay() {
- const panel = document.getElementById('sn-cleaning-assessment');
+function updateCalculatedEstimateDisplay(category) {
+ const panel = document.getElementById(`sn-${category.id}-assessment`);
  if (!panel || panel.hidden || panel.dataset.rendering === 'true') return null;
- const pricing = window.SNCleaningPricing;
+ const { pricing, context } = category;
  const key = panel.dataset.serviceKey;
- const inputs = cleaningInputs();
- const context = cleaningContext();
- pricing.configs[key].fields.forEach(field => {
-  const wrapper = panel.querySelector(`[data-cleaning-field="${field.key}"]`);
+ const inputs = calculatedInputs(category);
+ calculatedFields(category, key, inputs).forEach(field => {
+  const wrapper = panel.querySelector(`[data-service-field="${field.key}"]`);
+  if (field.type === 'select') {
+   const select = wrapper.querySelector('select');
+   const currentOptions = [...select.options].map(option => option.value);
+   if (JSON.stringify(currentOptions) !== JSON.stringify(field.options)) {
+    const previous = select.value;
+    select.innerHTML = field.options.map(value => `<option value="${bookingEsc(value)}">${bookingEsc(value)}</option>`).join('');
+    if (field.options.includes(previous)) select.value = previous;
+    inputs[field.key] = select.value;
+   }
+  }
   const visible = pricing.fieldVisible(field, inputs, context);
   wrapper.hidden = !visible;
   wrapper.querySelectorAll('input, select').forEach(input => { input.disabled = !visible; });
  });
- const summary = panel.querySelector('.sn-cleaning-price-summary');
+ const summary = panel.querySelector('.sn-calculated-price-summary');
  try {
   const estimate = pricing.assessment(key, inputs, context);
   summary.innerHTML = `<h5>Price breakdown <span>Sample rates</span></h5><dl>${estimate.details.breakdown.map(item =>
    `<div><dt>${bookingEsc(item.label)}</dt><dd>${bookingMoney(item.amount)}${item.max_amount !== undefined ? ` - ${bookingMoney(item.max_amount)}` : ''}</dd></div>`).join('')}</dl>
-   <p class="sn-cleaning-total" role="status">${bookingEsc(estimate.details.estimate_label)}</p><p>${bookingEsc(estimate.details.note)}</p>`;
+   <p class="sn-calculated-total sn-${category.id}-total" role="status">${bookingEsc(estimate.details.estimate_label)}</p><p>${bookingEsc(estimate.details.note)}</p>`;
   return estimate;
  } catch (error) {
   summary.innerHTML = `<p role="status">${bookingEsc(error.message)}</p>`;
@@ -375,12 +387,17 @@ function updateCleaningEstimateDisplay() {
 }
 
 function renderBookingAssessment() {
- const panel = document.getElementById('sn-cleaning-assessment');
- const selection = cleaningSelection();
- if (!selection.isCleaning) {
-  panel.hidden = true;
-  panel.innerHTML = '';
-  delete panel.dataset.serviceKey;
+ const selection = selectedBookingService();
+ const categories = calculatedBookingCategories();
+ const category = categories.find(item => item.pricing.serviceKey(selection.title) || item.pricing.isCategory(selection.title));
+ categories.forEach(item => {
+  if (item === category) return;
+  const inactive = document.getElementById(`sn-${item.id}-assessment`);
+  inactive.hidden = true;
+  inactive.innerHTML = '';
+  delete inactive.dataset.serviceKey;
+ });
+ if (!category) {
   renderRepairAssessment();
   return;
  }
@@ -388,31 +405,35 @@ function renderBookingAssessment() {
  repair.hidden = true;
  repair.innerHTML = '';
  setManualAmountVisible(false);
- const pricing = window.SNCleaningPricing;
- const previous = panel.querySelector('#sn-cleaning-specific-service')?.value;
- const key = selection.key || previous || 'general house cleaning';
- const config = pricing.configs[key];
+ const { pricing, context } = category;
+ const panel = document.getElementById(`sn-${category.id}-assessment`);
+ const selectorId = `sn-${category.id}-specific-service`;
+ const directKey = pricing.serviceKey(selection.title);
+ const previous = panel.querySelector(`#${selectorId}`)?.value;
+ const key = directKey || previous || Object.keys(pricing.configs)[0];
+ const defaults = pricing.defaults(key, context);
  panel.hidden = false;
  // Replacing a focused input can fire its change event before the new fields exist.
  panel.dataset.rendering = 'true';
  panel.dataset.serviceKey = key;
- panel.innerHTML = `<div class="sn-cleaning-head"><h4>Cleaning Services</h4><span>Sample estimate</span></div>
-  <div class="sn-cleaning-grid">${!selection.key ? `<label class="full"><span>Specific cleaning service</span><select id="sn-cleaning-specific-service">${Object.entries(pricing.configs).map(([value, item]) => `<option value="${value}"${value === key ? ' selected' : ''}>${bookingEsc(item.title)}</option>`).join('')}</select></label>` : ''}
-  ${config.fields.map(field => cleaningQuestionField(field, pricing.defaults(key))).join('')}</div>
-  <div class="sn-cleaning-price-summary"></div>`;
+ panel.innerHTML = `<div class="sn-calculated-head"><h4>${category.title}</h4><span>Sample estimate</span></div>
+  <div class="sn-calculated-grid">${!directKey ? `<label class="full"><span>Specific service</span><select id="${selectorId}">${Object.entries(pricing.configs).map(([value, item]) => `<option value="${bookingEsc(value)}"${value === key ? ' selected' : ''}>${bookingEsc(item.title)}</option>`).join('')}</select></label>` : ''}
+  ${calculatedFields(category, key, defaults).map(field => calculatedQuestionField(field, defaults, category)).join('')}</div>
+  <div class="sn-calculated-price-summary sn-${category.id}-price-summary"></div>`;
  delete panel.dataset.rendering;
- panel.querySelector('#sn-cleaning-specific-service')?.addEventListener('change', renderBookingAssessment);
- panel.querySelectorAll('[name^="cleaning_"]').forEach(input => {
-  input.addEventListener('input', updateCleaningEstimateDisplay);
-  input.addEventListener('change', updateCleaningEstimateDisplay);
+ panel.querySelector(`#${selectorId}`)?.addEventListener('change', renderBookingAssessment);
+ panel.querySelectorAll(`[name^="${category.prefix}_"]`).forEach(input => {
+  input.addEventListener('input', () => updateCalculatedEstimateDisplay(category));
+  input.addEventListener('change', () => updateCalculatedEstimateDisplay(category));
  });
- updateCleaningEstimateDisplay();
+ updateCalculatedEstimateDisplay(category);
 }
 
-function collectCleaningAssessment() {
- const panel = document.getElementById('sn-cleaning-assessment');
- if (!panel || panel.hidden) return null;
- return window.SNCleaningPricing.assessment(panel.dataset.serviceKey, cleaningInputs(), cleaningContext());
+function collectCalculatedAssessment() {
+ const category = calculatedBookingCategories().find(item => !document.getElementById(`sn-${item.id}-assessment`)?.hidden);
+ if (!category) return null;
+ const panel = document.getElementById(`sn-${category.id}-assessment`);
+ return category.pricing.assessment(panel.dataset.serviceKey, calculatedInputs(category), category.context);
 }
 
 function renderRepairAssessment() {
@@ -503,11 +524,15 @@ function bookingServiceOptions(provider) {
    starting_price: 0,
    max_price: 0,
   }];
- return services.map((service, index) => `
+ return services.map((service, index) => {
+  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing]
+   .some(pricing => pricing.serviceKey(service.title) || pricing.isCategory(service.title));
+  return `
   <option value="${bookingEsc(service.title)}" data-index="${index}">
-   ${bookingEsc(service.title)}${service.starting_price ? ` - ${bookingMoney(service.starting_price)}${service.max_price && service.max_price !== service.starting_price ? ` to ${bookingMoney(service.max_price)}` : ''}` : ''}
+   ${bookingEsc(service.title)}${!calculated && service.starting_price ? ` - ${bookingMoney(service.starting_price)}${service.max_price && service.max_price !== service.starting_price ? ` to ${bookingMoney(service.max_price)}` : ''}` : ''}
   </option>
- `).join('');
+ `;
+ }).join('');
 }
 
 function updateBookingPaymentChoices() {
@@ -964,7 +989,8 @@ async function renderBookingRequestForm(customer) {
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
   <label><span>Payment Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash Payment</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">To be paid directly to the service provider after the service.</small></label>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
-   <section class="sn-cleaning-assessment full" id="sn-cleaning-assessment" hidden></section>
+   <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>
+   <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>
    <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>
@@ -1121,9 +1147,9 @@ async function submitBookingRequest(event, customer, providerId) {
  const formData = new FormData(form);
  let assessment;
  try {
-  assessment = collectCleaningAssessment() || collectRepairAssessment(form);
+  assessment = collectCalculatedAssessment() || collectRepairAssessment(form);
  } catch (error) {
-  await bookingAlert(error.message, { title: 'Check Cleaning Details', type: 'warning' });
+  await bookingAlert(error.message, { title: 'Check Service Details', type: 'warning' });
   return;
  }
  const body = {

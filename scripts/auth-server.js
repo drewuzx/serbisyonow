@@ -11,6 +11,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./db');
 const cleaningPricing = require('../shared/js/cleaningPricing');
+const personalCarePricing = require('../shared/js/personalCarePricing');
 
 const app = express();
 app.set('trust proxy', true);
@@ -1231,13 +1232,15 @@ async function ensureAdminSupportTables() {
       accepts_gcash BOOLEAN NOT NULL DEFAULT FALSE,
       accepts_other BOOLEAN NOT NULL DEFAULT FALSE,
       laundry_pickup_delivery BOOLEAN NOT NULL DEFAULT FALSE,
+      massage_types TEXT[] NOT NULL DEFAULT '{}'::text[],
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     ALTER TABLE provider_services
-      ADD COLUMN IF NOT EXISTS laundry_pickup_delivery BOOLEAN NOT NULL DEFAULT FALSE;
+      ADD COLUMN IF NOT EXISTS laundry_pickup_delivery BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS massage_types TEXT[] NOT NULL DEFAULT '{}'::text[];
 
     CREATE TABLE IF NOT EXISTS provider_availability (
       id SERIAL PRIMARY KEY,
@@ -1627,6 +1630,7 @@ function providerServiceRow(row) {
     accepts_gcash: row.accepts_gcash,
     accepts_other: row.accepts_other,
     laundry_pickup_delivery: row.laundry_pickup_delivery === true,
+    massage_types: row.massage_types || [],
     is_active: row.is_active,
     created_at: row.created_at,
   };
@@ -3133,18 +3137,20 @@ app.post('/api/customer/:id/bookings', upload.fields([
   let estimatedMax = positiveMoney(req.body.estimated_max, estimatedMin);
   let bookingAmount = positiveMoney(req.body.amount, estimatedMin);
 
-  if (cleaningPricing.serviceKey(req.body.service) || cleaningPricing.isCategory(req.body.service) || cleaningPricing.isCategory(serviceDetails.category)) {
+  const calculatedPricing = [cleaningPricing, personalCarePricing].find(pricing =>
+    pricing.serviceKey(req.body.service) || pricing.isCategory(req.body.service) || pricing.isCategory(serviceDetails.category));
+  if (calculatedPricing) {
     const offered = await db.query(`
       SELECT * FROM provider_services
       WHERE provider_id = $1 AND is_active = TRUE
     `, [req.body.provider_id]);
-    const key = cleaningPricing.serviceKey(req.body.service);
+    const key = calculatedPricing.serviceKey(req.body.service);
     const selected = req.body.provider_service_id
       ? offered.rows.find(service => String(service.id) === String(req.body.provider_service_id))
-      : offered.rows.find(service => cleaningPricing.serviceKey(service.title) === key)
-        || offered.rows.find(service => cleaningPricing.isCategory(service.title));
+      : offered.rows.find(service => calculatedPricing.serviceKey(service.title) === key)
+        || offered.rows.find(service => calculatedPricing.isCategory(service.title));
     // Ignore submitted totals and rebuild the saved price from validated selections.
-    const estimate = cleaningPricing.forBooking(req.body.service, serviceDetails, selected);
+    const estimate = calculatedPricing.forBooking(req.body.service, serviceDetails, selected);
     serviceDetails = { ...estimate.details, media_files: mediaFiles };
     pricingType = estimate.pricingType;
     estimatedMin = estimate.estimatedMin;
@@ -3345,10 +3351,11 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
     return res.status(400).json({ message: 'Laundry pickup / delivery must be enabled or disabled.' });
   }
   const category = canonicalCategoryName(req.body.category);
+  const massageTypes = personalCarePricing.massageTypes(req.body.massage_types ?? []);
   const result = await db.query(`
     INSERT INTO provider_services
-      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active, laundry_pickup_delivery)
-    VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, TRUE), COALESCE($8, FALSE), COALESCE($9, FALSE), COALESCE($10, TRUE), COALESCE($11, FALSE))
+      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active, laundry_pickup_delivery, massage_types)
+    VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, TRUE), COALESCE($8, FALSE), COALESCE($9, FALSE), COALESCE($10, TRUE), COALESCE($11, FALSE), $12::text[])
     RETURNING *
   `, [
     req.params.id,
@@ -3362,6 +3369,7 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
     Boolean(req.body.accepts_other),
     req.body.is_active !== false,
     req.body.laundry_pickup_delivery === true,
+    massageTypes,
   ]);
   await upsertServiceCategory(category, req.body.title);
   res.status(201).json({ service: providerServiceRow(result.rows[0]) });
@@ -3372,6 +3380,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     return res.status(400).json({ message: 'Laundry pickup / delivery must be enabled or disabled.' });
   }
   const category = req.body.category === undefined ? undefined : canonicalCategoryName(req.body.category);
+  const massageTypes = req.body.massage_types === undefined ? null : personalCarePricing.massageTypes(req.body.massage_types);
   const result = await db.query(`
     UPDATE provider_services
     SET title = COALESCE($3, title),
@@ -3384,6 +3393,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
         accepts_other = COALESCE($10, accepts_other),
         is_active = COALESCE($11, is_active),
         laundry_pickup_delivery = COALESCE($12, laundry_pickup_delivery),
+        massage_types = COALESCE($13::text[], massage_types),
         updated_at = NOW()
     WHERE provider_id = $1 AND id = $2
     RETURNING *
@@ -3400,6 +3410,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     req.body.accepts_other ?? null,
     req.body.is_active ?? null,
     req.body.laundry_pickup_delivery ?? null,
+    massageTypes,
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Service not found.' });
   await upsertServiceCategory(result.rows[0].category, result.rows[0].title);

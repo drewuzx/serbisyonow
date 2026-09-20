@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
 const pricing = require('../shared/js/cleaningPricing');
+const personalPricing = require('../shared/js/personalCarePricing');
 const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
 
 (async () => {
@@ -19,7 +20,10 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
    { id: 987011, title: 'Bathroom cleaning', category: 'Cleaning' },
    { id: 987012, title: 'Sofa and upholstery cleaning', category: 'Cleaning' },
    { id: 987013, title: 'Plumbing Services', category: 'Repair Services' },
-   { id: 987014, title: 'Massage therapy', category: 'Personal Care' },
+   { id: 987014, title: 'Aircon', category: 'Appliance Maintenance' },
+   { id: 987015, title: 'Personal Care', category: 'Personal Care', massage_types: ['Foot massage'] },
+   { id: 987016, title: 'Hair Cut', category: 'Personal Care' },
+   { id: 987017, title: 'Massage therapy', category: 'Personal Care', massage_types: [] },
   ].map(service => ({ ...service, starting_price: 500, max_price: 800, is_active: true, accepts_cash: true, accepts_gcash: true }));
   let submitted;
   let providerUpdate;
@@ -36,7 +40,9 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
     data = { booking: { id: 987020, ...submitted } };
    } else if (request.method() === 'PATCH' && url.pathname.includes('/services/')) {
     providerUpdate = request.postDataJSON();
-    data = { service: { ...services[0], ...providerUpdate } };
+    const selected = services.find(service => String(service.id) === url.pathname.split('/').pop());
+    Object.assign(selected, providerUpdate);
+    data = { service: selected };
    } else if (url.pathname.includes('/auth/provider/status/')) data = { user: provider };
    else if (url.pathname.includes('/auth/customer/status/')) data = { user: customer };
    else if (url.pathname.includes('/provider/') && url.pathname.endsWith('/dashboard')) data = { provider, user: provider, services, bookings: [], messages: [], reviews: [], availability: [], assessment: { score: 100 } };
@@ -80,6 +86,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
   for (const width of [390, 320]) {
    await page.setViewportSize({ width, height: 844 });
    if (await page.locator('.sn-shell').evaluate(shell => shell.classList.contains('sidebar-open'))) await page.locator('#sn-hamburger').click();
+   await page.waitForFunction(() => document.getElementById('sn-sidebar').getBoundingClientRect().right <= 0);
    await page.locator('#sn-cleaning-assessment').scrollIntoViewIfNeeded();
    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
    assert.equal(overflow, false, `No page overflow at ${width}px`);
@@ -106,7 +113,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
   await second.locator('#sn-booking-service').selectOption('Plumbing Services');
   assert.equal(await second.locator('#sn-repair-assessment').isVisible(), true);
   assert.equal(await second.locator('#sn-cleaning-assessment').isVisible(), false);
-  await second.locator('#sn-booking-service').selectOption('Massage therapy');
+  await second.locator('#sn-booking-service').selectOption('Aircon');
   assert.equal(await second.locator('#sn-cleaning-assessment').isVisible(), false);
   assert.equal(await second.locator('#sn-repair-assessment').isVisible(), false);
   assert.equal(await second.locator('#sn-booking-amount-choice').isEnabled(), true);
@@ -126,8 +133,96 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
   const rendered = await second.evaluate(quote => renderProviderBookingAssessment({ service_details: quote.details, amount: quote.amount, estimated_min: quote.estimatedMin, estimated_max: quote.estimatedMax, pricing_type: quote.pricingType }), quote);
   assert.match(rendered, /Sample-rate price breakdown/);
   assert.match(rendered, /Studio/);
+
+  const customTypeButton = second.locator('[data-service-id="987015"] [data-action="edit-massage-types"]');
+  await customTypeButton.click();
+  await second.locator('.sn-modal-input').fill('Foot massage\nTraditional massage');
+  await second.locator('[data-modal-confirm]').click();
+  await second.locator('[data-service-id="987015"]').getByText('Foot massage, Traditional massage', { exact: true }).waitFor();
+  assert.deepEqual(providerUpdate.massage_types, ['Foot massage', 'Traditional massage']);
+  await customTypeButton.click();
+  await second.locator('.sn-modal-input').fill('');
+  await second.locator('[data-modal-confirm]').click();
+  await second.locator('[data-service-id="987015"]').getByText('No additional massage types', { exact: true }).waitFor();
+  assert.deepEqual(providerUpdate.massage_types, []);
+  services.find(service => service.id === 987015).massage_types = ['Foot massage'];
+
+  const personalPage = await context.newPage();
+  personalPage.on('pageerror', error => errors.push(error.stack));
+  await personalPage.goto(`${base}/pages/customer/bookings/bookings.html?provider_id=${provider.id}`);
+  await personalPage.locator('#sn-booking-service').selectOption('Personal Care');
+  assert.equal((await personalPage.locator('#sn-booking-service option:checked').innerText()).trim(), 'Personal Care');
+  await personalPage.locator('#sn-booking-time').selectOption('09:00 AM');
+  for (const key of Object.keys(personalPricing.configs)) {
+   await personalPage.locator('#sn-personal-care-specific-service').selectOption(key);
+   assert.match(await personalPage.locator('.sn-personal-care-price-summary').innerText(), /Sample estimated price/);
+   assert.equal(await personalPage.locator('#sn-cleaning-assessment').isVisible(), false);
+   assert.equal(await personalPage.locator('#sn-repair-assessment').isVisible(), false);
+   assert.equal(await personalPage.locator('#sn-create-booking-form').evaluate(form => form.checkValidity()), true, key);
+  }
+  await personalPage.locator('#sn-personal-care-specific-service').selectOption('massage therapy');
+  await personalPage.locator('[name="personal_care_massage_type"]').selectOption('Other provider-offered type');
+  assert.equal(await personalPage.locator('[name="personal_care_other_massage_type"]').inputValue(), 'Foot massage');
+  await personalPage.locator('[name="personal_care_duration"]').selectOption('60 min');
+  assert.match(await personalPage.locator('.sn-personal-care-total').innerText(), /PHP 500/);
+  await personalPage.locator('#sn-booking-service').selectOption('Massage therapy');
+  assert.equal(await personalPage.locator('[name="personal_care_massage_type"] option').count(), 3);
+  assert.equal(await personalPage.locator('[name="personal_care_other_massage_type"]').isDisabled(), true);
+  await personalPage.locator('#sn-booking-service').selectOption('Hair Cut');
+  assert.equal(await personalPage.locator('#sn-personal-care-specific-service').count(), 0);
+  await personalPage.locator('[name="personal_care_service"]').selectOption('Haircut + styling');
+  await personalPage.locator('[name="personal_care_hair_length"]').selectOption('Long');
+  await personalPage.locator('[name="personal_care_addons"][value="Hair wash"]').check();
+  assert.match(await personalPage.locator('.sn-personal-care-total').innerText(), /PHP 530/);
+
+  await personalPage.locator('#sn-booking-service').selectOption('Personal Care');
+  await personalPage.locator('#sn-personal-care-specific-service').selectOption('grooming');
+  assert.equal(await personalPage.locator('[name="personal_care_duration"]').isVisible(), false);
+  await personalPage.locator('[name="personal_care_grooming_type"]').selectOption('Body grooming');
+  assert.equal(await personalPage.locator('[name="personal_care_area"]').inputValue(), 'Arms');
+  await personalPage.locator('[name="personal_care_area"]').selectOption('Arms + legs');
+  await personalPage.locator('[name="personal_care_duration"]').selectOption('60 min');
+  assert.match(await personalPage.locator('.sn-personal-care-total').innerText(), /PHP 850/);
+  await personalPage.locator('[name="personal_care_grooming_type"]').selectOption('Shaving');
+  assert.equal(await personalPage.locator('[name="personal_care_area"]').inputValue(), 'Face');
+  assert.equal(await personalPage.locator('[name="personal_care_duration"]').isDisabled(), true);
+  assert.match(await personalPage.locator('.sn-personal-care-total').innerText(), /PHP 120/);
+
+  await personalPage.locator('#sn-personal-care-specific-service').selectOption('home spa services');
+  await personalPage.locator('[name="personal_care_package"]').selectOption('Full spa package');
+  await personalPage.locator('[name="personal_care_duration"]').selectOption('60 min');
+  await personalPage.locator('[name="personal_care_persons"]').fill('');
+  assert.equal(await personalPage.locator('#sn-create-booking-form').evaluate(form => form.checkValidity()), false);
+  assert.doesNotMatch(await personalPage.locator('.sn-personal-care-price-summary').innerText(), /NaN/);
+  await personalPage.locator('[name="personal_care_persons"]').fill('2');
+  await personalPage.locator('[name="personal_care_addons"][value="Foot spa"]').check();
+  await personalPage.locator('[name="personal_care_addons"][value="Aromatherapy"]').check();
+  assert.match(await personalPage.locator('.sn-personal-care-total').innerText(), /PHP 3,000/);
+  for (const width of [1365, 390, 320]) {
+   await personalPage.setViewportSize({ width, height: 950 });
+   if (width < 940 && await personalPage.locator('.sn-shell').evaluate(shell => shell.classList.contains('sidebar-open'))) await personalPage.locator('#sn-hamburger').click();
+   if (width < 940) await personalPage.waitForFunction(() => document.getElementById('sn-sidebar').getBoundingClientRect().right <= 0);
+   assert.equal(await personalPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, `Personal care fits at ${width}px`);
+   const clipped = await personalPage.locator('#sn-personal-care-assessment label > span').evaluateAll(labels => labels.filter(label => label.scrollWidth > label.clientWidth + 1).length);
+   assert.equal(clipped, 0);
+   await personalPage.evaluate(() => window.scrollTo(0, 0));
+   await personalPage.screenshot({ path: path.join(os.tmpdir(), `personal-care-${width}.png`), fullPage: true, animations: 'disabled' });
+  }
+  await personalPage.locator('#sn-create-booking-form [type="submit"]').click();
+  await personalPage.waitForFunction(() => document.querySelector('#sn-create-booking-form [type="submit"]')?.textContent === 'Booking Submitted');
+  assert.equal(submitted.amount, 3000);
+  assert.equal(submitted.service, 'Home Spa Services');
+  assert.equal(submitted.provider_service_id, 987015);
+  assert.equal(submitted.service_details.answers['Number of persons'], '2');
+  assert.equal(submitted.service_details.answers['Add-ons (per person)'], 'Aromatherapy, Foot spa');
+  const customerDetails = await personalPage.evaluate(details => bookingServiceDetailRows(details), submitted.service_details);
+  assert.match(customerDetails, /Sample estimated price: PHP 3,000/);
+  assert.match(customerDetails, /Full spa package/);
+  const providerDetails = await second.evaluate(booking => renderProviderBookingAssessment(booking), submitted);
+  assert.match(providerDetails, /Full spa package/);
+  assert.match(providerDetails, /Aromatherapy/);
   assert.deepEqual(errors, []);
-  console.log('PASS: all 7 forms, calculations, validation, booking payload, aliases, category switching, provider pickup toggle and breakdown; desktop/390px/320px screenshots saved in', os.tmpdir());
+  console.log('PASS: 7 cleaning + 6 personal care forms, calculations, validation, booking payloads, aliases, category switching, provider options and customer/provider breakdowns; desktop/390px/320px screenshots saved in', os.tmpdir());
  } finally {
   await browser.close();
  }

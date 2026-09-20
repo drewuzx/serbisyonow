@@ -410,7 +410,7 @@ function startProviderNotificationRealtime(provider) {
   window.addEventListener('beforeunload', () => window.clearInterval(window.snProviderNotificationTimer));
 }
 
-function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, confirmText = 'Save', cancelText = 'Cancel', danger = false, options = [] }) {
+function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', danger = false, options = [] }) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.className = 'sn-modal-backdrop';
@@ -452,7 +452,7 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
     const submitModal = () => {
       if (!field) return close(true);
       const nextValue = field.tagName === 'SELECT' ? field.value : field.value.trim();
-      close(nextValue || (typeof value === 'string' ? value : ''));
+      close(allowEmpty ? nextValue : nextValue || (typeof value === 'string' ? value : ''));
     };
     const onKeydown = (event) => {
       if (event.key === 'Escape') close(null);
@@ -909,6 +909,9 @@ function renderServices(services) {
         ${['laundry', 'laundry services', 'cleaning', 'cleaning services'].includes(String(service.title || '').trim().toLowerCase()) ? `
           <div class="sn-provider-payment-row"><label><input type="checkbox" data-service-field="laundry_pickup_delivery" ${service.laundry_pickup_delivery ? 'checked' : ''}> Offer laundry pickup / delivery</label></div>
         ` : ''}
+        ${['massage', 'massage therapy', 'personal care', 'personal care service', 'personal care services'].includes(String(service.title || '').trim().toLowerCase()) ? `
+          <div class="sn-provider-payment-row"><button class="btn btn-outline" type="button" data-action="edit-massage-types">Edit Other Massage Types</button><span>${esc((service.massage_types || []).join(', ') || 'No additional massage types')}</span></div>
+        ` : ''}
         <div class="sn-provider-payment-row">
           <span>Payment Options</span>
           <label><input type="checkbox" data-service-field="accepts_cash" ${service.accepts_cash ? 'checked' : ''}> Cash</label>
@@ -931,6 +934,12 @@ function renderServices(services) {
   host.querySelectorAll('[data-action="remove-service"]').forEach((button) => {
     button.addEventListener('click', () => removeService(button.closest('[data-service-id]')?.dataset.serviceId));
   });
+  host.querySelectorAll('[data-action="edit-massage-types"]').forEach(button => {
+    button.addEventListener('click', () => {
+      const service = services.find(item => String(item.id) === button.closest('[data-service-id]')?.dataset.serviceId);
+      editMassageTypes(service);
+    });
+  });
   host.querySelectorAll('[data-service-field]').forEach((input) => {
     input.addEventListener('change', () => updateServiceField(
       input.closest('[data-service-id]')?.dataset.serviceId,
@@ -939,6 +948,24 @@ function renderServices(services) {
       input,
     ));
   });
+}
+
+async function editMassageTypes(service) {
+  const provider = getProviderUser();
+  if (!provider?.id || !service?.id) return;
+  const value = await openProviderModal({
+    title: 'Other Massage Types', label: 'Offered types (one per line, up to 10)',
+    value: (service.massage_types || []).join('\n'), multiline: true, allowEmpty: true, confirmText: 'Save',
+  });
+  if (value === null || value === undefined) return;
+  try {
+    await providerSend(`/api/provider/${provider.id}/services/${service.id}`, 'PATCH', {
+      massage_types: value.split(/\r?\n/).map(item => item.trim()).filter(Boolean),
+    });
+    await loadProviderDatabase();
+  } catch (error) {
+    await openProviderModal({ title: 'Massage Types Not Saved', message: error.message, confirmText: 'OK' });
+  }
 }
 
 async function updateServiceField(serviceId, field, value, input) {
