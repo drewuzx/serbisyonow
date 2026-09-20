@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   attachProviderTopbarRealtime(provider);
   loadProviderDatabase();
-  startProviderBackgroundLiveGps();
+  if (typeof startProviderBackgroundLiveGps === 'function') startProviderBackgroundLiveGps();
   if (window.location.pathname.includes('/provider/dashboard/')) {
     startProviderDashboardRealtime();
   }
@@ -906,6 +906,9 @@ function renderServices(services) {
         <h3>${esc(service.title)} ${service.is_active ? '<span class="sn-status-pill accepted">Active</span>' : '<span class="sn-status-pill pending">Off</span>'}</h3>
         <p>${esc(service.description || service.category)}</p>
         <strong style="display:block;text-align:right;color:#005cab">Price: ${money(service.starting_price)} - ${money(service.max_price)}</strong>
+        ${['laundry', 'laundry services', 'cleaning', 'cleaning services'].includes(String(service.title || '').trim().toLowerCase()) ? `
+          <div class="sn-provider-payment-row"><label><input type="checkbox" data-service-field="laundry_pickup_delivery" ${service.laundry_pickup_delivery ? 'checked' : ''}> Offer laundry pickup / delivery</label></div>
+        ` : ''}
         <div class="sn-provider-payment-row">
           <span>Payment Options</span>
           <label><input type="checkbox" data-service-field="accepts_cash" ${service.accepts_cash ? 'checked' : ''}> Cash</label>
@@ -1073,6 +1076,7 @@ function renderProviderBookingAssessment(booking) {
   const mediaRows = (details.media_files || [])
     .map((file) => file?.url ? `<a href="${esc(file.url)}" target="_blank" rel="noopener">${esc(file.name || 'Uploaded file')}</a>` : '')
     .join('');
+  const priceRows = (details.breakdown || []).map(item => `<li><span>${esc(item.label)}</span><strong>${esc(providerMoney(item.amount))}${item.max_amount !== undefined ? ` - ${esc(providerMoney(item.max_amount))}` : ''}</strong></li>`).join('');
   if (!details.service_type && !answerRows && !mediaRows && !booking?.estimated_min) return '';
   return `
     <div class="sn-booking-assessment">
@@ -1081,6 +1085,7 @@ function renderProviderBookingAssessment(booking) {
         <span>${esc(providerBookingEstimateLabel(booking))}</span>
       </div>
       ${details.note ? `<p>${esc(details.note)}</p>` : ''}
+      ${priceRows ? `<p><strong>${details.sample_rates ? 'Sample-rate price breakdown' : 'Price breakdown'}</strong></p><ul>${priceRows}</ul>` : ''}
       ${answerRows ? `<ul>${answerRows}</ul>` : ''}
       ${mediaRows ? `<div class="sn-booking-assessment-files">${mediaRows}</div>` : ''}
     </div>

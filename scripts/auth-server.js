@@ -10,6 +10,7 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./db');
+const cleaningPricing = require('../shared/js/cleaningPricing');
 
 const app = express();
 app.set('trust proxy', true);
@@ -1229,10 +1230,14 @@ async function ensureAdminSupportTables() {
       accepts_cash BOOLEAN NOT NULL DEFAULT TRUE,
       accepts_gcash BOOLEAN NOT NULL DEFAULT FALSE,
       accepts_other BOOLEAN NOT NULL DEFAULT FALSE,
+      laundry_pickup_delivery BOOLEAN NOT NULL DEFAULT FALSE,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE provider_services
+      ADD COLUMN IF NOT EXISTS laundry_pickup_delivery BOOLEAN NOT NULL DEFAULT FALSE;
 
     CREATE TABLE IF NOT EXISTS provider_availability (
       id SERIAL PRIMARY KEY,
@@ -1621,6 +1626,7 @@ function providerServiceRow(row) {
     accepts_cash: row.accepts_cash,
     accepts_gcash: row.accepts_gcash,
     accepts_other: row.accepts_other,
+    laundry_pickup_delivery: row.laundry_pickup_delivery === true,
     is_active: row.is_active,
     created_at: row.created_at,
   };
@@ -3115,17 +3121,37 @@ app.post('/api/customer/:id/bookings', upload.fields([
   const longitude = Number(req.body.longitude);
   const accuracy = Number(req.body.accuracy);
   const hasBookingGps = Number.isFinite(latitude) && Number.isFinite(longitude);
-  const serviceDetails = parseObjectField(req.body.service_details);
+  let serviceDetails = parseObjectField(req.body.service_details);
   const mediaFiles = bookingMediaFiles(req);
   if (mediaFiles.length) {
     serviceDetails.media_files = mediaFiles;
   }
-  const pricingType = String(req.body.pricing_type || serviceDetails.pricing_type || 'provider_quote')
+  let pricingType = String(req.body.pricing_type || serviceDetails.pricing_type || 'provider_quote')
     .trim()
     .slice(0, 40) || 'provider_quote';
-  const estimatedMin = positiveMoney(req.body.estimated_min);
-  const estimatedMax = positiveMoney(req.body.estimated_max, estimatedMin);
-  const bookingAmount = positiveMoney(req.body.amount, estimatedMin);
+  let estimatedMin = positiveMoney(req.body.estimated_min);
+  let estimatedMax = positiveMoney(req.body.estimated_max, estimatedMin);
+  let bookingAmount = positiveMoney(req.body.amount, estimatedMin);
+
+  if (cleaningPricing.serviceKey(req.body.service) || cleaningPricing.isCategory(req.body.service) || cleaningPricing.isCategory(serviceDetails.category)) {
+    const offered = await db.query(`
+      SELECT * FROM provider_services
+      WHERE provider_id = $1 AND is_active = TRUE
+    `, [req.body.provider_id]);
+    const key = cleaningPricing.serviceKey(req.body.service);
+    const selected = req.body.provider_service_id
+      ? offered.rows.find(service => String(service.id) === String(req.body.provider_service_id))
+      : offered.rows.find(service => cleaningPricing.serviceKey(service.title) === key)
+        || offered.rows.find(service => cleaningPricing.isCategory(service.title));
+    // Ignore submitted totals and rebuild the saved price from validated selections.
+    const estimate = cleaningPricing.forBooking(req.body.service, serviceDetails, selected);
+    serviceDetails = { ...estimate.details, media_files: mediaFiles };
+    pricingType = estimate.pricingType;
+    estimatedMin = estimate.estimatedMin;
+    estimatedMax = estimate.estimatedMax;
+    bookingAmount = estimate.amount;
+    req.body.service = estimate.details.service_type;
+  }
 
   const availability = await db.query(`
     SELECT id FROM provider_availability
@@ -3315,11 +3341,14 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
 
 app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
   requireFields(req.body, ['title', 'category']);
+  if (req.body.laundry_pickup_delivery !== undefined && typeof req.body.laundry_pickup_delivery !== 'boolean') {
+    return res.status(400).json({ message: 'Laundry pickup / delivery must be enabled or disabled.' });
+  }
   const category = canonicalCategoryName(req.body.category);
   const result = await db.query(`
     INSERT INTO provider_services
-      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active)
-    VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, TRUE), COALESCE($8, FALSE), COALESCE($9, FALSE), COALESCE($10, TRUE))
+      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active, laundry_pickup_delivery)
+    VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, TRUE), COALESCE($8, FALSE), COALESCE($9, FALSE), COALESCE($10, TRUE), COALESCE($11, FALSE))
     RETURNING *
   `, [
     req.params.id,
@@ -3332,12 +3361,16 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
     Boolean(req.body.accepts_gcash),
     Boolean(req.body.accepts_other),
     req.body.is_active !== false,
+    req.body.laundry_pickup_delivery === true,
   ]);
   await upsertServiceCategory(category, req.body.title);
   res.status(201).json({ service: providerServiceRow(result.rows[0]) });
 }));
 
 app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req, res) => {
+  if (req.body.laundry_pickup_delivery !== undefined && typeof req.body.laundry_pickup_delivery !== 'boolean') {
+    return res.status(400).json({ message: 'Laundry pickup / delivery must be enabled or disabled.' });
+  }
   const category = req.body.category === undefined ? undefined : canonicalCategoryName(req.body.category);
   const result = await db.query(`
     UPDATE provider_services
@@ -3350,6 +3383,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
         accepts_gcash = COALESCE($9, accepts_gcash),
         accepts_other = COALESCE($10, accepts_other),
         is_active = COALESCE($11, is_active),
+        laundry_pickup_delivery = COALESCE($12, laundry_pickup_delivery),
         updated_at = NOW()
     WHERE provider_id = $1 AND id = $2
     RETURNING *
@@ -3365,6 +3399,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     req.body.accepts_gcash ?? null,
     req.body.accepts_other ?? null,
     req.body.is_active ?? null,
+    req.body.laundry_pickup_delivery ?? null,
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Service not found.' });
   await upsertServiceCategory(result.rows[0].category, result.rows[0].title);

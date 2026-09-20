@@ -175,7 +175,7 @@ function selectedBookingService() {
 }
 
 function isRepairSelection(selection) {
- const values = [selection?.title, selection?.category, bookingProviderProfile?.category, bookingProviderProfile?.service]
+ const values = [selection?.title, selection?.category]
   .map(normalizeBookingText);
  return values.includes('repair services') || values.some(value => Boolean(REPAIR_SERVICE_CONFIGS[value]));
 }
@@ -309,6 +309,110 @@ function setManualAmountVisible(visible) {
  const amountInput = document.getElementById('sn-booking-custom-amount')?.closest('label');
  if (amountChoice) amountChoice.hidden = !visible;
  if (amountInput) amountInput.hidden = !visible;
+ amountChoice?.querySelectorAll('input, select').forEach(field => { field.disabled = !visible; });
+ amountInput?.querySelectorAll('input, select').forEach(field => { field.disabled = !visible; });
+}
+
+function cleaningSelection() {
+ const pricing = window.SNCleaningPricing;
+ const selection = selectedBookingService();
+ const direct = pricing.serviceKey(selection.title);
+ return { ...selection, key: direct, isCleaning: Boolean(direct || pricing.isCategory(selection.title)) };
+}
+
+function cleaningContext() {
+ return { pickupDelivery: selectedBookingService().service?.laundry_pickup_delivery === true };
+}
+
+function cleaningInputs() {
+ const panel = document.getElementById('sn-cleaning-assessment');
+ const config = window.SNCleaningPricing.configs[panel?.dataset.serviceKey];
+ if (!config) return {};
+ return Object.fromEntries(config.fields.map(field => {
+  const controls = [...panel.querySelectorAll(`[name="cleaning_${field.key}"]`)];
+  return [field.key, field.type === 'checkboxes' ? controls.filter(input => input.checked).map(input => input.value) : controls[0]?.value || ''];
+ }));
+}
+
+function cleaningQuestionField(field, defaults) {
+ const name = `cleaning_${field.key}`;
+ const id = `sn-${name}`;
+ const wrapper = `data-cleaning-field="${field.key}"`;
+ if (field.type === 'checkboxes') {
+  return `<fieldset class="sn-cleaning-areas full" ${wrapper}><legend>${bookingEsc(field.label)}</legend><div>${field.options.map((option, i) =>
+   `<label for="${id}-${i}"><input id="${id}-${i}" type="checkbox" name="${name}" value="${bookingEsc(option)}" /><span>${bookingEsc(option)}</span></label>`).join('')}</div></fieldset>`;
+ }
+ const control = field.type === 'select'
+  ? `<select id="${id}" name="${name}" required>${field.options.map(option => `<option value="${bookingEsc(option)}">${bookingEsc(option)}</option>`).join('')}</select>`
+  : `<input id="${id}" name="${name}" type="${field.type}" value="${bookingEsc(defaults[field.key])}" ${field.type === 'number' ? `min="${field.min}" max="${field.max}" step="${field.step}"` : `maxlength="${field.maxLength}"`} required />`;
+ return `<label ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span>${control}</label>`;
+}
+
+function updateCleaningEstimateDisplay() {
+ const panel = document.getElementById('sn-cleaning-assessment');
+ if (!panel || panel.hidden || panel.dataset.rendering === 'true') return null;
+ const pricing = window.SNCleaningPricing;
+ const key = panel.dataset.serviceKey;
+ const inputs = cleaningInputs();
+ const context = cleaningContext();
+ pricing.configs[key].fields.forEach(field => {
+  const wrapper = panel.querySelector(`[data-cleaning-field="${field.key}"]`);
+  const visible = pricing.fieldVisible(field, inputs, context);
+  wrapper.hidden = !visible;
+  wrapper.querySelectorAll('input, select').forEach(input => { input.disabled = !visible; });
+ });
+ const summary = panel.querySelector('.sn-cleaning-price-summary');
+ try {
+  const estimate = pricing.assessment(key, inputs, context);
+  summary.innerHTML = `<h5>Price breakdown <span>Sample rates</span></h5><dl>${estimate.details.breakdown.map(item =>
+   `<div><dt>${bookingEsc(item.label)}</dt><dd>${bookingMoney(item.amount)}${item.max_amount !== undefined ? ` - ${bookingMoney(item.max_amount)}` : ''}</dd></div>`).join('')}</dl>
+   <p class="sn-cleaning-total" role="status">${bookingEsc(estimate.details.estimate_label)}</p><p>${bookingEsc(estimate.details.note)}</p>`;
+  return estimate;
+ } catch (error) {
+  summary.innerHTML = `<p role="status">${bookingEsc(error.message)}</p>`;
+  return null;
+ }
+}
+
+function renderBookingAssessment() {
+ const panel = document.getElementById('sn-cleaning-assessment');
+ const selection = cleaningSelection();
+ if (!selection.isCleaning) {
+  panel.hidden = true;
+  panel.innerHTML = '';
+  delete panel.dataset.serviceKey;
+  renderRepairAssessment();
+  return;
+ }
+ const repair = document.getElementById('sn-repair-assessment');
+ repair.hidden = true;
+ repair.innerHTML = '';
+ setManualAmountVisible(false);
+ const pricing = window.SNCleaningPricing;
+ const previous = panel.querySelector('#sn-cleaning-specific-service')?.value;
+ const key = selection.key || previous || 'general house cleaning';
+ const config = pricing.configs[key];
+ panel.hidden = false;
+ // Replacing a focused input can fire its change event before the new fields exist.
+ panel.dataset.rendering = 'true';
+ panel.dataset.serviceKey = key;
+ panel.innerHTML = `<div class="sn-cleaning-head"><h4>Cleaning Services</h4><span>Sample estimate</span></div>
+  <div class="sn-cleaning-grid">${!selection.key ? `<label class="full"><span>Specific cleaning service</span><select id="sn-cleaning-specific-service">${Object.entries(pricing.configs).map(([value, item]) => `<option value="${value}"${value === key ? ' selected' : ''}>${bookingEsc(item.title)}</option>`).join('')}</select></label>` : ''}
+  ${config.fields.map(field => cleaningQuestionField(field, pricing.defaults(key))).join('')}</div>
+  <div class="sn-cleaning-price-summary"></div>`;
+ delete panel.dataset.rendering;
+ panel.querySelector('#sn-cleaning-specific-service')?.addEventListener('change', renderBookingAssessment);
+ panel.querySelectorAll('[name^="cleaning_"]').forEach(input => {
+  input.addEventListener('input', updateCleaningEstimateDisplay);
+  input.addEventListener('change', updateCleaningEstimateDisplay);
+ });
+ updateCleaningEstimateDisplay();
+}
+
+function collectCleaningAssessment() {
+ const panel = document.getElementById('sn-cleaning-assessment');
+ if (!panel || panel.hidden) return null;
+ return window.SNCleaningPricing.assessment(panel.dataset.serviceKey, cleaningInputs(), cleaningContext());
 }
 
 function renderRepairAssessment() {
@@ -611,6 +715,9 @@ function bookingServiceDetailRows(details = {}) {
  const rows = [];
  if (details.service_type) rows.push(bookingDetailRow('Specific work', details.service_type));
  if (details.estimate_label) rows.push(bookingDetailRow('Estimate', details.estimate_label));
+ if (details.sample_rates && details.note) rows.push(bookingDetailRow('Pricing note', details.note));
+ (details.breakdown || []).forEach(item => rows.push(bookingDetailRow(item.label,
+  `${bookingMoney(item.amount)}${item.max_amount !== undefined ? ` - ${bookingMoney(item.max_amount)}` : ''}`)));
  const answers = details.answers && typeof details.answers === 'object' ? details.answers : {};
  Object.entries(answers).forEach(([label, value]) => {
   if (value) rows.push(bookingDetailRow(label, value));
@@ -857,6 +964,7 @@ async function renderBookingRequestForm(customer) {
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
   <label><span>Payment Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash Payment</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">To be paid directly to the service provider after the service.</small></label>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
+   <section class="sn-cleaning-assessment full" id="sn-cleaning-assessment" hidden></section>
    <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>
@@ -872,10 +980,10 @@ async function renderBookingRequestForm(customer) {
  pageHeader.insertAdjacentElement('afterend', form);
 
  updateBookingPaymentChoices();
- renderRepairAssessment();
+ renderBookingAssessment();
  document.getElementById('sn-booking-service')?.addEventListener('change', () => {
   updateBookingPaymentChoices();
-  renderRepairAssessment();
+  renderBookingAssessment();
  });
  document.getElementById('sn-booking-payment')?.addEventListener('change', (event) => {
   const note = document.getElementById('sn-booking-payment-note');
@@ -1011,19 +1119,26 @@ async function submitBookingRequest(event, customer, providerId) {
  const form = event.currentTarget;
  const submit = form.querySelector('[type="submit"]');
  const formData = new FormData(form);
- const repairAssessment = collectRepairAssessment(form);
+ let assessment;
+ try {
+  assessment = collectCleaningAssessment() || collectRepairAssessment(form);
+ } catch (error) {
+  await bookingAlert(error.message, { title: 'Check Cleaning Details', type: 'warning' });
+  return;
+ }
  const body = {
   provider_id: Number(providerId),
-  service: repairAssessment?.details?.service_type || formData.get('service'),
+  service: assessment?.details?.service_type || formData.get('service'),
+  provider_service_id: selectedBookingService().service?.id || null,
   scheduled_date: formData.get('scheduled_date'),
   scheduled_time: formData.get('scheduled_time'),
   address: formData.get('address'),
  payment_method: formData.get('payment_method'),
- amount: repairAssessment?.amount ?? Number(formData.get('amount') || 0),
- pricing_type: repairAssessment?.pricingType || 'provider_quote',
- estimated_min: repairAssessment?.estimatedMin ?? Number(formData.get('amount') || 0),
- estimated_max: repairAssessment?.estimatedMax ?? Number(formData.get('amount') || 0),
- service_details: repairAssessment?.details || {},
+ amount: assessment?.amount ?? Number(formData.get('amount') || 0),
+ pricing_type: assessment?.pricingType || 'provider_quote',
+ estimated_min: assessment?.estimatedMin ?? Number(formData.get('amount') || 0),
+ estimated_max: assessment?.estimatedMax ?? Number(formData.get('amount') || 0),
+ service_details: assessment?.details || {},
  ...(bookingDeviceCoords || {}),
  };
 
@@ -1031,14 +1146,14 @@ async function submitBookingRequest(event, customer, providerId) {
  const selectedService = bookingProviderServices[Number(selectedServiceOption?.dataset.index || 0)] || null;
  const minPrice = Number(selectedService?.starting_price || 0);
  const maxPrice = Number(selectedService?.max_price || minPrice || 0);
- if (!repairAssessment && minPrice && body.amount < minPrice) {
+ if (!assessment && minPrice && body.amount < minPrice) {
   await bookingAlert(`Cash amount must be at least ${bookingMoney(minPrice)} for this service.`, {
    title: 'Invalid Cash Amount',
    type: 'warning',
   });
   return;
  }
- if (!repairAssessment && maxPrice && body.amount > maxPrice) {
+ if (!assessment && maxPrice && body.amount > maxPrice) {
   await bookingAlert(`Cash amount cannot exceed ${bookingMoney(maxPrice)} for this service.`, {
    title: 'Invalid Cash Amount',
    type: 'warning',
@@ -1048,13 +1163,13 @@ async function submitBookingRequest(event, customer, providerId) {
 
  if (submit) submit.textContent = 'Submitting...';
  try {
-  if (repairAssessment?.mediaFiles?.length) {
+  if (assessment?.mediaFiles?.length) {
    const payload = new FormData();
    Object.entries(body).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
     payload.append(key, key === 'service_details' ? JSON.stringify(value) : String(value));
    });
-   repairAssessment.mediaFiles.slice(0, 3).forEach((file) => payload.append('assessmentMedia', file));
+   assessment.mediaFiles.slice(0, 3).forEach((file) => payload.append('assessmentMedia', file));
    await bookingFetch(`/api/customer/${customer.id}/bookings`, {
     method: 'POST',
     body: payload,
