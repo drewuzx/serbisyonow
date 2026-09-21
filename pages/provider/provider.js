@@ -25,13 +25,16 @@ let selectedProviderBookingId = null;
 let providerNavBooking = null;
 let providerDirectionsRequestId = 0;
 let providerRequestsGpsRefreshStarted = false;
+let providerRequestsGpsInFlight = false;
 let providerDashboardRefreshActive = false;
 let providerNotificationRefreshActive = false;
 let lastProviderGpsPayload = { at: 0, lat: null, lng: null };
 let lastProviderRouteKey = '';
+const providerBookingActions = new Set();
+const providerRequestsState = { bookings: [], provider: null, filter: 'active', notice: '', noticeType: 'info', signature: '' };
 
-async function providerGet(path) {
-  const response = await fetch(`${PROVIDER_API_BASE}${path}`);
+async function providerGet(path, options = {}) {
+  const response = await fetch(`${PROVIDER_API_BASE}${path}`, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || 'Failed to load provider data.');
   return data;
@@ -44,7 +47,11 @@ async function providerSend(path, method, body) {
     body: JSON.stringify(body || {}),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Request failed.');
+  if (!response.ok) {
+    const error = new Error(data.message || 'Request failed.');
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -403,6 +410,10 @@ function startProviderNotificationRealtime(provider) {
     try {
       const data = await providerGet(`/api/provider/${provider.id}/dashboard`);
       handleProviderNotifications(data, true);
+      if (window.location.pathname.includes('/requests/') && !providerBookingActions.size && !document.querySelector('.sn-modal-backdrop')) {
+        const signature = JSON.stringify([data.bookings, data.provider?.latitude, data.provider?.longitude]);
+        if (signature !== providerRequestsState.signature) renderRequests(data.bookings || [], data.provider || provider);
+      }
     } catch (error) {
       console.warn(error.message || error);
     }
@@ -611,8 +622,14 @@ async function loadProviderDatabase() {
     if (path.includes('/reviews/')) renderReviews(data.reviews || [], data.metrics);
     if (path.includes('/history/')) renderHistory(data.history_bookings || data.bookings || []);
     if (path.includes('/profile/')) renderProfile(data.provider || provider, data.metrics, data.assessment);
+    return true;
   } catch (error) {
     console.warn(error.message || error);
+    if (window.location.pathname.includes('/requests/')) {
+      if (!document.getElementById('sn-provider-requests-notice')) renderRequests(providerRequestsState.bookings, providerRequestsState.provider || provider);
+      setProviderRequestsNotice('Unable to refresh bookings. Check your connection and use Refresh.', 'error');
+    }
+    return false;
   }
 }
 
@@ -889,10 +906,10 @@ function renderProviderDashboardLists(activeBookings, allBookings, availability)
   }
 }
 
-function statusPill(status) {
+function statusPill(status, label) {
   const normalized = String(status || 'pending').toLowerCase();
   const cls = normalized === 'completed' ? 'active' : normalized === 'cancelled' ? 'declined' : normalized === 'upcoming' || normalized === 'ongoing' ? 'info' : 'pending';
-  return `<span class="sn-status-pill ${cls}">${normalized}</span>`;
+  return `<span class="sn-status-pill ${cls}">${esc(label || normalized)}</span>`;
 }
 
 function renderServices(services) {
@@ -1122,17 +1139,28 @@ function renderProviderBookingAssessment(booking) {
 function renderRequests(bookings, provider) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
-  const visibleBookings = bookings.filter((booking) => !booking.provider_closed);
+  const expanded = document.querySelector('.sn-booking-customer-map-panel')?.classList.contains('is-fullscreen');
+  disposeProviderBookingMap();
+  providerRequestsState.bookings = bookings.filter(booking => !booking.provider_closed);
+  providerRequestsState.provider = provider;
+  providerRequestsState.signature = JSON.stringify([bookings, provider?.latitude, provider?.longitude]);
+  const filters = [['active', 'Active'], ['pending', 'Pending'], ['upcoming', 'Upcoming'], ['ongoing', 'In Progress'], ['completed', 'Completed'], ['cancelled', 'Cancelled']];
+  const matchesFilter = (booking, filter) => filter === 'active' ? ['pending', 'upcoming', 'ongoing'].includes(booking.status) : booking.status === filter;
+  const visibleBookings = providerRequestsState.bookings.filter(booking => matchesFilter(booking, providerRequestsState.filter));
   const selectedBooking = visibleBookings.find((booking) => String(booking.id) === String(selectedProviderBookingId))
-    || visibleBookings.find((booking) => booking.customer_latitude && booking.customer_longitude)
+    || visibleBookings.find((booking) => providerMapPoint(booking.customer_latitude, booking.customer_longitude))
     || visibleBookings[0];
   selectedProviderBookingId = selectedBooking?.id || null;
   panel.innerHTML = `
-    <h2>Booking Requests</h2>
+    <div class="sn-requests-heading"><h2>Bookings</h2><button type="button" class="btn btn-outline btn-sm" id="sn-refresh-requests">Refresh</button></div>
+    <div class="sn-request-filters" role="tablist" aria-label="Booking status">
+      ${filters.map(([key, label]) => `<button type="button" role="tab" aria-selected="${providerRequestsState.filter === key}" data-request-filter="${key}" class="${providerRequestsState.filter === key ? 'active' : ''}">${label} <span>${providerRequestsState.bookings.filter(booking => matchesFilter(booking, key)).length}</span></button>`).join('')}
+    </div>
+    <p id="sn-provider-requests-notice" class="sn-requests-notice" role="status" hidden></p>
     <div class="sn-booking-map-layout">
       <div class="sn-booking-request-list">
         ${visibleBookings.map((booking) => `
-          <article class="sn-booking-request-card ${selectedBooking?.id === booking.id ? 'active' : ''}" data-booking-card="${booking.id}" data-lat="${booking.customer_latitude || ''}" data-lng="${booking.customer_longitude || ''}">
+          <article class="sn-booking-request-card ${selectedBooking?.id === booking.id ? 'active' : ''}" data-booking-card="${booking.id}" tabindex="0" aria-label="${esc(booking.service)} for ${esc(booking.customer_name || 'Customer')}">
             <div>
               <strong>${esc(booking.service)}</strong>
               <span>${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)} - ${esc(booking.scheduled_time)}</span>
@@ -1140,16 +1168,16 @@ function renderRequests(bookings, provider) {
               ${renderProviderBookingAssessment(booking)}
             </div>
             <div class="sn-booking-request-side" data-booking-id="${booking.id}">
-              ${statusPill(booking.status)}
+              ${statusPill(booking.status, filters.find(item => item[0] === booking.status)?.[1])}
               ${booking.status === 'pending' ? '<div class="sn-actions-row"><button class="btn btn-success btn-sm" data-status="upcoming">Accept</button><button class="btn btn-danger btn-sm" data-status="cancelled">Decline</button></div>' : ''}
-              ${booking.status === 'upcoming' || booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark done</button>' : ''}
-              ${booking.status === 'completed' ? '<button class="btn btn-outline btn-sm" data-close-booking>Close</button>' : ''}
-              ${booking.status === 'cancelled' ? '<button class="btn btn-outline btn-sm" disabled>Cancelled</button>' : ''}
+              ${booking.status === 'upcoming' ? '<button class="btn btn-success btn-sm" data-status="ongoing">Start Service</button><button class="btn btn-outline btn-sm" data-status="cancelled">Cancel Booking</button>' : ''}
+              ${booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark Completed</button>' : ''}
+              ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
             </div>
           </article>
         `).join('') || '<p>No booking requests to show.</p>'}
       </div>
-      <aside class="sn-booking-customer-map-panel">
+      <aside class="sn-booking-customer-map-panel${expanded ? ' is-fullscreen' : ''}">
         <div class="sn-booking-customer-map-head">
           <div>
             <h3>Customer Location</h3>
@@ -1157,14 +1185,15 @@ function renderRequests(bookings, provider) {
           </div>
           <div class="sn-booking-map-tools">
             <span id="sn-booking-map-status">In-app map</span>
-            <button class="sn-booking-map-expand" id="sn-booking-map-expand" type="button" aria-label="Expand map"></button>
+            <button class="sn-booking-map-expand${expanded ? ' is-close' : ''}" id="sn-booking-map-expand" type="button" aria-label="${expanded ? 'Close full screen map' : 'Expand map'}"></button>
           </div>
         </div>
         <div id="sn-booking-customer-map" class="sn-booking-customer-map"></div>
         <div class="sn-booking-nav-guide">
           <p class="sn-booking-nav-eta" id="sn-booking-nav-eta">Road directions appear once both GPS pins are available.</p>
           <div class="sn-booking-nav-actions">
-            <button class="btn btn-primary btn-sm" id="sn-booking-add-direction" type="button">Add Direction</button>
+            <button class="btn btn-primary btn-sm" id="sn-booking-add-direction" type="button">Get Directions</button>
+            <button class="btn btn-outline btn-sm" id="sn-booking-refresh-gps" type="button">Update My Location</button>
             <a class="btn btn-outline btn-sm" id="sn-booking-open-gmaps" target="_blank" rel="noopener">Google Maps</a>
             <a class="btn btn-outline btn-sm" id="sn-booking-open-waze" target="_blank" rel="noopener">Waze</a>
           </div>
@@ -1173,6 +1202,17 @@ function renderRequests(bookings, provider) {
       </aside>
     </div>
   `;
+  setProviderRequestsNotice(providerRequestsState.notice, providerRequestsState.noticeType);
+  panel.querySelectorAll('[data-request-filter]').forEach(button => button.addEventListener('click', () => {
+    providerRequestsState.filter = button.dataset.requestFilter;
+    renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
+  }));
+  panel.querySelector('#sn-refresh-requests').addEventListener('click', async event => {
+    event.currentTarget.disabled = true;
+    if (await loadProviderDatabase()) setProviderRequestsNotice('Bookings refreshed.', 'success');
+    const button = document.getElementById('sn-refresh-requests');
+    if (button) button.disabled = false;
+  });
   panel.querySelectorAll('[data-status]').forEach((button) => {
     button.addEventListener('click', () => updateBookingStatus(button.closest('[data-booking-id]')?.dataset.bookingId, button.dataset.status));
   });
@@ -1180,21 +1220,53 @@ function renderRequests(bookings, provider) {
     button.addEventListener('click', () => closeCompletedBooking(button.closest('[data-booking-id]')?.dataset.bookingId, button.closest('[data-booking-card]')));
   });
   panel.querySelectorAll('[data-booking-card]').forEach((card) => {
+    if (providerBookingActions.has(card.dataset.bookingCard)) {
+      card.setAttribute('aria-busy', 'true');
+      card.querySelectorAll('button').forEach(button => { button.disabled = true; });
+    }
     card.addEventListener('click', (event) => {
-      if (event.target.closest('button')) return;
+      if (event.target.closest('button, a')) return;
       const booking = visibleBookings.find((item) => String(item.id) === String(card.dataset.bookingCard));
       panel.querySelectorAll('[data-booking-card]').forEach((item) => item.classList.toggle('active', item === card));
       selectedProviderBookingId = booking?.id || null;
       renderBookingCustomerMap(booking, provider, { loadDirections: true });
     });
+    card.addEventListener('keydown', event => {
+      if (event.target === card && ['Enter', ' '].includes(event.key)) { event.preventDefault(); card.click(); }
+    });
   });
   document.getElementById('sn-booking-map-expand')?.addEventListener('click', toggleBookingMapFullscreen);
+  document.getElementById('sn-booking-refresh-gps')?.addEventListener('click', () => refreshProviderGpsForRequests(true));
   document.getElementById('sn-booking-add-direction')?.addEventListener('click', () => {
     const booking = visibleBookings.find((item) => String(item.id) === String(selectedProviderBookingId)) || selectedBooking;
     renderBookingCustomerMap(booking, provider, { loadDirections: true, force: true });
   });
   document.addEventListener('keydown', closeBookingMapFullscreenOnEscape);
   renderBookingCustomerMap(selectedBooking, provider, { loadDirections: true });
+}
+
+function setProviderRequestsNotice(message, type = 'info') {
+  providerRequestsState.notice = message;
+  providerRequestsState.noticeType = type;
+  const notice = document.getElementById('sn-provider-requests-notice');
+  if (!notice) return;
+  notice.hidden = !message;
+  notice.textContent = message;
+  notice.className = `sn-requests-notice sn-requests-notice--${type}`;
+}
+
+function providerMapPoint(latitude, longitude) {
+  const values = [latitude, longitude];
+  if (values.some(value => value === null || value === undefined || String(value).trim() === '' || !['string', 'number'].includes(typeof value))) return null;
+  const [lat, lng] = values.map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+}
+
+function disposeProviderBookingMap() {
+  providerDirectionsRequestId += 1;
+  lastProviderRouteKey = '';
+  if (providerBookingMap) { providerBookingMap.stop(); providerBookingMap.remove(); }
+  providerBookingMap = providerBookingMapLayer = providerRouteLayer = providerRouteLine = providerNavMarker = null;
 }
 
 function providerDistanceKm(start, end) {
@@ -1235,20 +1307,34 @@ function closeBookingMapFullscreenOnEscape(event) {
   setTimeout(() => providerBookingMap?.invalidateSize(), 120);
 }
 
-function refreshProviderGpsForRequests() {
+function refreshProviderGpsForRequests(force = false) {
   const provider = getProviderUser();
-  if (providerRequestsGpsRefreshStarted || !provider?.id || !navigator.geolocation) return;
+  if (providerRequestsGpsInFlight || (!force && providerRequestsGpsRefreshStarted) || !provider?.id) return;
+  if (!navigator.geolocation) {
+    setProviderRequestsNotice('Device location is unavailable. You can still manage bookings and open the address in Google Maps.', 'error');
+    return;
+  }
   providerRequestsGpsRefreshStarted = true;
+  providerRequestsGpsInFlight = true;
+  const button = document.getElementById('sn-booking-refresh-gps');
+  if (button) { button.disabled = true; button.textContent = 'Locating...'; }
+  const finish = () => {
+    providerRequestsGpsInFlight = false;
+    const currentButton = document.getElementById('sn-booking-refresh-gps');
+    if (currentButton) { currentButton.disabled = false; currentButton.textContent = 'Update My Location'; }
+  };
 
   navigator.geolocation.getCurrentPosition(async (position) => {
     try {
       await saveProviderCoordinates(position.coords, null);
-      loadProviderDatabase();
+      await loadProviderDatabase();
+      if (force) setProviderRequestsNotice('Your location has been updated.', 'success');
     } catch (error) {
-      console.warn(error.message || error);
-    }
+      setProviderRequestsNotice(error.message || 'Unable to save your location. Try again.', 'error');
+    } finally { finish(); }
   }, (error) => {
-    console.warn(error.code === error.PERMISSION_DENIED ? 'Provider GPS permission denied.' : 'Provider GPS unavailable.');
+    setProviderRequestsNotice(error.code === 1 ? 'Location permission denied. Allow location in your browser, then use Update My Location.' : 'Device location is unavailable. Use Update My Location to retry.', 'error');
+    finish();
   }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
 }
 
@@ -1268,13 +1354,15 @@ function formatProviderRouteDuration(seconds) {
   return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
 }
 
-function setProviderDirectionsLinks(from, to) {
+function setProviderDirectionsLinks(from, to, address = '') {
   const googleLink = document.getElementById('sn-booking-open-gmaps');
   const wazeLink = document.getElementById('sn-booking-open-waze');
-  const hasPins = [from?.lat, from?.lng, to?.lat, to?.lng].every((value) => Number.isFinite(Number(value)));
+  const destination = to ? `${to.lat},${to.lng}` : String(address || '').trim();
   if (googleLink) {
-    if (hasPins) {
-      googleLink.href = `https://www.google.com/maps/dir/?api=1&origin=${from.lat},${from.lng}&destination=${to.lat},${to.lng}&travelmode=driving`;
+    if (destination) {
+      const params = new URLSearchParams({ api: '1', destination, travelmode: 'driving' });
+      if (from) params.set('origin', `${from.lat},${from.lng}`);
+      googleLink.href = `https://www.google.com/maps/dir/?${params}`;
       googleLink.removeAttribute('aria-disabled');
     } else {
       googleLink.removeAttribute('href');
@@ -1282,7 +1370,7 @@ function setProviderDirectionsLinks(from, to) {
     }
   }
   if (wazeLink) {
-    if (hasPins) {
+    if (to) {
       wazeLink.href = `https://waze.com/ul?ll=${to.lat},${to.lng}&navigate=yes`;
       wazeLink.removeAttribute('aria-disabled');
     } else {
@@ -1293,12 +1381,13 @@ function setProviderDirectionsLinks(from, to) {
 }
 
 function clearProviderDirectionsUi(message = 'Road directions appear once both GPS pins are available.') {
+  providerDirectionsRequestId += 1;
   const eta = document.getElementById('sn-booking-nav-eta');
   const steps = document.getElementById('sn-booking-nav-steps');
   const addButton = document.getElementById('sn-booking-add-direction');
   if (eta) eta.textContent = message;
   if (steps) steps.innerHTML = '';
-  if (addButton) addButton.disabled = false;
+  if (addButton) { addButton.disabled = false; addButton.textContent = 'Get Directions'; }
   if (providerRouteLayer) providerRouteLayer.clearLayers();
   providerRouteLine = null;
   providerNavMarker = null;
@@ -1359,7 +1448,7 @@ function renderProviderDirections(directions, routeKey) {
 
 async function fetchProviderDirectionsFromOsrm(from, to) {
   const coordinates = `${from.lng},${from.lat};${to.lng},${to.lat}`;
-  const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=true`);
+  const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=true`, { signal: AbortSignal.timeout(12000) });
   const data = await response.json().catch(() => ({}));
   const route = data.routes?.[0];
   if (!response.ok || data.code !== 'Ok' || !route?.geometry?.coordinates?.length) {
@@ -1399,9 +1488,11 @@ async function loadProviderBookingDirections(from, to, force = false) {
     });
     let directions = null;
     try {
-      const data = await providerGet(`/api/directions?${params}`);
+      const data = await providerGet(`/api/directions?${params}`, { signal: AbortSignal.timeout(15000) });
       directions = data.directions;
+      if (!directions) throw new Error('Directions unavailable.');
     } catch {
+      if (requestId !== providerDirectionsRequestId) return;
       directions = await fetchProviderDirectionsFromOsrm(from, to);
     }
     if (requestId !== providerDirectionsRequestId) return;
@@ -1413,7 +1504,7 @@ async function loadProviderBookingDirections(from, to, force = false) {
   } finally {
     if (requestId === providerDirectionsRequestId && addButton) {
       addButton.disabled = false;
-      addButton.textContent = 'Add Direction';
+      addButton.textContent = 'Get Directions';
     }
   }
 }
@@ -1433,6 +1524,7 @@ function renderProviderWaitingMap(providerLat, providerLng) {
   providerBookingMap = window.L.map('sn-booking-customer-map', {
     zoomControl: false,
     scrollWheelZoom: true,
+    zoomAnimation: false,
   }).setView([providerLat, providerLng], 15);
   window.L.control.zoom({ position: 'bottomleft' }).addTo(providerBookingMap);
   window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1459,13 +1551,15 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   const caption = document.getElementById('sn-booking-map-caption');
   const status = document.getElementById('sn-booking-map-status');
   if (!host) return;
-
-  const latitude = Number(booking?.customer_latitude);
-  const longitude = Number(booking?.customer_longitude);
-  const hasGps = Number.isFinite(latitude) && Number.isFinite(longitude);
-  const providerLat = Number(provider?.latitude);
-  const providerLng = Number(provider?.longitude);
-  const hasProviderGps = Number.isFinite(providerLat) && Number.isFinite(providerLng);
+  disposeProviderBookingMap();
+  const customerPoint = providerMapPoint(booking?.customer_latitude, booking?.customer_longitude);
+  const providerPoint = providerMapPoint(provider?.latitude, provider?.longitude);
+  const latitude = customerPoint?.lat;
+  const longitude = customerPoint?.lng;
+  const providerLat = providerPoint?.lat;
+  const providerLng = providerPoint?.lng;
+  const hasGps = Boolean(customerPoint);
+  const hasProviderGps = Boolean(providerPoint);
   const isEstimatedCustomerPin = booking?.customer_location_source === 'estimated-address';
   const accuracy = isEstimatedCustomerPin
     ? 'Estimated from booking address'
@@ -1475,12 +1569,13 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   const distance = hasGps && hasProviderGps
     ? providerDistanceKm({ lat: providerLat, lng: providerLng }, { lat: latitude, lng: longitude })
     : null;
+  const overlapping = distance !== null && distance < 0.001;
   clearProviderDirectionsUi(hasGps && hasProviderGps
-    ? 'Tap Add Direction to refresh the provider-to-customer route.'
-    : 'Road directions appear once both GPS pins are available.');
+    ? overlapping ? 'The provider and customer pins overlap. Confirm the service address before travelling.' : 'Get Directions to refresh the road route.'
+    : 'In-app directions require both GPS pins. Google Maps can also use the typed address.');
   const addDirectionButton = document.getElementById('sn-booking-add-direction');
   if (addDirectionButton) {
-    addDirectionButton.disabled = !(hasGps && hasProviderGps);
+    addDirectionButton.disabled = !(hasGps && hasProviderGps) || overlapping;
     addDirectionButton.title = hasGps && hasProviderGps
       ? 'Build provider-to-customer road directions'
       : 'Customer and provider GPS pins are required for directions';
@@ -1488,6 +1583,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   setProviderDirectionsLinks(
     hasProviderGps ? { lat: providerLat, lng: providerLng } : null,
     hasGps ? { lat: latitude, lng: longitude } : null,
+    booking?.address,
   );
 
   if (caption) {
@@ -1497,7 +1593,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   }
   if (status) status.textContent = distance === null
     ? (hasGps ? (isEstimatedCustomerPin ? 'Address estimate' : 'Customer GPS') : 'Address only')
-    : `${distance.toFixed(1)} km away`;
+    : overlapping ? 'Pins overlap' : `${distance.toFixed(1)} km away`;
 
   if (!booking) {
     if (status) status.textContent = hasProviderGps ? 'Provider GPS' : 'No bookings';
@@ -1537,6 +1633,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
         <span>${esc(accuracy)}</span>
       </div>
     `;
+    if (hasProviderGps && options.loadDirections && !overlapping) loadProviderBookingDirections(providerPoint, customerPoint, options.force);
     return;
   }
 
@@ -1551,6 +1648,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   providerBookingMap = window.L.map('sn-booking-customer-map', {
     zoomControl: false,
     scrollWheelZoom: true,
+    zoomAnimation: false,
   }).setView([latitude, longitude], hasProviderGps ? 14 : 16);
 
   window.L.control.zoom({ position: 'bottomleft' }).addTo(providerBookingMap);
@@ -1565,7 +1663,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
     className: '',
     html: '<div class="sn-booking-map-pin sn-booking-map-pin--customer"><span>C</span></div>',
     iconSize: [48, 48],
-    iconAnchor: [24, 44],
+    iconAnchor: overlapping ? [48, 44] : [24, 44],
   });
   window.L.marker([latitude, longitude], { icon: customerIcon })
     .bindPopup(`<strong>${esc(booking.customer_name || 'Customer')}</strong><br>${esc(booking.service || 'Booking request')}<br>${esc(booking.address || '')}<br>${esc(accuracy)}`)
@@ -1576,7 +1674,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
       className: '',
       html: '<div class="sn-booking-map-pin sn-booking-map-pin--provider"><span>You</span></div>',
       iconSize: [52, 52],
-      iconAnchor: [26, 46],
+      iconAnchor: overlapping ? [0, 46] : [26, 46],
     });
     window.L.marker([providerLat, providerLng], { icon: providerIcon })
       .bindPopup(`<strong>Your current provider location</strong><br>${providerLat.toFixed(6)}, ${providerLng.toFixed(6)}`)
@@ -1603,7 +1701,7 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   if (bounds.isValid()) providerBookingMap.fitBounds(bounds.pad(0.28), { maxZoom: 16 });
 
   setTimeout(() => providerBookingMap?.invalidateSize(), 100);
-  if (hasProviderGps && options.loadDirections) {
+  if (hasProviderGps && options.loadDirections && !overlapping) {
     loadProviderBookingDirections(
       { lat: providerLat, lng: providerLng },
       { lat: latitude, lng: longitude },
@@ -1613,36 +1711,49 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
 }
 
 async function updateBookingStatus(bookingId, status) {
-  const provider = getProviderUser();
-  if (!provider?.id || !bookingId) return;
-  await providerSend(`/api/provider/${provider.id}/bookings/${bookingId}/status`, 'PATCH', { status });
-  loadProviderDatabase();
+  return performProviderBookingAction(bookingId, status);
 }
 
-async function closeCompletedBooking(bookingId, bookingCard = null) {
+async function closeCompletedBooking(bookingId) {
+  return performProviderBookingAction(bookingId, 'archive');
+}
+
+async function performProviderBookingAction(bookingId, action) {
   const provider = getProviderUser();
-  if (!provider?.id || !bookingId) return;
-  const confirmed = await openProviderModal({
-    title: 'Close completed booking',
-    message: 'This will move the completed booking from Booking Requests to Service History.',
-    confirmText: 'Move to history',
-  });
-  if (!confirmed) return;
-  const card = bookingCard || document.querySelector(`[data-booking-card="${CSS.escape(String(bookingId))}"]`);
-  const closeButton = card?.querySelector('[data-close-booking]');
-  if (closeButton) {
-    closeButton.disabled = true;
-    closeButton.textContent = 'Closing...';
+  const key = String(bookingId || '');
+  const booking = providerRequestsState.bookings.find(item => String(item.id) === key);
+  if (!provider?.id || !booking || providerBookingActions.has(key)) return;
+  providerBookingActions.add(key);
+  const card = document.querySelector(`[data-booking-card="${CSS.escape(key)}"]`);
+  card?.setAttribute('aria-busy', 'true');
+  card?.querySelectorAll('button').forEach(button => { button.disabled = true; });
+  try {
+    const confirmation = action === 'cancelled'
+      ? { title: booking.status === 'pending' ? 'Decline booking?' : 'Cancel booking?', message: 'The customer will see this booking as cancelled.', confirmText: booking.status === 'pending' ? 'Decline Booking' : 'Cancel Booking', danger: true }
+      : action === 'completed'
+        ? { title: 'Complete service?', message: 'Confirm that the booked service has been finished.', confirmText: 'Mark Completed' }
+        : action === 'archive'
+          ? { title: 'Move to history?', message: 'The booking will remain available in Service History.', confirmText: 'Move to History' }
+          : null;
+    if (confirmation && !await openProviderModal(confirmation)) return;
+    setProviderRequestsNotice('Saving booking...', 'info');
+    const archive = action === 'archive';
+    const data = await providerSend(`/api/provider/${provider.id}/bookings/${bookingId}/${archive ? 'close' : 'status'}`, 'PATCH', archive ? {} : { status: action, expected_status: booking.status });
+    if (archive) booking.provider_closed = true;
+    else booking.status = data.booking.status;
+    const messages = { upcoming: 'Booking accepted.', ongoing: 'Service started.', completed: 'Service marked completed.', cancelled: 'Booking cancelled.', archive: 'Booking moved to history.' };
+    setProviderRequestsNotice(messages[action], 'success');
+    renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
+    if (!await loadProviderDatabase()) setProviderRequestsNotice(`${messages[action]} Refresh to get the latest booking list.`, 'info');
+  } catch (error) {
+    if (error.status === 409) await loadProviderDatabase();
+    setProviderRequestsNotice(error.message || 'Unable to update this booking. Please try again.', 'error');
+  } finally {
+    providerBookingActions.delete(key);
+    const currentCard = document.querySelector(`[data-booking-card="${CSS.escape(key)}"]`);
+    currentCard?.removeAttribute('aria-busy');
+    currentCard?.querySelectorAll('button').forEach(button => { button.disabled = false; });
   }
-  await providerSend(`/api/provider/${provider.id}/bookings/${bookingId}/close`, 'PATCH');
-  if (card) {
-    const wasActive = card.classList.contains('active');
-    card.remove();
-    const nextCard = document.querySelector('[data-booking-card]');
-    if (wasActive && nextCard) nextCard.click();
-    if (!nextCard) renderBookingCustomerMap(null);
-  }
-  loadProviderDatabase();
 }
 
 function providerDateInputValue(value = new Date()) {

@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const cleaningPricing = require('../shared/js/cleaningPricing');
 const personalCarePricing = require('../shared/js/personalCarePricing');
+const { changeProviderBookingStatus } = require('./booking-workflow');
 
 const app = express();
 app.set('trust proxy', true);
@@ -990,6 +991,7 @@ async function fetchDrivingDirections(from, to) {
   const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true`;
   const response = await fetch(url, {
     headers: { Accept: 'application/json', 'User-Agent': 'SerbisyoNow/1.0' },
+    signal: AbortSignal.timeout(12000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.code !== 'Ok' || !data.routes?.[0]) {
@@ -1636,17 +1638,22 @@ function providerServiceRow(row) {
   };
 }
 
+function bookingCoordinate(value, limit) {
+  if (value === null || value === undefined || String(value).trim() === '' || !['number', 'string'].includes(typeof value)) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && Math.abs(number) <= limit ? number : null;
+}
+
 function providerBookingRow(row) {
-  const bookingLat = row.booking_latitude === null || row.booking_latitude === undefined ? null : Number(row.booking_latitude);
-  const bookingLng = row.booking_longitude === null || row.booking_longitude === undefined ? null : Number(row.booking_longitude);
-  const customerLat = row.customer_latitude === null || row.customer_latitude === undefined ? null : Number(row.customer_latitude);
-  const customerLng = row.customer_longitude === null || row.customer_longitude === undefined ? null : Number(row.customer_longitude);
+  const bookingLat = bookingCoordinate(row.booking_latitude ?? row.latitude, 90);
+  const bookingLng = bookingCoordinate(row.booking_longitude ?? row.longitude, 180);
+  const customerLat = bookingCoordinate(row.customer_latitude, 90);
+  const customerLng = bookingCoordinate(row.customer_longitude, 180);
   const hasBookingGps = Number.isFinite(bookingLat) && Number.isFinite(bookingLng);
   const hasCustomerGps = Number.isFinite(customerLat) && Number.isFinite(customerLng);
-  const estimatedPoint = hasBookingGps || hasCustomerGps ? null : estimateLocationPoint(row.address || '');
-  const displayLat = hasBookingGps ? bookingLat : hasCustomerGps ? customerLat : estimatedPoint?.lat;
-  const displayLng = hasBookingGps ? bookingLng : hasCustomerGps ? customerLng : estimatedPoint?.lng;
-  const locationSource = hasBookingGps ? 'booking-gps' : hasCustomerGps ? 'customer-gps' : estimatedPoint ? 'estimated-address' : 'none';
+  const displayLat = hasBookingGps ? bookingLat : hasCustomerGps ? customerLat : null;
+  const displayLng = hasBookingGps ? bookingLng : hasCustomerGps ? customerLng : null;
+  const locationSource = hasBookingGps ? 'booking-gps' : hasCustomerGps ? 'customer-gps' : 'none';
   return {
     id: row.id,
     customer_id: row.customer_id,
@@ -1655,7 +1662,7 @@ function providerBookingRow(row) {
     customer_latitude: Number.isFinite(displayLat) ? displayLat : null,
     customer_longitude: Number.isFinite(displayLng) ? displayLng : null,
     customer_location_source: locationSource,
-    customer_location_estimate_source: estimatedPoint?.source || null,
+    customer_location_estimate_source: null,
     customer_location_accuracy_m: row.booking_location_accuracy_m === null || row.booking_location_accuracy_m === undefined
       ? (row.customer_location_accuracy_m === null || row.customer_location_accuracy_m === undefined ? null : Number(row.customer_location_accuracy_m))
       : Number(row.booking_location_accuracy_m),
@@ -1664,6 +1671,7 @@ function providerBookingRow(row) {
     booking_longitude: bookingLng,
     booking_location_accuracy_m: row.booking_location_accuracy_m === null || row.booking_location_accuracy_m === undefined ? null : Number(row.booking_location_accuracy_m),
     booking_location_updated_at: row.booking_location_updated_at || null,
+    provider_closed: Boolean(row.provider_closed),
     provider_id: row.provider_id,
     service: row.service,
     scheduled_date: row.scheduled_date,
@@ -3471,42 +3479,18 @@ app.delete('/api/provider/:providerId/availability/:slotId', asyncRoute(async (r
 
 app.patch('/api/provider/:providerId/bookings/:bookingId/status', asyncRoute(async (req, res) => {
   requireFields(req.body, ['status']);
-  const status = String(req.body.status).toLowerCase();
-  if (!['pending', 'upcoming', 'ongoing', 'completed', 'cancelled'].includes(status)) {
-    return res.status(400).json({ message: 'Invalid booking status.' });
-  }
-  const result = await db.query(`
-    UPDATE customer_bookings
-    SET status = $3, updated_at = NOW()
-    WHERE provider_id = $1 AND id = $2
-    RETURNING *
-  `, [req.params.providerId, req.params.bookingId, status]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Booking not found.' });
-  const booking = result.rows[0];
-  if (status === 'cancelled') {
-    await db.query(`
-      UPDATE provider_availability
-      SET is_available = TRUE
-      WHERE provider_id = $1 AND available_date = $2 AND start_time = $3
-    `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
-  } else if (['upcoming', 'ongoing', 'completed'].includes(status)) {
-    await db.query(`
-      UPDATE provider_availability
-      SET is_available = FALSE
-      WHERE provider_id = $1 AND available_date = $2 AND start_time = $3
-    `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
-  }
-  res.json({ booking: providerBookingRow(result.rows[0]) });
+  const booking = await changeProviderBookingStatus(db, req.params.providerId, req.params.bookingId, req.body.status, req.body.expected_status);
+  res.json({ booking: providerBookingRow(booking) });
 }));
 
 app.patch('/api/provider/:providerId/bookings/:bookingId/close', asyncRoute(async (req, res) => {
   const result = await db.query(`
     UPDATE customer_bookings
     SET provider_closed = TRUE, updated_at = NOW()
-    WHERE provider_id = $1 AND id = $2 AND status = 'completed'
+    WHERE provider_id = $1 AND id = $2 AND status IN ('completed', 'cancelled')
     RETURNING *
   `, [req.params.providerId, req.params.bookingId]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Completed booking not found.' });
+  if (!result.rowCount) return res.status(404).json({ message: 'Completed or cancelled booking not found.' });
   res.json({ archived: true, booking: providerBookingRow(result.rows[0]) });
 }));
 
