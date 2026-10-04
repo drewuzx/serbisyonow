@@ -178,7 +178,8 @@
       'Refrigerator',
       'Washing Machine',
       'Microwave',
-      'TV / Electronics',
+      'TV',
+      'Electronics',
       'Small Appliances',
     ],
     'Installation Services': [

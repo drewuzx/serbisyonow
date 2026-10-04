@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const cleaningPricing = require('../shared/js/cleaningPricing');
 const personalCarePricing = require('../shared/js/personalCarePricing');
+const appliancePricing = require('../shared/js/appliancePricing');
 const { changeProviderBookingStatus } = require('./booking-workflow');
 
 const app = express();
@@ -57,6 +58,17 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+const bookingUpload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    if (/^(image|video)\//.test(file.mimetype)) return cb(null, true);
+    const error = new Error('Attach photos or videos only.');
+    error.statusCode = 400;
+    cb(error);
+  },
 });
 
 const UPLOAD_FOLDERS = new Set(['customer-ids', 'provider-docs', 'booking-media']);
@@ -1325,7 +1337,7 @@ async function ensureAdminSupportTables() {
       ('Repair Services', 'Services related to fixing or maintaining household facilities.', ARRAY['Plumbing services','Electrical repair','Appliance repair','Carpentry','Roof repair','Furniture repair','Painting services','Door and window repair']),
       ('Cleaning', 'Services focused on cleaning and sanitation of homes.', ARRAY['General house cleaning','Deep cleaning','Bathroom cleaning','Kitchen cleaning','Sofa and upholstery cleaning','Carpet cleaning','Window cleaning','Laundry Services']),
       ('Personal Care', 'Services related to health, relaxation, and personal care.', ARRAY['Massage therapy','Home spa services','Haircut','Nail Care','Eyelash Care','Grooming']),
-      ('Appliance Maintenance', 'Services focused on maintaining household appliances.', ARRAY['Aircon','Refrigerator','Washing Machine','Microwave','TV / Electronics','Small Appliances']),
+      ('Appliance Maintenance', 'Services focused on maintaining household appliances.', ARRAY['Aircon','Refrigerator','Washing Machine','Microwave','TV','Electronics','Small Appliances']),
       ('Installation Services', 'Services that improve or upgrade household facilities.', ARRAY['Furniture assembly','Cabinet installation','Curtain or blinds installation','Lighting installation','CCTV installation','Internet or router setup','Appliance Installation']),
       ('Outdoor and Property Maintenance', 'Services related to the maintenance of outdoor spaces.', ARRAY['Gardening services','Lawn mowing','Landscape maintenance','Tree trimming','Fence repair'])
     ON CONFLICT (name) DO UPDATE
@@ -3125,7 +3137,7 @@ app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
   });
 }));
 
-app.post('/api/customer/:id/bookings', upload.fields([
+app.post('/api/customer/:id/bookings', bookingUpload.fields([
   { name: 'assessmentMedia', maxCount: 3 },
 ]), asyncRoute(async (req, res) => {
   requireFields(req.body, ['provider_id', 'service', 'scheduled_date', 'scheduled_time', 'address']);
@@ -3145,8 +3157,8 @@ app.post('/api/customer/:id/bookings', upload.fields([
   let estimatedMax = positiveMoney(req.body.estimated_max, estimatedMin);
   let bookingAmount = positiveMoney(req.body.amount, estimatedMin);
 
-  const calculatedPricing = [cleaningPricing, personalCarePricing].find(pricing =>
-    pricing.serviceKey(req.body.service) || pricing.isCategory(req.body.service) || pricing.isCategory(serviceDetails.category));
+  const calculatedPricing = [cleaningPricing, personalCarePricing, appliancePricing].find(pricing =>
+    pricing.serviceKey(req.body.service) || pricing.isCategory(req.body.service) || pricing.serviceKeys?.(req.body.service)?.length || pricing.isCategory(serviceDetails.category));
   if (calculatedPricing) {
     const offered = await db.query(`
       SELECT * FROM provider_services
@@ -3155,7 +3167,7 @@ app.post('/api/customer/:id/bookings', upload.fields([
     const key = calculatedPricing.serviceKey(req.body.service);
     const selected = req.body.provider_service_id
       ? offered.rows.find(service => String(service.id) === String(req.body.provider_service_id))
-      : offered.rows.find(service => calculatedPricing.serviceKey(service.title) === key)
+      : offered.rows.find(service => calculatedPricing.serviceKey(service.title) === key || calculatedPricing.serviceKeys?.(service.title)?.includes(key))
         || offered.rows.find(service => calculatedPricing.isCategory(service.title));
     // Ignore submitted totals and rebuild the saved price from validated selections.
     const estimate = calculatedPricing.forBooking(req.body.service, serviceDetails, selected);
@@ -3898,6 +3910,9 @@ app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
 }));
 
 app.use((error, _req, res, _next) => {
+  if (error instanceof multer.MulterError && /^\/api\/customer\/[^/]+\/bookings$/.test(_req.path)) {
+    return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each uploaded file must be 10 MB or smaller.' : 'Upload up to 3 photos/videos for a booking.' });
+  }
   if (error.code === '23505') {
     return res.status(409).json({ message: 'That email or username is already registered.' });
   }

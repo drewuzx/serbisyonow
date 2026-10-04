@@ -270,7 +270,7 @@ VALUES
   ('Repair Services', 'Services related to fixing or maintaining household facilities.', ARRAY['Plumbing services','Electrical repair','Appliance repair','Carpentry','Roof repair','Furniture repair','Painting services','Door and window repair']),
   ('Cleaning', 'Services focused on cleaning and sanitation of homes.', ARRAY['General house cleaning','Deep cleaning','Bathroom cleaning','Kitchen cleaning','Sofa and upholstery cleaning','Carpet cleaning','Window cleaning','Laundry Services']),
   ('Personal Care', 'Services related to health, relaxation, and personal care.', ARRAY['Massage therapy','Home spa services','Haircut','Nail Care','Eyelash Care','Grooming']),
-  ('Appliance Maintenance', 'Services focused on maintaining household appliances.', ARRAY['Aircon','Refrigerator','Washing Machine','Microwave','TV / Electronics','Small Appliances']),
+  ('Appliance Maintenance', 'Services focused on maintaining household appliances.', ARRAY['Aircon','Refrigerator','Washing Machine','Microwave','TV','Electronics','Small Appliances']),
   ('Installation Services', 'Services that improve or upgrade household facilities.', ARRAY['Furniture assembly','Cabinet installation','Curtain or blinds installation','Lighting installation','CCTV installation','Internet or router setup','Appliance Installation']),
   ('Outdoor and Property Maintenance', 'Services related to the maintenance of outdoor spaces.', ARRAY['Gardening services','Lawn mowing','Landscape maintenance','Tree trimming','Fence repair'])
 ON CONFLICT (name) DO UPDATE

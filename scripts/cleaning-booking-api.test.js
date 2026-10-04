@@ -7,21 +7,41 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const express = require('express');
+const multer = require('multer');
 const pricing = require('../shared/js/cleaningPricing');
 const personalPricing = require('../shared/js/personalCarePricing');
+const appliancePricing = require('../shared/js/appliancePricing');
 
-test('cleaning and personal care HTTP bookings validate prices, selections and provider settings', { timeout: 15000 }, async t => {
+test('category HTTP bookings validate prices, selections and provider settings', { timeout: 15000 }, async t => {
  const filename = path.join(__dirname, 'auth-server.js');
  const localRequire = createRequire(filename);
  const offered = { id: 71, provider_id: 81, title: 'Cleaning', category: 'Cleaning', is_active: true, laundry_pickup_delivery: false };
  const personalOffered = { id: 72, provider_id: 81, title: 'Personal Care', category: 'Personal Care', is_active: true, massage_types: [] };
+ const applianceOffered = { id: 73, provider_id: 81, title: 'Appliance Maintenance', category: 'Appliance Maintenance', is_active: true };
+ const combinedOffered = { id: 74, provider_id: 81, title: 'TV / Electronics', category: 'Appliance Maintenance', is_active: true };
  let lastInsert;
  let insertCount = 0;
+ const uploads = new Map();
+ const persistedUploads = [];
+ let uploadCount = 0;
+ const memory = multer.memoryStorage();
+ const testStorage = {
+  _handleFile(req, file, cb) {
+   memory._handleFile(req, file, (error, result) => {
+    if (error) return cb(error);
+    const filename = `test-${++uploadCount}-${file.originalname}`;
+    uploads.set(filename, result.buffer);
+    cb(null, { ...result, filename, path: filename });
+   });
+  },
+  _removeFile(_req, file, cb) { uploads.delete(file.filename); cb(null); },
+ };
  const database = {
   async query(sql, params = []) {
    const query = sql.trim();
    let rows = [];
-   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered];
+   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered];
+   else if (query.startsWith('INSERT INTO uploaded_files')) persistedUploads.push(params);
    else if (query.startsWith('SELECT id FROM provider_availability')) rows = [{ id: 91 }];
    else if (query.startsWith('INSERT INTO customer_bookings')) {
     insertCount += 1;
@@ -58,7 +78,8 @@ test('cleaning and personal care HTTP bookings validate prices, selections and p
    if (name === './db') return database;
    if (name === 'express') return expressFactory;
    if (name === 'dotenv') return { config() {} };
-   if (name === 'fs') return { ...fs, mkdirSync() {}, readdirSync: () => [] };
+   if (name === 'multer') return Object.assign(options => multer({ ...options, storage: testStorage }), multer);
+   if (name === 'fs') return { ...fs, mkdirSync() {}, readdirSync: () => [], promises: { ...fs.promises, readdir: async () => [], readFile: async name => uploads.get(name) } };
    return localRequire(name);
   },
  }, { filename });
@@ -66,7 +87,8 @@ test('cleaning and personal care HTTP bookings validate prices, selections and p
  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
  const base = `http://127.0.0.1:${server.address().port}`;
  async function request(route, body, method = 'POST') {
-  const response = await fetch(`${base}${route}`, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const multipart = body instanceof FormData;
+  const response = await fetch(`${base}${route}`, { method, headers: multipart ? {} : { 'Content-Type': 'application/json' }, body: multipart ? body : JSON.stringify(body) });
   return { status: response.status, data: await response.json() };
  }
  const body = {
@@ -129,4 +151,53 @@ test('cleaning and personal care HTTP bookings validate prices, selections and p
  assert.equal(cleared.status, 200);
  assert.deepEqual(cleared.data.service.massage_types, []);
  assert.equal((await request('/api/customer/61/bookings', customMassage)).status, 400);
+ for (const [key, config] of Object.entries(appliancePricing.configs)) {
+  const inputs = { ...appliancePricing.defaults(key), brand: 'Test brand', problem: 'Test symptom', ...(key === 'electronics' || key === 'small appliances' ? { appliance_type: 'Test appliance' } : {}) };
+  const result = await request('/api/customer/61/bookings', { ...body, service: config.title, provider_service_id: 73,
+   amount: 1, estimated_min: 1, estimated_max: 1, pricing_type: 'free',
+   service_details: { inputs, sample_rates: false, answers: { Fake: 'Do not save' }, media_files: [{ url: '/fake-upload' }] } });
+  assert.equal(result.status, 201, key);
+  assert.equal(lastInsert.amount, appliancePricing.assessment(key, inputs).amount);
+  assert.equal(lastInsert.pricing_type, config.pricingType);
+  assert.equal(lastInsert.service_details.category, 'Appliance Maintenance');
+  assert.equal(lastInsert.service_details.answers.Fake, undefined);
+  assert.deepEqual(lastInsert.service_details.media_files, []);
+  assert.equal(lastInsert.service_details.sample_rates, true);
+ }
+ const aircon = { ...body, service: 'Aircon', provider_service_id: 73, service_details: { inputs: { unit_type: 'Split-type', units: 2, service: 'Deep cleaning' } } };
+ assert.equal((await request('/api/customer/61/bookings', aircon)).data.booking.amount, 2000);
+ for (const invalid of [
+  { ...aircon, service_details: {} },
+  { ...aircon, provider_service_id: 72 },
+  { ...aircon, service_details: { inputs: { ...aircon.service_details.inputs, units: -5 } } },
+  { ...aircon, service: 'Appliance Maintenance' },
+  { ...aircon, service: 'TV / Electronics', provider_service_id: 74 },
+ ]) assert.equal((await request('/api/customer/61/bookings', invalid)).status, 400);
+ const tv = { ...aircon, service: 'TV', provider_service_id: 74, service_details: { inputs: { ...appliancePricing.defaults('tv'), brand: 'Test brand', problem: 'Screen does not light up' } } };
+ assert.equal((await request('/api/customer/61/bookings', tv)).status, 201);
+ assert.equal((await request('/api/customer/61/bookings', { ...tv, provider_service_id: undefined })).status, 201, 'provider offering auto-selection supports the existing combined title');
+ assert.equal((await request('/api/customer/61/bookings', { ...aircon, provider_service_id: 74 })).status, 400);
+ function uploadForm(files) {
+  const form = new FormData();
+  Object.entries(tv).forEach(([key, value]) => form.append(key, key === 'service_details' ? JSON.stringify(value) : String(value)));
+  files.forEach(file => form.append('assessmentMedia', file.blob, file.name));
+  return form;
+ }
+ const photo = { name: 'appliance.png', blob: new Blob([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z1hYAAAAASUVORK5CYII=', 'base64')], { type: 'image/png' }) };
+ const video = { name: 'symptom.mp4', blob: new Blob(['test video transport'], { type: 'video/mp4' }) };
+ const uploaded = await request('/api/customer/61/bookings', uploadForm([photo, video]));
+ assert.equal(uploaded.status, 201);
+ assert.equal(uploaded.data.booking.service_details.media_files.length, 2);
+ assert.match(uploaded.data.booking.service_details.media_files[0].url, /^\/uploads\/booking-media\/test-/);
+ assert.equal(uploaded.data.booking.service_details.media_files[1].name, 'symptom.mp4');
+ assert.equal(persistedUploads.length, 2, 'media content is saved in persistent storage');
+ assert.equal(persistedUploads[0][0], 'booking-media');
+ assert.equal(persistedUploads[0][6], 'booking');
+ assert.equal(persistedUploads[0][7], 101);
+ assert.ok(Buffer.isBuffer(persistedUploads[0][5]));
+ const invalidFile = { name: 'notes.txt', blob: new Blob(['not a photo'], { type: 'text/plain' }) };
+ assert.equal((await request('/api/customer/61/bookings', uploadForm([invalidFile]))).status, 400);
+ assert.equal((await request('/api/customer/61/bookings', uploadForm([photo, photo, photo, photo]))).status, 400);
+ const oversized = { name: 'too-large.png', blob: new Blob([Buffer.alloc(10 * 1024 * 1024 + 1)], { type: 'image/png' }) };
+ assert.equal((await request('/api/customer/61/bookings', uploadForm([oversized]))).status, 400);
 });

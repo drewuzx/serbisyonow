@@ -320,6 +320,7 @@ function calculatedBookingCategories() {
    context: { pickupDelivery: service?.laundry_pickup_delivery === true } },
   { id: 'personal-care', prefix: 'personal_care', title: 'Personal Care', pricing: window.SNPersonalCarePricing,
    context: { massageTypes: service?.massage_types || [] } },
+  { id: 'appliance', prefix: 'appliance', title: 'Appliance Maintenance', pricing: window.SNAppliancePricing, context: {} },
  ];
 }
 
@@ -345,10 +346,15 @@ function calculatedQuestionField(field, defaults, category) {
   return `<fieldset class="sn-calculated-areas full" ${wrapper}><legend>${bookingEsc(field.label)}</legend><div>${field.options.map((option, i) =>
    `<label for="${id}-${i}"><input id="${id}-${i}" type="checkbox" name="${name}" value="${bookingEsc(option)}" /><span>${bookingEsc(option)}</span></label>`).join('')}</div></fieldset>`;
  }
+ const required = field.required === false ? '' : ' required';
+ const placeholder = field.placeholder ? ` placeholder="${bookingEsc(field.placeholder)}"` : '';
+ const length = field.maxLength ? ` maxlength="${field.maxLength}"` : '';
  const control = field.type === 'select'
-  ? `<select id="${id}" name="${name}" required>${field.options.map(option => `<option value="${bookingEsc(option)}">${bookingEsc(option)}</option>`).join('')}</select>`
-  : `<input id="${id}" name="${name}" type="${field.type}" value="${bookingEsc(defaults[field.key])}" ${field.type === 'number' ? `min="${field.min}" max="${field.max}" step="${field.step}"` : `maxlength="${field.maxLength}"`} required />`;
- return `<label ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span>${control}</label>`;
+  ? `<select id="${id}" name="${name}"${required}>${field.options.map(option => `<option value="${bookingEsc(option)}">${bookingEsc(option)}</option>`).join('')}</select>`
+  : field.type === 'textarea'
+   ? `<textarea id="${id}" name="${name}"${length}${placeholder}${required}>${bookingEsc(defaults[field.key])}</textarea>`
+   : `<input id="${id}" name="${name}" type="${field.type}" value="${bookingEsc(defaults[field.key])}"${field.type === 'number' ? ` min="${field.min}" max="${field.max}" step="${field.step}"` : length}${placeholder}${required} />`;
+ return `<label${field.type === 'textarea' ? ' class="full"' : ''} ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span>${control}</label>`;
 }
 
 function updateCalculatedEstimateDisplay(category) {
@@ -371,7 +377,7 @@ function updateCalculatedEstimateDisplay(category) {
   }
   const visible = pricing.fieldVisible(field, inputs, context);
   wrapper.hidden = !visible;
-  wrapper.querySelectorAll('input, select').forEach(input => { input.disabled = !visible; });
+  wrapper.querySelectorAll('input, select, textarea').forEach(input => { input.disabled = !visible; });
  });
  const summary = panel.querySelector('.sn-calculated-price-summary');
  try {
@@ -389,7 +395,7 @@ function updateCalculatedEstimateDisplay(category) {
 function renderBookingAssessment() {
  const selection = selectedBookingService();
  const categories = calculatedBookingCategories();
- const category = categories.find(item => item.pricing.serviceKey(selection.title) || item.pricing.isCategory(selection.title));
+ const category = categories.find(item => item.pricing.serviceKey(selection.title) || item.pricing.isCategory(selection.title) || item.pricing.serviceKeys?.(selection.title)?.length);
  categories.forEach(item => {
   if (item === category) return;
   const inactive = document.getElementById(`sn-${item.id}-assessment`);
@@ -409,19 +415,26 @@ function renderBookingAssessment() {
  const panel = document.getElementById(`sn-${category.id}-assessment`);
  const selectorId = `sn-${category.id}-specific-service`;
  const directKey = pricing.serviceKey(selection.title);
+ const serviceKeys = pricing.serviceKeys?.(selection.title) || Object.keys(pricing.configs);
  const previous = panel.querySelector(`#${selectorId}`)?.value;
- const key = directKey || previous || Object.keys(pricing.configs)[0];
+ const key = directKey || (serviceKeys.includes(previous) ? previous : serviceKeys[0]);
  const defaults = pricing.defaults(key, context);
  panel.hidden = false;
  // Replacing a focused input can fire its change event before the new fields exist.
  panel.dataset.rendering = 'true';
  panel.dataset.serviceKey = key;
- panel.innerHTML = `<div class="sn-calculated-head"><h4>${category.title}</h4><span>Sample estimate</span></div>
-  <div class="sn-calculated-grid">${!directKey ? `<label class="full"><span>Specific service</span><select id="${selectorId}">${Object.entries(pricing.configs).map(([value, item]) => `<option value="${bookingEsc(value)}"${value === key ? ' selected' : ''}>${bookingEsc(item.title)}</option>`).join('')}</select></label>` : ''}
-  ${calculatedFields(category, key, defaults).map(field => calculatedQuestionField(field, defaults, category)).join('')}</div>
+ panel.innerHTML = `<div class="sn-calculated-head"><h4>${category.title}</h4><span>${pricing.configs[key].pricingType === 'provider_quote' ? 'Assessment / Quote' : 'Sample estimate'}</span></div>
+  <div class="sn-calculated-grid">${!directKey ? `<label class="full"><span>Specific service</span><select id="${selectorId}">${serviceKeys.map(value => `<option value="${bookingEsc(value)}"${value === key ? ' selected' : ''}>${bookingEsc(pricing.configs[value].title)}</option>`).join('')}</select></label>` : ''}
+  ${calculatedFields(category, key, defaults).map(field => calculatedQuestionField(field, defaults, category)).join('')}
+  ${pricing.configs[key].media ? `<label class="full"><span>Photo/video (optional)</span><input id="sn-${category.id}-media" type="file" accept="image/*,video/*" multiple /><small>Up to 3 photos/videos, 10 MB each.</small></label>` : ''}</div>
   <div class="sn-calculated-price-summary sn-${category.id}-price-summary"></div>`;
  delete panel.dataset.rendering;
  panel.querySelector(`#${selectorId}`)?.addEventListener('change', renderBookingAssessment);
+ const media = panel.querySelector(`#sn-${category.id}-media`);
+ media?.addEventListener('change', () => {
+  try { calculatedAssessmentMedia(panel, category); media.setCustomValidity(''); }
+  catch (error) { media.setCustomValidity(error.message); media.reportValidity(); }
+ });
  panel.querySelectorAll(`[name^="${category.prefix}_"]`).forEach(input => {
   input.addEventListener('input', () => updateCalculatedEstimateDisplay(category));
   input.addEventListener('change', () => updateCalculatedEstimateDisplay(category));
@@ -433,7 +446,17 @@ function collectCalculatedAssessment() {
  const category = calculatedBookingCategories().find(item => !document.getElementById(`sn-${item.id}-assessment`)?.hidden);
  if (!category) return null;
  const panel = document.getElementById(`sn-${category.id}-assessment`);
- return category.pricing.assessment(panel.dataset.serviceKey, calculatedInputs(category), category.context);
+ const estimate = category.pricing.assessment(panel.dataset.serviceKey, calculatedInputs(category), category.context);
+ estimate.mediaFiles = calculatedAssessmentMedia(panel, category);
+ return estimate;
+}
+
+function calculatedAssessmentMedia(panel, category) {
+ const files = [...(panel.querySelector(`#sn-${category.id}-media`)?.files || [])];
+ if (files.length > 3) throw new Error('Upload up to 3 photos/videos.');
+ if (files.some(file => !/^(image|video)\//.test(file.type))) throw new Error('Attach photos or videos only.');
+ if (files.some(file => file.size > 10 * 1024 * 1024)) throw new Error('Each photo/video must be 10 MB or smaller.');
+ return files;
 }
 
 function renderRepairAssessment() {
@@ -525,8 +548,8 @@ function bookingServiceOptions(provider) {
    max_price: 0,
   }];
  return services.map((service, index) => {
-  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing]
-   .some(pricing => pricing.serviceKey(service.title) || pricing.isCategory(service.title));
+  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing, window.SNAppliancePricing]
+   .some(pricing => pricing.serviceKey(service.title) || pricing.isCategory(service.title) || pricing.serviceKeys?.(service.title)?.length);
   return `
   <option value="${bookingEsc(service.title)}" data-index="${index}">
    ${bookingEsc(service.title)}${!calculated && service.starting_price ? ` - ${bookingMoney(service.starting_price)}${service.max_price && service.max_price !== service.starting_price ? ` to ${bookingMoney(service.max_price)}` : ''}` : ''}
@@ -747,6 +770,9 @@ function bookingServiceDetailRows(details = {}) {
  Object.entries(answers).forEach(([label, value]) => {
   if (value) rows.push(bookingDetailRow(label, value));
  });
+ const files = (details.media_files || []).filter(file => file?.url);
+ if (files.length) rows.push(`<div class="sn-booking-detail-item sn-booking-detail-files"><span>Photos/videos</span><div>${files.map(file =>
+  `<a href="${bookingEsc(file.url)}" target="_blank" rel="noopener">${bookingEsc(file.name || 'Uploaded file')}</a>`).join('')}</div></div>`);
  return rows.join('');
 }
 
@@ -991,6 +1017,7 @@ async function renderBookingRequestForm(customer) {
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>
+   <section class="sn-calculated-assessment full" id="sn-appliance-assessment" hidden></section>
    <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>

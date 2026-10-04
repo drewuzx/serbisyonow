@@ -140,6 +140,24 @@
   font-size: 0.875rem;
 }
 
+.sn-calculated-grid textarea {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 110px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.sn-calculated-grid input[type="file"] {
+  height: auto;
+  min-height: 48px;
+}
+
+.sn-booking-detail-files { grid-column: 1 / -1; }
+.sn-booking-detail-files > div { display: flex; gap: 10px; flex-wrap: wrap; }
+.sn-booking-detail-files a { color: var(--blue-main); overflow-wrap: anywhere; }
+
 .sn-calculated-areas {
   border: 0;
   padding: 0;
