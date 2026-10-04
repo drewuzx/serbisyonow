@@ -13,6 +13,7 @@ const db = require('./db');
 const cleaningPricing = require('../shared/js/cleaningPricing');
 const personalCarePricing = require('../shared/js/personalCarePricing');
 const appliancePricing = require('../shared/js/appliancePricing');
+const installationPricing = require('../shared/js/installationPricing');
 const { changeProviderBookingStatus } = require('./booking-workflow');
 
 const app = express();
@@ -3157,7 +3158,7 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
   let estimatedMax = positiveMoney(req.body.estimated_max, estimatedMin);
   let bookingAmount = positiveMoney(req.body.amount, estimatedMin);
 
-  const calculatedPricing = [cleaningPricing, personalCarePricing, appliancePricing].find(pricing =>
+  const calculatedPricing = [cleaningPricing, personalCarePricing, appliancePricing, installationPricing].find(pricing =>
     pricing.serviceKey(req.body.service) || pricing.isCategory(req.body.service) || pricing.serviceKeys?.(req.body.service)?.length || pricing.isCategory(serviceDetails.category));
   if (calculatedPricing) {
     const offered = await db.query(`

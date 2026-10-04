@@ -321,6 +321,7 @@ function calculatedBookingCategories() {
   { id: 'personal-care', prefix: 'personal_care', title: 'Personal Care', pricing: window.SNPersonalCarePricing,
    context: { massageTypes: service?.massage_types || [] } },
   { id: 'appliance', prefix: 'appliance', title: 'Appliance Maintenance', pricing: window.SNAppliancePricing, context: {} },
+  { id: 'installation', prefix: 'installation', title: 'Installation Services', pricing: window.SNInstallationPricing, context: {} },
  ];
 }
 
@@ -350,7 +351,7 @@ function calculatedQuestionField(field, defaults, category) {
  const placeholder = field.placeholder ? ` placeholder="${bookingEsc(field.placeholder)}"` : '';
  const length = field.maxLength ? ` maxlength="${field.maxLength}"` : '';
  const control = field.type === 'select'
-  ? `<select id="${id}" name="${name}"${required}>${field.options.map(option => `<option value="${bookingEsc(option)}">${bookingEsc(option)}</option>`).join('')}</select>`
+  ? `<select id="${id}" name="${name}"${required}>${field.options.map(option => `<option value="${bookingEsc(option)}"${option === defaults[field.key] ? ' selected' : ''}>${bookingEsc(option)}</option>`).join('')}</select>`
   : field.type === 'textarea'
    ? `<textarea id="${id}" name="${name}"${length}${placeholder}${required}>${bookingEsc(defaults[field.key])}</textarea>`
    : `<input id="${id}" name="${name}" type="${field.type}" value="${bookingEsc(defaults[field.key])}"${field.type === 'number' ? ` min="${field.min}" max="${field.max}" step="${field.step}"` : length}${placeholder}${required} />`;
@@ -382,6 +383,8 @@ function updateCalculatedEstimateDisplay(category) {
  const summary = panel.querySelector('.sn-calculated-price-summary');
  try {
   const estimate = pricing.assessment(key, inputs, context);
+  const mode = panel.querySelector('.sn-calculated-head > span');
+  if (mode) mode.textContent = estimate.pricingType === 'provider_quote' ? 'Assessment / Quote' : 'Sample estimate';
   summary.innerHTML = `<h5>Price breakdown <span>Sample rates</span></h5><dl>${estimate.details.breakdown.map(item =>
    `<div><dt>${bookingEsc(item.label)}</dt><dd>${bookingMoney(item.amount)}${item.max_amount !== undefined ? ` - ${bookingMoney(item.max_amount)}` : ''}</dd></div>`).join('')}</dl>
    <p class="sn-calculated-total sn-${category.id}-total" role="status">${bookingEsc(estimate.details.estimate_label)}</p><p>${bookingEsc(estimate.details.note)}</p>`;
@@ -548,7 +551,7 @@ function bookingServiceOptions(provider) {
    max_price: 0,
   }];
  return services.map((service, index) => {
-  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing, window.SNAppliancePricing]
+  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing, window.SNAppliancePricing, window.SNInstallationPricing]
    .some(pricing => pricing.serviceKey(service.title) || pricing.isCategory(service.title) || pricing.serviceKeys?.(service.title)?.length);
   return `
   <option value="${bookingEsc(service.title)}" data-index="${index}">
@@ -761,6 +764,13 @@ function bookingEstimateLabel(booking) {
 
 function bookingServiceDetailRows(details = {}) {
  const rows = [];
+ let productLink = '';
+ if (details.product_url) {
+  try {
+   const url = new URL(details.product_url);
+   if (['http:', 'https:'].includes(url.protocol)) productLink = url.href;
+  } catch {}
+ }
  if (details.service_type) rows.push(bookingDetailRow('Specific work', details.service_type));
  if (details.estimate_label) rows.push(bookingDetailRow('Estimate', details.estimate_label));
  if (details.sample_rates && details.note) rows.push(bookingDetailRow('Pricing note', details.note));
@@ -768,7 +778,8 @@ function bookingServiceDetailRows(details = {}) {
   `${bookingMoney(item.amount)}${item.max_amount !== undefined ? ` - ${bookingMoney(item.max_amount)}` : ''}`)));
  const answers = details.answers && typeof details.answers === 'object' ? details.answers : {};
  Object.entries(answers).forEach(([label, value]) => {
-  if (value) rows.push(bookingDetailRow(label, value));
+  if (productLink && value === productLink) rows.push(`<div class="sn-booking-detail-item"><span>${bookingEsc(label)}</span><strong><a href="${bookingEsc(productLink)}" target="_blank" rel="noopener">Open product link</a></strong></div>`);
+  else if (value) rows.push(bookingDetailRow(label, value));
  });
  const files = (details.media_files || []).filter(file => file?.url);
  if (files.length) rows.push(`<div class="sn-booking-detail-item sn-booking-detail-files"><span>Photos/videos</span><div>${files.map(file =>
@@ -1018,6 +1029,7 @@ async function renderBookingRequestForm(customer) {
    <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-appliance-assessment" hidden></section>
+   <section class="sn-calculated-assessment full" id="sn-installation-assessment" hidden></section>
    <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>

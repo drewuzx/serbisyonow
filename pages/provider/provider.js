@@ -1112,10 +1112,17 @@ function providerBookingEstimateLabel(booking) {
 
 function renderProviderBookingAssessment(booking) {
   const details = booking?.service_details || {};
+  let productLink = '';
+  if (details.product_url) {
+    try {
+      const url = new URL(details.product_url);
+      if (['http:', 'https:'].includes(url.protocol)) productLink = url.href;
+    } catch {}
+  }
   const answers = details.answers && typeof details.answers === 'object' ? details.answers : {};
   const answerRows = Object.entries(answers)
     .filter(([, value]) => value)
-    .map(([label, value]) => `<li><span>${esc(label)}</span><strong>${esc(value)}</strong></li>`)
+    .map(([label, value]) => `<li><span>${esc(label)}</span><strong>${productLink && value === productLink ? `<a href="${esc(productLink)}" target="_blank" rel="noopener">Open product link</a>` : esc(value)}</strong></li>`)
     .join('');
   const mediaRows = (details.media_files || [])
     .map((file) => file?.url ? `<a href="${esc(file.url)}" target="_blank" rel="noopener">${esc(file.name || 'Uploaded file')}</a>` : '')

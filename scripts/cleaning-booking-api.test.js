@@ -11,6 +11,7 @@ const multer = require('multer');
 const pricing = require('../shared/js/cleaningPricing');
 const personalPricing = require('../shared/js/personalCarePricing');
 const appliancePricing = require('../shared/js/appliancePricing');
+const installationPricing = require('../shared/js/installationPricing');
 
 test('category HTTP bookings validate prices, selections and provider settings', { timeout: 15000 }, async t => {
  const filename = path.join(__dirname, 'auth-server.js');
@@ -19,6 +20,8 @@ test('category HTTP bookings validate prices, selections and provider settings',
  const personalOffered = { id: 72, provider_id: 81, title: 'Personal Care', category: 'Personal Care', is_active: true, massage_types: [] };
  const applianceOffered = { id: 73, provider_id: 81, title: 'Appliance Maintenance', category: 'Appliance Maintenance', is_active: true };
  const combinedOffered = { id: 74, provider_id: 81, title: 'TV / Electronics', category: 'Appliance Maintenance', is_active: true };
+ const installationOffered = { id: 75, provider_id: 81, title: 'Installation Services', category: 'Installation Services', is_active: true };
+ const assemblyOffered = { id: 76, provider_id: 81, title: 'Furniture assembly', category: 'Installation Services', is_active: true };
  let lastInsert;
  let insertCount = 0;
  const uploads = new Map();
@@ -40,7 +43,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
   async query(sql, params = []) {
    const query = sql.trim();
    let rows = [];
-   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered];
+   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered];
    else if (query.startsWith('INSERT INTO uploaded_files')) persistedUploads.push(params);
    else if (query.startsWith('SELECT id FROM provider_availability')) rows = [{ id: 91 }];
    else if (query.startsWith('INSERT INTO customer_bookings')) {
@@ -177,9 +180,9 @@ test('category HTTP bookings validate prices, selections and provider settings',
  assert.equal((await request('/api/customer/61/bookings', tv)).status, 201);
  assert.equal((await request('/api/customer/61/bookings', { ...tv, provider_service_id: undefined })).status, 201, 'provider offering auto-selection supports the existing combined title');
  assert.equal((await request('/api/customer/61/bookings', { ...aircon, provider_service_id: 74 })).status, 400);
- function uploadForm(files) {
+ function uploadForm(files, booking = tv) {
   const form = new FormData();
-  Object.entries(tv).forEach(([key, value]) => form.append(key, key === 'service_details' ? JSON.stringify(value) : String(value)));
+  Object.entries(booking).forEach(([key, value]) => form.append(key, key === 'service_details' ? JSON.stringify(value) : String(value)));
   files.forEach(file => form.append('assessmentMedia', file.blob, file.name));
   return form;
  }
@@ -200,4 +203,32 @@ test('category HTTP bookings validate prices, selections and provider settings',
  assert.equal((await request('/api/customer/61/bookings', uploadForm([photo, photo, photo, photo]))).status, 400);
  const oversized = { name: 'too-large.png', blob: new Blob([Buffer.alloc(10 * 1024 * 1024 + 1)], { type: 'image/png' }) };
  assert.equal((await request('/api/customer/61/bookings', uploadForm([oversized]))).status, 400);
+ for (const [key, config] of Object.entries(installationPricing.configs)) {
+  const inputs = { ...installationPricing.defaults(key), brand: 'Test brand', dimensions: '80 x 120 x 40 cm' };
+  const expected = installationPricing.assessment(key, inputs);
+  const result = await request('/api/customer/61/bookings', { ...body, provider_service_id: 75, service: config.title,
+   amount: 1, pricing_type: 'free', estimated_min: 1, estimated_max: 1,
+   service_details: { inputs, sample_rates: false, answers: { Fake: 'Do not save' }, breakdown: [{ amount: 1 }] } });
+  assert.equal(result.status, 201, key);
+  assert.equal(lastInsert.amount, expected.amount);
+  assert.equal(lastInsert.estimated_max, expected.estimatedMax);
+  assert.equal(lastInsert.pricing_type, expected.pricingType);
+  assert.equal(lastInsert.service_details.category, 'Installation Services');
+  assert.equal(lastInsert.service_details.sample_rates, true);
+  assert.equal(lastInsert.service_details.answers.Fake, undefined);
+ }
+ const assembly = { ...body, service: 'Furniture assembly', provider_service_id: 76,
+  service_details: { inputs: { ...installationPricing.defaults('furniture installation'), units: 2, product_url: 'https://example.com/furniture' } } };
+ assert.equal((await request('/api/customer/61/bookings', assembly)).data.booking.amount, 500);
+ assert.equal(lastInsert.service_details.product_url, 'https://example.com/furniture');
+ for (const invalid of [
+  { ...assembly, service_details: {} }, { ...assembly, provider_service_id: 73 },
+  { ...assembly, service: 'Installation Services' },
+  { ...assembly, service_details: { inputs: { ...assembly.service_details.inputs, product_url: 'javascript:alert(1)' } } },
+ ]) assert.equal((await request('/api/customer/61/bookings', invalid)).status, 400);
+ const furnitureUpload = await request('/api/customer/61/bookings', uploadForm([photo], assembly));
+ assert.equal(furnitureUpload.status, 201);
+ assert.equal(furnitureUpload.data.booking.service_details.media_files[0].name, 'appliance.png');
+ assert.equal(furnitureUpload.data.booking.service_details.answers['Number of units'], '2');
+ assert.equal(persistedUploads.length, 3);
 });
