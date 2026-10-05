@@ -12,6 +12,7 @@ const pricing = require('../shared/js/cleaningPricing');
 const personalPricing = require('../shared/js/personalCarePricing');
 const appliancePricing = require('../shared/js/appliancePricing');
 const installationPricing = require('../shared/js/installationPricing');
+const outdoorPricing = require('../shared/js/outdoorPricing');
 
 test('category HTTP bookings validate prices, selections and provider settings', { timeout: 15000 }, async t => {
  const filename = path.join(__dirname, 'auth-server.js');
@@ -22,6 +23,8 @@ test('category HTTP bookings validate prices, selections and provider settings',
  const combinedOffered = { id: 74, provider_id: 81, title: 'TV / Electronics', category: 'Appliance Maintenance', is_active: true };
  const installationOffered = { id: 75, provider_id: 81, title: 'Installation Services', category: 'Installation Services', is_active: true };
  const assemblyOffered = { id: 76, provider_id: 81, title: 'Furniture assembly', category: 'Installation Services', is_active: true };
+ const outdoorOffered = { id: 77, provider_id: 81, title: 'Outdoor and Property Maintenance', category: 'Outdoor and Property Maintenance', is_active: true };
+ const lawnOffered = { id: 78, provider_id: 81, title: 'Lawn mowing', category: 'Outdoor and Property Maintenance', is_active: true };
  let lastInsert;
  let insertCount = 0;
  const uploads = new Map();
@@ -43,7 +46,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
   async query(sql, params = []) {
    const query = sql.trim();
    let rows = [];
-   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered];
+   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered, outdoorOffered, lawnOffered];
    else if (query.startsWith('INSERT INTO uploaded_files')) persistedUploads.push(params);
    else if (query.startsWith('SELECT id FROM provider_availability')) rows = [{ id: 91 }];
    else if (query.startsWith('INSERT INTO customer_bookings')) {
@@ -231,4 +234,41 @@ test('category HTTP bookings validate prices, selections and provider settings',
  assert.equal(furnitureUpload.data.booking.service_details.media_files[0].name, 'appliance.png');
  assert.equal(furnitureUpload.data.booking.service_details.answers['Number of units'], '2');
  assert.equal(persistedUploads.length, 3);
+ for (const [key, config] of Object.entries(outdoorPricing.configs)) {
+  const inputs = { ...outdoorPricing.defaults(key), ...(config.perVisit ? { frequency: 'Weekly' } : {}) };
+  const expected = outdoorPricing.assessment(key, inputs);
+  const result = await request('/api/customer/61/bookings', { ...body, provider_service_id: 77, service: config.title,
+   amount: 1, pricing_type: 'free', estimated_min: 1, estimated_max: 1,
+   service_details: { inputs, sample_rates: false, answers: { Fake: 'Do not save' }, note: 'Fake note', media_files: [{ url: '/fake-upload' }] } });
+  assert.equal(result.status, 201, key);
+  assert.equal(lastInsert.amount, expected.amount);
+  assert.equal(lastInsert.estimated_max, expected.estimatedMax);
+  assert.equal(lastInsert.pricing_type, expected.pricingType);
+  assert.equal(lastInsert.service_details.category, 'Outdoor and Property Maintenance');
+  assert.equal(lastInsert.service_details.pricing_basis, config.perVisit ? 'per_visit' : 'per_job');
+  assert.equal(lastInsert.service_details.sample_rates, true);
+  assert.equal(lastInsert.service_details.answers.Fake, undefined);
+  assert.deepEqual(lastInsert.service_details.media_files, []);
+ }
+ const lawn = { ...body, service: 'Lawn mowing', provider_service_id: 78,
+  service_details: { inputs: { ...outdoorPricing.defaults('lawn mowing'), lawn_size: 'Custom m2', area_m2: 80, grass_height: 'Tall (over 30 cm)', cleanup: 'Bag grass clippings' } } };
+ assert.equal((await request('/api/customer/61/bookings', lawn)).data.booking.amount, 1304);
+ assert.equal((await request('/api/customer/61/bookings', { ...lawn, provider_service_id: undefined })).status, 201);
+ const beforeInvalid = insertCount;
+ for (const invalid of [
+  { ...lawn, service_details: {} }, { ...lawn, provider_service_id: 75 },
+  { ...lawn, service: 'Tree Trimming' }, { ...lawn, service: 'Outdoor & Property Maintenance' },
+  { ...lawn, service_details: { inputs: { ...lawn.service_details.inputs, area_m2: -5 } } },
+ ]) assert.equal((await request('/api/customer/61/bookings', invalid)).status, 400);
+ assert.equal(insertCount, beforeInvalid);
+ const tree = { ...body, service: 'Tree Trimming', provider_service_id: 77,
+  service_details: { inputs: { ...outdoorPricing.defaults('tree trimming'), trees: 2, tree_type: 'Mango', near_power_lines: 'Yes' }, requires_safety_assessment: false, safety_note: 'No assessment needed' } };
+ const treeUpload = await request('/api/customer/61/bookings', uploadForm([{ ...photo, name: 'tree.png' }], tree));
+ assert.equal(treeUpload.status, 201);
+ assert.equal(treeUpload.data.booking.service_details.answers['Tree type (if known)'], 'Mango');
+ assert.equal(treeUpload.data.booking.service_details.answers['Near power lines?'], 'Yes');
+ assert.equal(treeUpload.data.booking.service_details.requires_safety_assessment, true);
+ assert.equal(treeUpload.data.booking.service_details.safety_note, outdoorPricing.SAFETY_NOTE);
+ assert.equal(treeUpload.data.booking.service_details.media_files[0].name, 'tree.png');
+ assert.equal(persistedUploads.length, 4);
 });

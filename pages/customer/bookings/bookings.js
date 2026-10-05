@@ -322,6 +322,7 @@ function calculatedBookingCategories() {
    context: { massageTypes: service?.massage_types || [] } },
   { id: 'appliance', prefix: 'appliance', title: 'Appliance Maintenance', pricing: window.SNAppliancePricing, context: {} },
   { id: 'installation', prefix: 'installation', title: 'Installation Services', pricing: window.SNInstallationPricing, context: {} },
+  { id: 'outdoor', prefix: 'outdoor', title: 'Outdoor and Property Maintenance', pricing: window.SNOutdoorPricing, context: {} },
  ];
 }
 
@@ -551,7 +552,7 @@ function bookingServiceOptions(provider) {
    max_price: 0,
   }];
  return services.map((service, index) => {
-  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing, window.SNAppliancePricing, window.SNInstallationPricing]
+  const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing, window.SNAppliancePricing, window.SNInstallationPricing, window.SNOutdoorPricing]
    .some(pricing => pricing.serviceKey(service.title) || pricing.isCategory(service.title) || pricing.serviceKeys?.(service.title)?.length);
   return `
   <option value="${bookingEsc(service.title)}" data-index="${index}">
@@ -1030,6 +1031,7 @@ async function renderBookingRequestForm(customer) {
    <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-appliance-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-installation-assessment" hidden></section>
+   <section class="sn-calculated-assessment full" id="sn-outdoor-assessment" hidden></section>
    <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>

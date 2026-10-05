@@ -242,6 +242,15 @@
   .sn-calculated-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .sn-outdoor-price-summary dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .sn-outdoor-price-summary dd {
+    text-align: left;
+  }
 }
 
 .sn-repair-assessment {
