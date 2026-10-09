@@ -34,7 +34,9 @@ const providerBookingActions = new Set();
 const providerRequestsState = { bookings: [], provider: null, filter: 'active', notice: '', noticeType: 'info', signature: '' };
 
 async function providerGet(path, options = {}) {
-  const response = await fetch(`${PROVIDER_API_BASE}${path}`, options);
+  const headers = new Headers(options.headers);
+  if (getProviderUser()?.auth_token) headers.set('Authorization', `Bearer ${getProviderUser().auth_token}`);
+  const response = await fetch(`${PROVIDER_API_BASE}${path}`, { ...options, headers });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || 'Failed to load provider data.');
   return data;
@@ -43,7 +45,7 @@ async function providerGet(path, options = {}) {
 async function providerSend(path, method, body) {
   const response = await fetch(`${PROVIDER_API_BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(getProviderUser()?.auth_token ? { Authorization: `Bearer ${getProviderUser().auth_token}` } : {}) },
     body: JSON.stringify(body || {}),
   });
   const data = await response.json().catch(() => ({}));
@@ -58,6 +60,7 @@ async function providerSend(path, method, body) {
 async function providerSendForm(path, method, body) {
   const response = await fetch(`${PROVIDER_API_BASE}${path}`, {
     method,
+    headers: getProviderUser()?.auth_token ? { Authorization: `Bearer ${getProviderUser().auth_token}` } : {},
     body,
   });
   const data = await response.json().catch(() => ({}));
@@ -483,7 +486,8 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await window.snAccountSessionReady;
   const provider = getProviderUser();
   if (!provider?.id) {
     window.location.href = '../../auth/providerLogin.html';
@@ -1101,6 +1105,7 @@ function providerMoney(value) {
 }
 
 function providerBookingEstimateLabel(booking) {
+  if (booking?.confirmed_price != null) return providerMoney(booking.confirmed_price);
   const min = Number(booking?.estimated_min || 0);
   const max = Number(booking?.estimated_max || 0);
   const type = booking?.pricing_type || booking?.service_details?.pricing_type || '';
@@ -1143,6 +1148,73 @@ function renderProviderBookingAssessment(booking) {
   `;
 }
 
+function renderProviderBookingPayment(booking) {
+  if (!booking.deposit_required) return '';
+  const labels = { awaiting_price: 'Waiting for confirmed price', awaiting_payment: 'Waiting for 30% downpayment', paid: 'Downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Refund review required' };
+  return `<section class="sn-booking-payment-summary"><strong>${esc(labels[booking.deposit_status] || 'Downpayment pending')}</strong>
+    ${booking.confirmed_price != null ? `<dl><div><dt>Confirmed total</dt><dd>${providerMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment</dt><dd>${providerMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${providerMoney(booking.balance_due)}</dd></div></dl>` : ''}
+    ${booking.price_notes ? `<p>${esc(booking.price_notes)}</p>` : ''}
+    ${booking.deposit_livemode === false ? '<p>Test payment only. No real funds received.</p>' : ''}
+    ${booking.deposit_status === 'refund_review' ? '<p>Not automatically refunded. Contact support for review.</p>' : ''}</section>`;
+}
+
+function showProviderPrice(booking) {
+  const provider = getProviderUser();
+  if (!provider?.id || document.querySelector('.sn-price-dialog')) return;
+  const previousFocus = document.activeElement;
+  const overlay = document.createElement('div');
+  overlay.className = 'sn-modal-backdrop sn-price-dialog';
+  overlay.innerHTML = `<form class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-price-title">
+    <div class="sn-modal-head"><h2 id="sn-price-title">Confirm Service Price</h2><button type="button" class="sn-modal-close" aria-label="Close">x</button></div>
+    <p>${esc(booking.service)} &middot; ${esc(booking.customer_name || 'Customer')}</p>
+    <label class="sn-modal-field">Total service price (PHP)<input class="sn-modal-input" name="price" type="number" min="3.34" max="333333.33" step="0.01" value="${esc(booking.confirmed_price ?? booking.amount ?? '')}" required /></label>
+    <label class="sn-modal-field">Scope / price notes<textarea class="sn-modal-input" name="notes" maxlength="1000">${esc(booking.price_notes || '')}</textarea></label>
+    <p class="sn-price-preview" aria-live="polite"></p><p>The customer must agree and pay 30% before the schedule is confirmed.</p>
+    <p class="sn-price-error" role="alert" hidden></p><div class="sn-modal-actions"><button type="submit" class="btn btn-primary">Request Downpayment</button></div>
+  </form>`;
+  document.body.appendChild(overlay);
+  const form = overlay.querySelector('form');
+  let busy = false;
+  const close = () => { if (busy) return; overlay.remove(); document.removeEventListener('keydown', onKey); previousFocus?.focus(); };
+  const onKey = event => {
+    if (event.key === 'Escape') close();
+    if (event.key === 'Tab') {
+      const controls = [...form.querySelectorAll('button:not(:disabled), input, textarea')];
+      if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus(); }
+      else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus(); }
+    }
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.querySelector('.sn-modal-close').onclick = close;
+  overlay.onclick = event => { if (event.target === overlay) close(); };
+  const preview = () => {
+    const total = Math.round(Number(form.elements.price.value) * 100);
+    const deposit = Math.round(total * 30 / 100);
+    overlay.querySelector('.sn-price-preview').textContent = total > 0 ? `30% downpayment: ${providerMoney(deposit / 100)} | Remaining balance: ${providerMoney((total - deposit) / 100)}` : '';
+  };
+  form.elements.price.addEventListener('input', preview);
+  preview();
+  form.elements.price.focus();
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (busy || !form.reportValidity()) return;
+    busy = true;
+    const button = form.querySelector('[type="submit"]');
+    const errorBox = form.querySelector('[role="alert"]');
+    button.disabled = true;
+    errorBox.hidden = true;
+    try {
+      const data = await providerSend(`/api/provider/${provider.id}/bookings/${booking.id}/price`, 'PATCH', { price: form.elements.price.value, notes: form.elements.notes.value, price_version: booking.price_version });
+      Object.assign(booking, data.booking);
+      busy = false;
+      close();
+      setProviderRequestsNotice('Price confirmed. Waiting for the customer\'s verified 30% downpayment.', 'success');
+      renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
+    } catch (error) { errorBox.textContent = error.message; errorBox.hidden = false; }
+    finally { busy = false; button.disabled = false; }
+  };
+}
+
 function renderRequests(bookings, provider) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
@@ -1173,10 +1245,13 @@ function renderRequests(bookings, provider) {
               <span>${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)} - ${esc(booking.scheduled_time)}</span>
               <small>${esc(booking.address || 'Customer address unavailable')}</small>
               ${renderProviderBookingAssessment(booking)}
+              ${renderProviderBookingPayment(booking)}
             </div>
             <div class="sn-booking-request-side" data-booking-id="${booking.id}">
               ${statusPill(booking.status, filters.find(item => item[0] === booking.status)?.[1])}
-              ${booking.status === 'pending' ? '<div class="sn-actions-row"><button class="btn btn-success btn-sm" data-status="upcoming">Accept</button><button class="btn btn-danger btn-sm" data-status="cancelled">Decline</button></div>' : ''}
+              ${booking.status === 'pending' ? `<div class="sn-actions-row">${booking.deposit_required
+                ? (!booking.customer_agreed_at && ['awaiting_price', 'awaiting_payment'].includes(booking.deposit_status) ? `<button class="btn btn-success btn-sm" data-confirm-price>${booking.confirmed_price == null ? 'Confirm Price' : 'Edit Price'}</button>` : '')
+                : '<button class="btn btn-success btn-sm" data-status="upcoming">Accept</button>'}<button class="btn btn-danger btn-sm" data-status="cancelled">Decline</button></div>` : ''}
               ${booking.status === 'upcoming' ? '<button class="btn btn-success btn-sm" data-status="ongoing">Start Service</button><button class="btn btn-outline btn-sm" data-status="cancelled">Cancel Booking</button>' : ''}
               ${booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark Completed</button>' : ''}
               ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
@@ -1223,6 +1298,10 @@ function renderRequests(bookings, provider) {
   panel.querySelectorAll('[data-status]').forEach((button) => {
     button.addEventListener('click', () => updateBookingStatus(button.closest('[data-booking-id]')?.dataset.bookingId, button.dataset.status));
   });
+  panel.querySelectorAll('[data-confirm-price]').forEach(button => button.addEventListener('click', () => {
+    const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]').dataset.bookingId);
+    if (booking) showProviderPrice(booking);
+  }));
   panel.querySelectorAll('[data-close-booking]').forEach((button) => {
     button.addEventListener('click', () => closeCompletedBooking(button.closest('[data-booking-id]')?.dataset.bookingId, button.closest('[data-booking-card]')));
   });
@@ -1736,7 +1815,7 @@ async function performProviderBookingAction(bookingId, action) {
   card?.querySelectorAll('button').forEach(button => { button.disabled = true; });
   try {
     const confirmation = action === 'cancelled'
-      ? { title: booking.status === 'pending' ? 'Decline booking?' : 'Cancel booking?', message: 'The customer will see this booking as cancelled.', confirmText: booking.status === 'pending' ? 'Decline Booking' : 'Cancel Booking', danger: true }
+      ? { title: booking.status === 'pending' ? 'Decline booking?' : 'Cancel booking?', message: `The customer will see this booking as cancelled.${booking.deposit_paid_at ? ' The paid downpayment will need refund review; it is not automatically refunded.' : ''}`, confirmText: booking.status === 'pending' ? 'Decline Booking' : 'Cancel Booking', danger: true }
       : action === 'completed'
         ? { title: 'Complete service?', message: 'Confirm that the booked service has been finished.', confirmText: 'Mark Completed' }
         : action === 'archive'
@@ -1747,7 +1826,7 @@ async function performProviderBookingAction(bookingId, action) {
     const archive = action === 'archive';
     const data = await providerSend(`/api/provider/${provider.id}/bookings/${bookingId}/${archive ? 'close' : 'status'}`, 'PATCH', archive ? {} : { status: action, expected_status: booking.status });
     if (archive) booking.provider_closed = true;
-    else booking.status = data.booking.status;
+    else Object.assign(booking, data.booking);
     const messages = { upcoming: 'Booking accepted.', ongoing: 'Service started.', completed: 'Service marked completed.', cancelled: 'Booking cancelled.', archive: 'Booking moved to history.' };
     setProviderRequestsNotice(messages[action], 'success');
     renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
@@ -2266,6 +2345,7 @@ function renderProviderHistoryDetail(booking) {
           <div class="sn-dr"><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value">${esc(booking.payment_method || 'cash')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Status</span><span class="sn-dr-value">${providerHistoryStatusPill(booking.status)}</span></div>
         </div>
+        ${renderProviderBookingPayment(booking)}
       </section>
       <aside class="sn-provider-info-card">
         <div class="sn-provider-info-title">Customer</div>
@@ -2386,7 +2466,7 @@ async function submitProviderReassessment(provider) {
       score,
       answers,
     });
-    if (data.user) localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    if (data.user) localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
     activeProviderReassessmentQuestions = [];
     await loadProviderDatabase();
     setProviderProfileStatus(`Reassessment submitted. New score: ${score}% (${data.assessment?.badge || data.user?.badge_status || 'updated'}).`, score >= 60 ? 'success' : 'error');
@@ -2483,7 +2563,7 @@ async function saveProviderProfile() {
   }
   try {
     const data = await providerSend(`/api/provider/${provider.id}/profile`, 'PATCH', body);
-    localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
     const userName = document.getElementById('sn-user-name');
     if (userName) userName.textContent = data.user.full_name || 'Service Provider';
     setProviderProfileStatus('Profile saved successfully.', 'success');
@@ -2525,7 +2605,7 @@ async function uploadProviderCredentials() {
   }
   try {
     const data = await providerSendForm(`/api/provider/${provider.id}/credentials`, 'PATCH', form);
-    localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
     await loadProviderDatabase();
     setProviderProfileStatus('Credentials uploaded. Your verification is back under admin review.', 'success');
   } catch (error) {
@@ -2549,7 +2629,7 @@ async function saveProviderCoordinates(coords, label, suffix = '') {
     accuracy: Number.isFinite(accuracy) ? accuracy : null,
   });
   if (data.user) {
-    localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+    localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
     if (label) {
       const gpsLabel = `${Number(data.user.latitude).toFixed(6)}, ${Number(data.user.longitude).toFixed(6)}`;
       const accuracyText = data.user.location_accuracy_m ? ` (+/- ${Math.round(data.user.location_accuracy_m)}m)` : '';

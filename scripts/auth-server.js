@@ -16,6 +16,10 @@ const appliancePricing = require('../shared/js/appliancePricing');
 const installationPricing = require('../shared/js/installationPricing');
 const outdoorPricing = require('../shared/js/outdoorPricing');
 const { changeProviderBookingStatus } = require('./booking-workflow');
+const { issueSession, authenticateAccount, requestSessionToken, rememberSession, revokeSession } = require('./account-sessions');
+const { createPayMongo } = require('./paymongo');
+const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheckout, settleBookingPayment, expireCancelledCheckout, cancelBookingPayment, fail: paymentFail } = require('./booking-payments');
+const paymongo = createPayMongo();
 
 const app = express();
 app.set('trust proxy', true);
@@ -110,6 +114,10 @@ function canonicalCategoryName(value) {
 }
 
 app.use(cors());
+app.post('/api/payments/paymongo/webhook', express.raw({ type: 'application/json', limit: '1mb' }), asyncRoute(async (req, res) => {
+  const event = paymongo.verifyWebhook(req.body, req.headers['paymongo-signature']);
+  res.json(await settleBookingPayment(db, event));
+}));
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
 
@@ -1446,6 +1454,7 @@ function feedbackRow(row) {
 
 function customerBookingRow(row) {
   return {
+    ...bookingPaymentView(row),
     id: row.id,
     customer_id: row.customer_id,
     provider_id: row.provider_id,
@@ -1669,6 +1678,7 @@ function providerBookingRow(row) {
   const displayLng = hasBookingGps ? bookingLng : hasCustomerGps ? customerLng : null;
   const locationSource = hasBookingGps ? 'booking-gps' : hasCustomerGps ? 'customer-gps' : 'none';
   return {
+    ...bookingPaymentView(row),
     id: row.id,
     customer_id: row.customer_id,
     customer_name: row.customer_name,
@@ -1773,6 +1783,25 @@ app.get('/api/health', asyncRoute(async (_req, res) => {
   res.json({ ok: true, database: 'connected' });
 }));
 
+app.get('/api/auth/:role/session', asyncRoute(async (req, res) => {
+  const role = req.params.role;
+  if (!['customer', 'provider'].includes(role)) return res.status(404).json({ message: 'Account role not found.' });
+  res.set('Cache-Control', 'no-store');
+  const session = await authenticateAccount(db, req, role);
+  const result = await db.query(`SELECT * FROM ${role === 'provider' ? 'providers' : 'customers'} WHERE id = $1`, [session.id]);
+  if (!result.rowCount) return res.status(401).json({ message: 'Account is no longer available.' });
+  const token = requestSessionToken(req, role);
+  rememberSession(req, res, role, token);
+  res.json({ user: { ...(role === 'provider' ? providerRow(result.rows[0]) : customerRow(result.rows[0])), auth_token: token } });
+}));
+
+app.post('/api/auth/:role/logout', asyncRoute(async (req, res) => {
+  const role = req.params.role;
+  if (!['customer', 'provider'].includes(role)) return res.status(404).json({ message: 'Account role not found.' });
+  await revokeSession(db, req, res, role);
+  res.sendStatus(204);
+}));
+
 app.get('/api/auth/google/start', (req, res) => {
   const role = String(req.query.role || 'customer').toLowerCase() === 'provider' ? 'provider' : 'customer';
   const requestFrontendBaseUrl = requestFrontendBase(req);
@@ -1868,7 +1897,7 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
       action: 'login',
       role,
       redirect: googleDashboardPath(role),
-      user: role === 'provider' ? providerRow(requestedAccount) : customerRow(requestedAccount),
+      user: { ...(role === 'provider' ? providerRow(requestedAccount) : customerRow(requestedAccount)), auth_token: await issueSession(db, role, requestedAccount.id, { req, res }) },
     });
   }
 
@@ -2040,6 +2069,7 @@ app.post('/api/auth/password-reset/complete', asyncRoute(async (req, res) => {
   if (!result.rowCount) {
     return res.status(404).json({ message: 'Account not found. Please request a new reset link.' });
   }
+  await db.query('DELETE FROM account_sessions WHERE account_role = $1 AND account_id = $2', [resetToken.account_type, resetToken.account_id]);
 
   res.json({
     ok: true,
@@ -2130,7 +2160,7 @@ app.post('/api/auth/customer/register', upload.fields([
   );
   await persistRequestUploads(req, { role: 'customer', id: result.rows[0].id });
 
-  res.status(201).json({ user: customerRow(result.rows[0]) });
+  res.status(201).json({ user: { ...customerRow(result.rows[0]), auth_token: await issueSession(db, 'customer', result.rows[0].id, { req, res }) } });
 }));
 
 app.post('/api/auth/customer/login', asyncRoute(async (req, res) => {
@@ -2156,7 +2186,7 @@ app.post('/api/auth/customer/login', asyncRoute(async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
 
-  res.json({ user: customerRow(customer) });
+  res.json({ user: { ...customerRow(customer), auth_token: await issueSession(db, 'customer', customer.id, { req, res }) } });
 }));
 
 app.get('/api/auth/customer/status/:id', asyncRoute(async (req, res) => {
@@ -2245,6 +2275,7 @@ app.patch('/api/auth/customer/change-password', asyncRoute(async (req, res) => {
   }
   const passwordHash = await bcrypt.hash(registrationPassword(req.body.newPassword), 12);
   await db.query('UPDATE customers SET password_hash = $2, updated_at = NOW() WHERE id = $1', [req.body.id, passwordHash]);
+  await db.query("DELETE FROM account_sessions WHERE account_role = 'customer' AND account_id = $1", [req.body.id]);
   res.json({ ok: true });
 }));
 
@@ -2459,28 +2490,47 @@ app.get('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/customer/:id/bookings/:bookingId/cancel', asyncRoute(async (req, res) => {
-  const result = await db.query(`
-    UPDATE customer_bookings
-    SET status = 'cancelled', updated_at = NOW()
-    WHERE customer_id = $1
-      AND id = $2
-      AND status IN ('pending', 'upcoming', 'ongoing')
-    RETURNING *
-  `, [req.params.id, req.params.bookingId]);
-  if (!result.rowCount) {
-    return res.status(404).json({ message: 'Active booking not found or already closed.' });
-  }
-
-  const booking = result.rows[0];
-  await db.query(`
-    UPDATE provider_availability
-    SET is_available = TRUE
-    WHERE provider_id = $1
-      AND available_date = $2
-      AND start_time = $3
-  `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
-
+  await authenticateAccount(db, req, 'customer', req.params.id);
+  const booking = await transaction(db, async client => {
+    const { rows: [current] } = await client.query('SELECT * FROM customer_bookings WHERE customer_id = $1 AND id = $2 FOR UPDATE', [req.params.id, req.params.bookingId]);
+    if (!current) paymentFail(404, 'Booking not found.');
+    if (current.status === 'cancelled') return current;
+    if (!['pending', 'upcoming', 'ongoing'].includes(current.status)) paymentFail(409, 'This booking is already closed.');
+    await cancelBookingPayment(client, current);
+    const updated = await client.query("UPDATE customer_bookings SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *", [current.id]);
+    await client.query(`UPDATE provider_availability AS a SET is_available = NOT EXISTS (
+      SELECT 1 FROM customer_bookings b WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
+      AND b.scheduled_time = a.start_time AND b.status <> 'cancelled')
+      WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time = $3`, [current.provider_id, current.scheduled_date, current.scheduled_time]);
+    return updated.rows[0];
+  });
+  await expireCancelledCheckout(db, paymongo, booking.id);
   res.json({ booking: customerBookingRow(booking) });
+}));
+
+async function verifiedPaymentAccount(req, role, id) {
+  const actor = await authenticateAccount(db, req, role, id);
+  const account = await db.query(role === 'provider' ? 'SELECT is_verified FROM providers WHERE id = $1' : 'SELECT is_verified FROM customers WHERE id = $1', [id]);
+  if (!account.rows[0]?.is_verified) paymentFail(403, 'Your account must be verified before confirming a price or paying.');
+  return actor;
+}
+
+app.post('/api/customer/:id/bookings/:bookingId/checkout', asyncRoute(async (req, res) => {
+  await verifiedPaymentAccount(req, 'customer', req.params.id);
+  res.json(await createBookingCheckout(db, paymongo, req.params.id, req.params.bookingId, req.body, configuredFrontendBaseUrl || configuredApiBaseUrl));
+}));
+
+app.get('/api/customer/:id/bookings/:bookingId/payment', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'customer', req.params.id);
+  const { rows: [booking] } = await db.query('SELECT * FROM customer_bookings WHERE customer_id = $1 AND id = $2', [req.params.id, req.params.bookingId]);
+  if (!booking) paymentFail(404, 'Booking not found.');
+  res.json({ booking: customerBookingRow(booking), checkout_configured: paymongo.ready, livemode: paymongo.livemode });
+}));
+
+app.patch('/api/provider/:providerId/bookings/:bookingId/price', asyncRoute(async (req, res) => {
+  await verifiedPaymentAccount(req, 'provider', req.params.providerId);
+  const booking = await confirmBookingPrice(db, req.params.providerId, req.params.bookingId, req.body);
+  res.json({ booking: providerBookingRow(booking) });
 }));
 
 app.get('/api/directions', asyncRoute(async (req, res) => {
@@ -2792,7 +2842,7 @@ app.post('/api/auth/provider/register', upload.fields([
   `, [result.rows[0].id, category || 'General', assessmentScore, badge]);
   await ensureProviderProfileService(result.rows[0]);
 
-  res.status(201).json({ user: providerRow(result.rows[0]) });
+  res.status(201).json({ user: { ...providerRow(result.rows[0]), auth_token: await issueSession(db, 'provider', result.rows[0].id, { req, res }) } });
 }));
 
 app.post('/api/auth/provider/login', asyncRoute(async (req, res) => {
@@ -2804,7 +2854,7 @@ app.post('/api/auth/provider/login', asyncRoute(async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
 
-  res.json({ user: providerRow(provider) });
+  res.json({ user: { ...providerRow(provider), auth_token: await issueSession(db, 'provider', provider.id, { req, res }) } });
 }));
 
 app.get('/api/auth/provider/status/:id', asyncRoute(async (req, res) => {
@@ -3142,6 +3192,7 @@ app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
 app.post('/api/customer/:id/bookings', bookingUpload.fields([
   { name: 'assessmentMedia', maxCount: 3 },
 ]), asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'customer', req.params.id);
   requireFields(req.body, ['provider_id', 'service', 'scheduled_date', 'scheduled_time', 'address']);
   const latitude = Number(req.body.latitude);
   const longitude = Number(req.body.longitude);
@@ -3181,31 +3232,37 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     req.body.service = estimate.details.service_type;
   }
 
-  const availability = await db.query(`
-    SELECT id FROM provider_availability
+  const result = await transaction(db, async client => {
+  const availability = await client.query(`
+    SELECT id FROM provider_availability AS a
     WHERE provider_id = $1
       AND available_date = $2
       AND start_time = $3
       AND is_available = TRUE
+      AND NOT EXISTS (
+        SELECT 1 FROM customer_bookings b
+        WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
+          AND b.scheduled_time = a.start_time AND b.status <> 'cancelled'
+      )
     LIMIT 1
+    FOR UPDATE
   `, [req.body.provider_id, req.body.scheduled_date, req.body.scheduled_time]);
 
   if (!availability.rowCount) {
-    const alternatives = await db.query(`
+    const alternatives = await client.query(`
       SELECT available_date, start_time, end_time
       FROM provider_availability
       WHERE provider_id = $1 AND available_date >= CURRENT_DATE AND is_available = TRUE
       ORDER BY available_date ASC, start_time ASC
       LIMIT 5
     `, [req.body.provider_id]);
-    return res.status(409).json({
-      message: 'Selected schedule is not available.',
-      alternatives: alternatives.rows,
-      algorithm: 'Booking & Scheduling Algorithm',
-    });
+    const error = new Error('Selected schedule is not available.');
+    error.statusCode = 409;
+    error.alternatives = alternatives.rows;
+    throw error;
   }
 
-  const result = await db.query(`
+  const inserted = await client.query(`
     INSERT INTO customer_bookings (
       customer_id,
       provider_id,
@@ -3223,9 +3280,11 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
       pricing_type,
       estimated_min,
       estimated_max,
-      status
+      status,
+      deposit_required,
+      deposit_status
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${hasBookingGps ? 'NOW()' : 'NULL'}, COALESCE($10, 0), COALESCE($11, 'cash'), $12::jsonb, $13, COALESCE($14, 0), COALESCE($15, 0), 'pending')
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${hasBookingGps ? 'NOW()' : 'NULL'}, COALESCE($10, 0), COALESCE($11, 'cash'), $12::jsonb, $13, COALESCE($14, 0), COALESCE($15, 0), 'pending', TRUE, 'awaiting_price')
     RETURNING *
   `, [
     req.params.id,
@@ -3245,13 +3304,14 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     estimatedMax,
   ]);
 
-  await persistRequestUploads(req, { role: 'booking', id: result.rows[0].id });
-
-  await db.query(`
+  await client.query(`
     UPDATE provider_availability
     SET is_available = FALSE
     WHERE provider_id = $1 AND available_date = $2 AND start_time = $3
   `, [req.body.provider_id, req.body.scheduled_date, req.body.scheduled_time]);
+  return inserted;
+  });
+  await persistRequestUploads(req, { role: 'booking', id: result.rows[0].id });
 
   res.status(201).json({ booking: customerBookingRow(result.rows[0]) });
 }));
@@ -3493,11 +3553,14 @@ app.delete('/api/provider/:providerId/availability/:slotId', asyncRoute(async (r
 
 app.patch('/api/provider/:providerId/bookings/:bookingId/status', asyncRoute(async (req, res) => {
   requireFields(req.body, ['status']);
-  const booking = await changeProviderBookingStatus(db, req.params.providerId, req.params.bookingId, req.body.status, req.body.expected_status);
+  const actor = await authenticateAccount(db, req, 'provider', req.params.providerId);
+  const booking = await changeProviderBookingStatus(db, req.params.providerId, req.params.bookingId, req.body.status, req.body.expected_status, actor);
+  if (booking.status === 'cancelled') await expireCancelledCheckout(db, paymongo, booking.id);
   res.json({ booking: providerBookingRow(booking) });
 }));
 
 app.patch('/api/provider/:providerId/bookings/:bookingId/close', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.providerId);
   const result = await db.query(`
     UPDATE customer_bookings
     SET provider_closed = TRUE, updated_at = NOW()
@@ -3920,10 +3983,11 @@ app.use((error, _req, res, _next) => {
   }
   console.error(error);
   const status = error.statusCode || 500;
-  res.status(status).json({ message: status === 500 ? 'Server error.' : error.message });
+  res.status(status).json({ message: status === 500 ? 'Server error.' : error.message, ...(error.alternatives ? { alternatives: error.alternatives } : {}) });
 });
 
 ensureAdminSupportTables()
+  .then(() => db.query(fs.readFileSync(path.join(__dirname, 'payment-schema.sql'), 'utf8')))
   .then(() => {
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);

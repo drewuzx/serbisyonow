@@ -27,7 +27,9 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
    const query = sql.trim().replace(/\s+/g, ' ');
    let rows = [];
    const booking = bookings.find(row => row.provider_id === Number(params[0]) && row.id === Number(params[1]));
-   if (query === 'BEGIN') snapshot = { bookings: structuredClone(bookings), available };
+   if (query.startsWith('SELECT account_role')) rows = [{ account_role: 'provider', account_id: 81 }];
+   else if (query.startsWith('UPDATE account_sessions')) rows = [{ account_id: 81 }];
+   else if (query === 'BEGIN') snapshot = { bookings: structuredClone(bookings), available };
    else if (query === 'ROLLBACK') { bookings = snapshot.bookings; available = snapshot.available; }
    else if (query.startsWith('SELECT * FROM customer_bookings')) rows = booking ? [booking] : [];
    else if (query.startsWith('UPDATE customer_bookings SET status')) {
@@ -80,7 +82,7 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
  const base = `http://127.0.0.1:${server.address().port}`;
  async function request(id, status, expectedStatus, providerId = 81) {
   const response = await fetch(`${base}/api/provider/${providerId}/bookings/${id}/${status === 'archive' ? 'close' : 'status'}`, {
-   method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, expected_status: expectedStatus }),
+   method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${'a'.repeat(64)}` }, body: JSON.stringify({ status, expected_status: expectedStatus }),
   });
   return { status: response.status, data: await response.json() };
  }
@@ -100,7 +102,7 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
  await t.test('reject invalid transitions, stale state and other providers', async () => {
   assert.equal((await request(1, 'completed', 'upcoming')).status, 409);
   assert.equal((await request(1, 'ongoing', 'pending')).status, 409);
-  assert.equal((await request(1, 'ongoing', 'upcoming', 82)).status, 404);
+  assert.equal((await request(1, 'ongoing', 'upcoming', 82)).status, 403);
   assert.equal((await request(999, 'upcoming')).status, 404);
   for (const invalid of ['pending', 'unknown', 'toString', '']) assert.equal((await request(1, invalid)).status, 400);
   assert.equal((await request(1, 'archive')).status, 404);

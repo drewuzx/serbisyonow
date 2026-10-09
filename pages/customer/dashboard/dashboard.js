@@ -205,7 +205,8 @@ function attachDashboardShell() {
   else closeSidebar();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await window.snAccountSessionReady;
   const currentCustomer = getCurrentCustomer();
   if (!currentCustomer) {
     window.location.href = '../../auth/customerLogin.html';

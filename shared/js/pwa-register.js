@@ -1,6 +1,15 @@
 'use strict';
 
 (function registerSerbisyoNowPwa() {
+  if (/\/pages\/(customer|provider)\//.test(window.location.pathname)) {
+    window.snAccountSessionReady = new Promise(resolve => {
+      const script = document.createElement('script');
+      script.src = '/shared/js/account-session.js';
+      script.onload = () => resolve(window.snAccountSession?.ready);
+      script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
   if (!('serviceWorker' in navigator)) return;
 
   window.addEventListener('load', () => {

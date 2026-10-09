@@ -118,6 +118,7 @@ function setupFavoriteActions(customer) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+ await window.snAccountSessionReady;
  const currentCustomer = getCurrentCustomer();
  if (!currentCustomer) {
  window.location.href = '../../auth/customerLogin.html';

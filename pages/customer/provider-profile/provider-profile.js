@@ -131,6 +131,7 @@ function ppRenderProvider(provider) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  await window.snAccountSessionReady;
   const providerId = new URLSearchParams(window.location.search).get('id');
   const detail = document.querySelector('.sn-provider-detail');
 

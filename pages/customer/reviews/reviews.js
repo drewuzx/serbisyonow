@@ -1,4 +1,4 @@
-const CUSTOMER_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
+const REVIEWS_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
 window.snDisableCustomerTopbarSearch = true;
 
 function getCurrentCustomer() {
@@ -102,14 +102,14 @@ async function submitReview(booking) {
  const result = await openReviewModal(booking.provider_name || 'Provider');
  if (!result) return;
  const customer = getCurrentCustomer();
- const response = await fetch(`${CUSTOMER_API_BASE}/api/customer/${customer.id}/reviews`, {
+ const response = await fetch(`${REVIEWS_API_BASE}/api/customer/${customer.id}/reviews`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ provider_id: booking.provider_id, booking_id: booking.id, ...result }),
  });
  const data = await response.json().catch(() => ({}));
  if (!response.ok) throw new Error(data.message || `Unable to submit review. Server response: ${response.status}.`);
- const refreshed = await fetch(`${CUSTOMER_API_BASE}/api/customer/${customer.id}/dashboard`);
+ const refreshed = await fetch(`${REVIEWS_API_BASE}/api/customer/${customer.id}/dashboard`);
  const refreshedData = await refreshed.json().catch(() => ({}));
  if (!refreshed.ok) throw new Error(refreshedData.message || 'Review was saved, but the page could not refresh.');
  renderLiveReviews(refreshedData.bookings || [], refreshedData.reviews || []);
@@ -170,6 +170,7 @@ function renderLiveReviews(bookings, reviews) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+ await window.snAccountSessionReady;
  const currentCustomer = getCurrentCustomer();
  if (!currentCustomer) {
  window.location.href = '../../auth/customerLogin.html';
@@ -179,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  // Always re-fetch fresh verification status from the API before guarding
  // (localStorage may be stale if admin verified/rejected while user was already logged in)
  try {
- const _res = await fetch(`${CUSTOMER_API_BASE}/api/auth/customer/status/${currentCustomer.id}`);
+ const _res = await fetch(`${REVIEWS_API_BASE}/api/auth/customer/status/${currentCustomer.id}`);
  if (_res.ok) {
  const _data = await _res.json().catch(() => ({}));
  if (_data.user) {
@@ -247,7 +248,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  const toRatePanel = document.getElementById('sn-to-rate');
  const myReviewsPanel = document.getElementById('sn-my-reviews');
  try {
- const response = await fetch(`${CUSTOMER_API_BASE}/api/customer/${currentCustomer.id}/dashboard`);
+ const response = await fetch(`${REVIEWS_API_BASE}/api/customer/${currentCustomer.id}/dashboard`);
  const data = await response.json().catch(() => ({}));
  if (response.ok) {
   renderLiveReviews(data.bookings || [], data.reviews || []);

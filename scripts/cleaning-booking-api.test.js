@@ -46,12 +46,20 @@ test('category HTTP bookings validate prices, selections and provider settings',
   async query(sql, params = []) {
    const query = sql.trim();
    let rows = [];
-   if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered, outdoorOffered, lawnOffered];
+   if (query.startsWith('SELECT account_role')) rows = [{ account_role: 'customer', account_id: 61 }];
+   else if (query.startsWith('UPDATE account_sessions')) rows = [{ account_id: 61 }];
+   else if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered, outdoorOffered, lawnOffered];
    else if (query.startsWith('INSERT INTO uploaded_files')) persistedUploads.push(params);
-   else if (query.startsWith('SELECT id FROM provider_availability')) rows = [{ id: 91 }];
+   else if (query.startsWith('SELECT id FROM provider_availability')) {
+    assert.match(query, /FOR UPDATE/);
+    assert.match(query, /NOT EXISTS/);
+    rows = [{ id: 91 }];
+   }
    else if (query.startsWith('INSERT INTO customer_bookings')) {
+    assert.match(query, /'pending', TRUE, 'awaiting_price'/);
     insertCount += 1;
     lastInsert = { id: 101, customer_id: params[0], provider_id: params[1], service: params[2], scheduled_date: params[3], scheduled_time: params[4], address: params[5], amount: params[9], payment_method: params[10], service_details: JSON.parse(params[11]), pricing_type: params[12], estimated_min: params[13], estimated_max: params[14], status: 'pending' };
+    Object.assign(lastInsert, { deposit_required: true, deposit_status: 'awaiting_price', price_version: 0 });
     rows = [lastInsert];
    } else if (query.startsWith('UPDATE provider_services') && query.includes('WHERE provider_id = $1 AND id = $2')) {
     const service = [offered, personalOffered].find(item => item.id === Number(params[1]));
@@ -62,6 +70,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
    return { rows, rowCount: rows.length };
   },
  };
+ database.pool = { async connect() { return { query: database.query, release() {} }; } };
  let resolveServer;
  let rejectServer;
  const ready = new Promise((resolve, reject) => { resolveServer = resolve; rejectServer = reject; });
@@ -94,7 +103,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
  const base = `http://127.0.0.1:${server.address().port}`;
  async function request(route, body, method = 'POST') {
   const multipart = body instanceof FormData;
-  const response = await fetch(`${base}${route}`, { method, headers: multipart ? {} : { 'Content-Type': 'application/json' }, body: multipart ? body : JSON.stringify(body) });
+  const response = await fetch(`${base}${route}`, { method, headers: { ...(!multipart ? { 'Content-Type': 'application/json' } : {}), Authorization: `Bearer ${'a'.repeat(64)}` }, body: multipart ? body : JSON.stringify(body) });
   return { status: response.status, data: await response.json() };
  }
  const body = {
@@ -104,6 +113,8 @@ test('category HTTP bookings validate prices, selections and provider settings',
  };
  const result = await request('/api/customer/61/bookings', body);
  assert.equal(result.status, 201);
+ assert.equal(result.data.booking.deposit_required, true);
+ assert.equal(result.data.booking.deposit_status, 'awaiting_price');
  assert.equal(result.data.booking.amount, 1600);
  assert.equal(lastInsert.service, 'Bathroom Cleaning');
  assert.equal(lastInsert.pricing_type, 'calculated');

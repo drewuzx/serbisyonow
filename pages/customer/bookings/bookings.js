@@ -132,7 +132,9 @@ function todayInputValue() {
 }
 
 async function bookingFetch(path, options = {}) {
- const response = await fetch(`${BOOKING_API_BASE}${path}`, options);
+ const headers = new Headers(options.headers);
+ if (getCurrentCustomer()?.auth_token) headers.set('Authorization', `Bearer ${getCurrentCustomer().auth_token}`);
+ const response = await fetch(`${BOOKING_API_BASE}${path}`, { ...options, headers });
  const data = await response.json().catch(() => ({}));
  if (!response.ok) {
   const error = new Error(data.message || 'Request failed.');
@@ -754,6 +756,7 @@ function bookingDetailRow(label, value) {
 }
 
 function bookingEstimateLabel(booking) {
+ if (booking?.confirmed_price != null) return bookingMoney(booking.confirmed_price);
  const min = Number(booking?.estimated_min || 0);
  const max = Number(booking?.estimated_max || 0);
  const type = booking?.pricing_type || booking?.service_details?.pricing_type || '';
@@ -820,7 +823,12 @@ async function showBookingDetails(booking) {
     ${bookingDetailRow('Date', bookingDisplayDate(item.scheduled_date))}
     ${bookingDetailRow('Time', item.scheduled_time)}
     ${bookingDetailRow('Amount / estimate', bookingEstimateLabel(item))}
-    ${bookingDetailRow('Payment', item.payment_method || 'cash')}
+    ${bookingDetailRow(item.deposit_required ? 'Remaining balance method' : 'Payment', item.payment_method || 'cash')}
+    ${item.deposit_required ? bookingDetailRow('Downpayment', item.deposit_status.replace(/_/g, ' ')) : ''}
+    ${item.deposit_amount != null ? bookingDetailRow('30% downpayment', bookingMoney(item.deposit_amount)) + bookingDetailRow('70% remaining balance', bookingMoney(item.balance_due)) : ''}
+    ${item.price_notes ? bookingDetailRow('Confirmed price notes', item.price_notes) : ''}
+    ${item.deposit_livemode === false ? bookingDetailRow('Payment mode', 'Test payment only. No real funds received.') : ''}
+    ${item.deposit_status === 'refund_review' ? bookingDetailRow('Refund', 'Review required. Not automatically refunded; contact support.') : ''}
     ${bookingDetailRow('Service address', item.address)}
     ${bookingDetailRow('Customer pin', customerPin)}
     ${bookingDetailRow('Provider GPS', providerLocation)}
@@ -840,6 +848,103 @@ async function showBookingDetails(booking) {
  modal.addEventListener('click', (event) => {
   if (event.target === modal) closeBookingModal(modal);
  });
+}
+
+async function showBookingPayment(bookingId, returnState = '') {
+ const customer = getCurrentCustomer();
+ if (!customer?.id || document.querySelector('.sn-downpayment-modal')) return;
+ const previousFocus = document.activeElement;
+ const modal = document.createElement('div');
+ modal.className = 'sn-modal sn-downpayment-modal';
+ modal.setAttribute('role', 'dialog');
+ modal.setAttribute('aria-modal', 'true');
+ modal.setAttribute('aria-labelledby', 'sn-downpayment-title');
+ modal.innerHTML = `<div class="sn-modal-card"><button type="button" class="sn-modal-close" aria-label="Close">x</button><h3 id="sn-downpayment-title" class="sn-modal-title">Booking Downpayment</h3><div class="sn-downpayment-content">Loading payment details...</div><p class="sn-downpayment-message" role="status"></p><div class="sn-modal-actions"><button type="button" class="btn btn-outline" data-payment-refresh>Refresh Status</button><button type="button" class="btn btn-primary" data-payment-pay hidden>Pay 30%</button></div></div>`;
+ document.body.appendChild(modal);
+ document.body.classList.add('sn-modal-open');
+ let booking;
+ let busy = false;
+ let timer;
+ let polls = 0;
+ let loadVersion = 0;
+ const message = modal.querySelector('[role="status"]');
+ const pay = modal.querySelector('[data-payment-pay]');
+ const refresh = modal.querySelector('[data-payment-refresh]');
+ const close = () => { if (busy) return; clearTimeout(timer); document.removeEventListener('keydown', onKey); closeBookingModal(modal); previousFocus?.focus(); };
+ const onKey = event => {
+  if (event.key === 'Escape') close();
+  if (event.key === 'Tab') {
+   const controls = [...modal.querySelectorAll('button:not(:disabled):not([hidden]), input')];
+   if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus(); }
+   else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus(); }
+  }
+ };
+ document.addEventListener('keydown', onKey);
+ modal.querySelector('.sn-modal-close').onclick = close;
+ modal.onclick = event => { if (event.target === modal) close(); };
+ const load = async () => {
+  const version = ++loadVersion;
+  refresh.disabled = true;
+  pay.disabled = true;
+  try {
+   const data = await bookingFetch(`/api/customer/${customer.id}/bookings/${encodeURIComponent(bookingId)}/payment`);
+   if (!modal.isConnected || version !== loadVersion) return;
+   booking = data.booking;
+   const awaiting = booking.status === 'pending' && booking.deposit_status === 'awaiting_payment';
+   const paid = booking.deposit_status === 'paid';
+   modal.querySelector('.sn-downpayment-content').innerHTML = `<p><strong>${bookingEsc(booking.service)}</strong></p>
+    ${booking.confirmed_price != null ? `<dl class="sn-downpayment-breakdown"><div><dt>Confirmed service total</dt><dd>${bookingMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment due now</dt><dd>${bookingMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${bookingMoney(booking.balance_due)}</dd></div></dl>` : '<p>Waiting for the provider to confirm the service price.</p>'}
+    ${booking.price_notes ? `<p>${bookingEsc(booking.price_notes)}</p>` : ''}
+    ${awaiting ? '<label class="sn-payment-consent"><input type="checkbox" data-payment-consent /> <span>I agree to this service price and the 30% downpayment. The remaining balance is due after service. Canceled payments require refund review.</span></label>' : ''}`;
+   pay.hidden = !awaiting;
+   pay.disabled = true;
+   modal.querySelector('[data-payment-consent]')?.addEventListener('change', event => { pay.disabled = !event.target.checked || !data.checkout_configured; });
+   message.textContent = paid
+    ? (booking.deposit_livemode === false ? 'Test downpayment verified. The test booking schedule is confirmed; no real funds received.' : 'Downpayment verified. Your booking schedule is confirmed.')
+    : booking.deposit_status === 'refund_review' ? 'Payment received, but this booking is not confirmed. Contact support for refund review.'
+    : booking.status === 'cancelled' ? 'This booking is cancelled. No new payment is allowed.'
+    : !data.checkout_configured ? 'E-wallet checkout is not configured yet. Please contact support.'
+    : returnState === 'success' ? 'Waiting for PayMongo payment verification. Your schedule is not confirmed yet.'
+    : returnState === 'cancelled' ? 'Checkout was closed. The booking remains pending until a payment is verified.'
+    : data.livemode === false ? 'PayMongo test checkout. Do not use real payment details.' : 'Pay securely with an e-wallet through PayMongo.';
+   if (paid && (window.snCustomerBookings || []).some(item => String(item.id) === String(bookingId) && item.status === 'pending')) {
+    const index = window.snCustomerBookings.findIndex(item => String(item.id) === String(bookingId));
+    window.snCustomerBookings[index] = { ...window.snCustomerBookings[index], ...booking };
+    const list = document.getElementById('sn-bookings');
+    if (list) list.innerHTML = renderCustomerBookings(window.snCustomerBookings);
+    document.dispatchEvent(new CustomEvent('sn:customer-bookings-rendered'));
+   }
+   if (returnState === 'success' && awaiting && polls++ < 5) timer = setTimeout(load, 3000);
+  } catch (error) { if (version === loadVersion) message.textContent = error.message; }
+  finally { if (version === loadVersion) refresh.disabled = false; }
+ };
+ refresh.onclick = () => { clearTimeout(timer); load(); };
+ pay.onclick = async () => {
+  if (busy || !modal.querySelector('[data-payment-consent]')?.checked) return;
+  busy = true;
+  pay.disabled = refresh.disabled = true;
+  try {
+   const data = await bookingFetch(`/api/customer/${customer.id}/bookings/${booking.id}/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accept_price: true, price_version: booking.price_version }) });
+   const url = new URL(data.checkout_url);
+   if (url.protocol !== 'https:' || url.hostname !== 'checkout.paymongo.com' || url.port || url.username || url.password) throw new Error('Invalid checkout address. Contact support.');
+   window.location.assign(url.href);
+  } catch (error) { message.textContent = error.message; busy = false; pay.disabled = refresh.disabled = false; }
+ };
+ await load();
+ modal.querySelector('.sn-modal-close').focus();
+}
+
+let bookingPaymentReturnHandled = false;
+function handleBookingPaymentReturn() {
+ if (bookingPaymentReturnHandled) return;
+ const params = new URLSearchParams(window.location.search);
+ const id = params.get('pay_booking_id') || (params.has('payment_return') && params.get('booking_id'));
+ if (!id || !/^\d+$/.test(id)) return;
+ bookingPaymentReturnHandled = true;
+ const returnState = params.get('payment_return') || '';
+ ['payment_return', 'booking_id', 'pay_booking_id'].forEach(key => params.delete(key));
+ history.replaceState(null, '', `${window.location.pathname}${params.size ? '?' + params : ''}`);
+ showBookingPayment(id, returnState);
 }
 
 function allVisibleBookings() {
@@ -934,7 +1039,10 @@ function setupBookingActions() {
  });
 
  document.addEventListener('sn:customer-bookings-rendered', renderBookingCalendar);
+ document.addEventListener('sn:customer-bookings-rendered', handleBookingPaymentReturn);
  document.addEventListener('click', (event) => {
+  const payButton = event.target.closest('[data-booking-action="pay"]');
+  if (payButton) { event.preventDefault(); showBookingPayment(payButton.dataset.bookingId); return; }
   const cancelButton = event.target.closest('[data-booking-action="cancel"]');
   if (cancelButton) {
    event.preventDefault();
@@ -962,7 +1070,8 @@ function setupBookingActions() {
 async function cancelCustomerBooking(bookingId, button) {
  const customer = getCurrentCustomer();
  if (!customer?.id || !bookingId) return;
- const confirmed = await bookingConfirm('This will cancel your booking and reopen the provider schedule slot.', {
+ const booking = getStoredBookingById(bookingId);
+ const confirmed = await bookingConfirm(`This will cancel your booking and reopen the provider schedule slot.${booking?.deposit_paid_at ? ' The downpayment needs refund review and is not automatically refunded.' : ''}`, {
   title: 'Cancel booking?',
   confirmText: 'Cancel Booking',
   type: 'warning',
@@ -1025,7 +1134,8 @@ async function renderBookingRequestForm(customer) {
    <label><span>Service</span><select id="sn-booking-service" name="service" required>${bookingServiceOptions(provider)}</select></label>
    <label><span>Date</span><input id="sn-booking-date" name="scheduled_date" type="date" value="${todayInputValue()}" required /></label>
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
-  <label><span>Payment Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash Payment</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">To be paid directly to the service provider after the service.</small></label>
+  <label><span>Remaining Balance Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">Remaining 70% is paid directly to the provider after service.</small></label>
+   <p class="sn-booking-downpayment-terms full">A 30% downpayment through PayMongo e-wallet checkout is required after the provider confirms the service price. Your schedule is confirmed only after payment is verified. The remaining 70% is due after service.</p>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>
@@ -1055,8 +1165,8 @@ async function renderBookingRequestForm(customer) {
  document.getElementById('sn-booking-payment')?.addEventListener('change', (event) => {
   const note = document.getElementById('sn-booking-payment-note');
   if (note) note.textContent = event.target.value === 'gcash'
-   ? 'Use the service provider\'s GCash QR code for easy payment access.'
-   : 'To be paid directly to the service provider after the service.';
+   ? 'Remaining 70% is paid to the provider via GCash after service.'
+   : 'Remaining 70% is paid directly to the provider in cash after service.';
  });
  document.getElementById('sn-booking-amount-choice')?.addEventListener('change', () => {
   const choice = document.getElementById('sn-booking-amount-choice');
@@ -1266,6 +1376,7 @@ async function submitBookingRequest(event, customer, providerId) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+ await window.snAccountSessionReady;
  const currentCustomer = getCurrentCustomer();
  if (!currentCustomer) {
  window.location.href = '../../auth/customerLogin.html';

@@ -2081,6 +2081,21 @@ body {
   backdrop-filter: blur(3px);
 }
 
+.sn-booking-payment-summary { border-top: 1px solid #d8e4f7; margin-top: 14px; padding-top: 12px; font-size: 13px; }
+.sn-booking-payment-summary dl { margin: 8px 0; }
+.sn-booking-payment-summary dl > div { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0; }
+.sn-booking-payment-summary dt { color: #52647c; }
+.sn-booking-payment-summary dd { margin: 0; font-weight: 700; text-align: right; white-space: nowrap; }
+.sn-booking-payment-summary p { margin: 7px 0; overflow-wrap: anywhere; }
+.sn-price-dialog { z-index: 10050; }
+.sn-price-dialog [hidden] { display: none !important; }
+.sn-price-dialog .sn-modal { border-radius: 8px; max-height: calc(100dvh - 44px); overflow-y: auto; }
+.sn-price-dialog .sn-modal-field { margin-top: 14px; }
+.sn-price-dialog .sn-modal-input { border-radius: 6px; }
+.sn-price-preview { color: #126849; font-weight: 700; }
+.sn-price-error { color: #b42318; }
+.sn-price-dialog .sn-modal-actions button { white-space: normal; }
+
 .sn-modal {
   width: min(520px, 100%);
   border: 1.5px solid #d8e4f7;

@@ -12,6 +12,7 @@ async function main() {
 
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   await db.query(schema);
+  await db.query(fs.readFileSync(path.join(__dirname, 'payment-schema.sql'), 'utf8'));
 
   const username = process.env.ADMIN_USERNAME || 'admin';
   const password = process.env.ADMIN_PASSWORD || 'admin123';

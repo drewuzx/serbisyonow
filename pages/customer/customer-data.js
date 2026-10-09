@@ -17,7 +17,7 @@ function snCurrentCustomer() {
 }
 
 async function snCustomerGet(path) {
- const response = await fetch(`${CUSTOMER_API_BASE}${path}`);
+ const response = await fetch(`${CUSTOMER_API_BASE}${path}`, { headers: snCurrentCustomer()?.auth_token ? { Authorization: `Bearer ${snCurrentCustomer().auth_token}` } : {} });
  const data = await response.json().catch(() => ({}));
  if (!response.ok) throw new Error(data.message || 'Failed to load customer data.');
  return data;
@@ -519,8 +519,12 @@ function renderCustomerBooking(booking) {
   const cancelButton = canCancel
   ? `<button class="sn-btn sn-btn-danger" type="button" data-booking-action="cancel" data-booking-id="${snEsc(booking.id)}">Cancel Booking</button>`
   : '';
+ const paymentLabels = { awaiting_price: 'Waiting for provider price', awaiting_payment: 'Waiting for 30% downpayment', paid: '30% downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Downpayment refund review' };
+ const paymentSummary = booking.deposit_required ? `<span>${snEsc(paymentLabels[booking.deposit_status] || 'Downpayment pending')}</span>${booking.confirmed_price != null ? `<span>30% downpayment: ${snMoney(booking.deposit_amount)}</span><span>70% remaining balance: ${snMoney(booking.balance_due)}</span>` : ''}${booking.deposit_livemode === false ? '<span>Test payment only</span>' : ''}` : '';
+ const payButton = booking.deposit_required && booking.status === 'pending' && booking.deposit_status === 'awaiting_payment'
+  ? `<a class="sn-btn sn-btn-primary" data-booking-action="pay" data-booking-id="${snEsc(booking.id)}" href="../bookings/bookings.html?pay_booking_id=${encodeURIComponent(booking.id)}">Review &amp; Pay 30%</a>` : '';
  return `
- <div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon">&#128197;</div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(booking.scheduled_time)}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Payment: ${snEsc(booking.payment_method || 'cash')}</span><span>Status: ${snEsc(statusInfo.description)}</span></div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.amount)}</strong><div class="sn-booking-status-wrap">${snStatusPill(booking.status)}<small>${snEsc(statusInfo.description)}</small></div><button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div>
+ <div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon">&#128197;</div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(booking.scheduled_time)}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Remaining balance method: ${snEsc(booking.payment_method || 'cash')}</span><span>Status: ${snEsc(statusInfo.description)}</span>${paymentSummary}</div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.confirmed_price ?? booking.amount)}</strong><div class="sn-booking-status-wrap">${snStatusPill(booking.status)}<small>${snEsc(statusInfo.description)}</small></div>${payButton}<button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div>
  `;
 }
 
@@ -551,6 +555,7 @@ function renderCustomerRows(items, emptyText) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+ await window.snAccountSessionReady;
  const customer = snCurrentCustomer();
  if (!customer?.id) return;
  snRenderCustomerChrome(customer);

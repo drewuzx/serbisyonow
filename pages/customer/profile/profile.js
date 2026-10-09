@@ -13,7 +13,7 @@ function getCurrentCustomer() {
 }
 
 function saveCurrentCustomer(data) {
- localStorage.setItem('sn_customer_user', JSON.stringify(data));
+ localStorage.setItem('sn_customer_user', JSON.stringify({ ...getCurrentCustomer(), ...data }));
 }
 
 function formatDate(dateStr) {
@@ -86,6 +86,7 @@ function populatePage(user) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+ await window.snAccountSessionReady;
  const currentCustomer = getCurrentCustomer();
  if (!currentCustomer) {
  window.location.href = '../../auth/customerLogin.html';

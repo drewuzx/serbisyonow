@@ -29,6 +29,7 @@ function multipart(request) {
  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
  try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+  await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   const customer = { id: 987001, full_name: 'Appliance Test Customer', address: 'Test address, Angeles City', verification_status: 'verified', is_verified: true };
   const provider = { id: 987002, full_name: 'Appliance Test Provider', service: 'Appliance Maintenance', category: 'Appliance Maintenance', verification_status: 'verified', is_verified: true };
   const services = [

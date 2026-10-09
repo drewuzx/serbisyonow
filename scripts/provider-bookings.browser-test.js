@@ -12,6 +12,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
  try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+  await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   const provider = { id: 987002, full_name: 'Booking Test Provider', verification_status: 'verified', is_verified: true, latitude: 15.147, longitude: 120.58 };
   const estimate = pricing.assessment('general house cleaning', { ...pricing.defaults('general house cleaning'), areas: ['Living room'] });
   const bookings = [

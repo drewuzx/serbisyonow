@@ -29,6 +29,10 @@ GMAIL_API_REFRESH_TOKEN=your-gmail-api-refresh-token
 GMAIL_API_FROM=SerbisyoNow <your-gmail@gmail.com>
 ```
 
+## Booking Downpayments
+
+See [PayMongo setup](PAYMONGO_SETUP.md) for the required backend keys, webhook endpoint, test-mode verification, refund-review behavior, and provider settlement limitations. New bookings require a verified 30% downpayment before schedule confirmation; live payments are unavailable until PayMongo is configured.
+
 ## Google OAuth
 
 In Google Cloud Console, add this Authorized redirect URI:

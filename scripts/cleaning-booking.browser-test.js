@@ -13,6 +13,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
  try {
   const context = await browser.newContext({ viewport: { width: 1365, height: 1000 }, serviceWorkers: 'block' });
+  await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   const customer = { id: 987001, full_name: 'Cleaning Test Customer', address: 'Test address, Angeles City', verification_status: 'verified', is_verified: true };
   const provider = { id: 987002, full_name: 'Cleaning Test Provider', service: 'Cleaning', category: 'Cleaning', verification_status: 'verified', is_verified: true };
   const services = [
