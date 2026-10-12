@@ -615,11 +615,11 @@ async function loadProviderDatabase({ background = false } = {}) {
       render();
       providerLiveSignatures.set(key, signature);
     };
-    renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews, data.messages], () => {
+    renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews], () => {
       renderProviderMetrics(data);
       renderProviderEarnings(data);
     });
-    if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.reviews, data.availability], () => renderProviderDashboardAnalytics(data));
+    if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.availability], () => renderProviderDashboardAnalytics(data));
     const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
     if (path.includes('/services/') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
     if (path.includes('/requests/')) {
@@ -694,38 +694,9 @@ function bookingResponseRate(bookings, days = 30) {
   return Math.round((acted / source.length) * 100);
 }
 
-function averageProviderReplyLabel(messages) {
-  const firstCustomer = new Map();
-  const firstReply = new Map();
-  const sorted = [...(messages || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  for (const row of sorted) {
-    const id = String(row.customer_id || '');
-    if (!id) continue;
-    const stamp = new Date(row.created_at).getTime();
-    if (!Number.isFinite(stamp)) continue;
-    if (row.sender_role === 'customer' && !firstCustomer.has(id)) firstCustomer.set(id, stamp);
-    if (row.sender_role === 'provider' && firstCustomer.has(id) && !firstReply.has(id) && stamp >= firstCustomer.get(id)) {
-      firstReply.set(id, stamp);
-    }
-  }
-  const diffs = [];
-  for (const [id, start] of firstCustomer) {
-    if (!firstReply.has(id)) continue;
-    diffs.push((firstReply.get(id) - start) / 60000);
-  }
-  if (!diffs.length) return '—';
-  const avg = diffs.reduce((sum, value) => sum + value, 0) / diffs.length;
-  if (avg < 1) return '< 1 min';
-  if (avg < 60) return `${Math.round(avg)} mins`;
-  const hours = avg / 60;
-  if (hours < 24) return `${hours.toFixed(1)} hrs`;
-  return `${Math.round(hours / 24)} days`;
-}
-
 function computeLiveProviderMetrics(data) {
   const bookings = data.history_bookings || data.bookings || [];
   const reviews = data.reviews || [];
-  const messages = data.messages || [];
   const completed = bookings.filter((booking) => String(booking.status || '').toLowerCase() === 'completed');
   const pending = bookings.filter((booking) => String(booking.status || '').toLowerCase() === 'pending');
   const rating = reviews.length
@@ -739,7 +710,6 @@ function computeLiveProviderMetrics(data) {
     response_rate: bookingResponseRate(bookings),
     pending_requests: pending.length,
     total_earnings: completed.reduce((sum, booking) => sum + Number(booking.amount || 0), 0),
-    avg_response_time: averageProviderReplyLabel(messages),
     badge_status: server.badge_status || data.provider?.assessment_badge || 'Pending',
   };
 }
@@ -783,7 +753,6 @@ function renderProviderMetrics(data) {
     ['&#9679;', `${m.response_rate}%`, 'Response Rate', 'var(--info-bg)'],
     ['&#9635;', m.pending_requests, 'Pending Requests', 'var(--blue-pale)'],
     ['&#8369;', money(m.total_earnings), 'Total Earnings', 'var(--blue-pale)'],
-    ['&#9719;', m.avg_response_time, 'Avg. Response Time', 'var(--blue-pale)'],
     ['&#9670;', m.badge_status, 'Badge Status', 'var(--orange-pale)'],
   ].map(([icon, value, label, bg]) => `
     <article class="stat-card">
@@ -795,66 +764,52 @@ function renderProviderMetrics(data) {
 
 function renderProviderDashboardAnalytics(data) {
   const bookings = data.history_bookings || data.bookings || [];
-  renderProviderRealtimeChart(bookings, data.reviews || []);
+  renderProviderRealtimeChart(bookings);
   renderProviderDashboardLists(data.bookings || [], bookings, data.availability || []);
 }
 
-function renderProviderRealtimeChart(bookings, reviews) {
+function renderProviderRealtimeChart(bookings) {
   const chart = document.querySelector('.sn-provider-chart');
   if (!chart) return;
 
   const days = lastSevenLiveDays();
   const completedByDay = Object.fromEntries(days.map((day) => [day.key, 0]));
-  const requestByDay = Object.fromEntries(days.map((day) => [day.key, 0]));
-  const earningsByDay = Object.fromEntries(days.map((day) => [day.key, 0]));
 
   (bookings || []).forEach((booking) => {
-    const requestKey = bookingDayStamp(booking.created_at || booking.scheduled_date);
-    if (requestByDay[requestKey] !== undefined) requestByDay[requestKey] += 1;
     if (String(booking.status || '').toLowerCase() === 'completed') {
       const completedKey = bookingDayStamp(booking.updated_at || booking.scheduled_date || booking.created_at);
       if (completedByDay[completedKey] !== undefined) {
         completedByDay[completedKey] += 1;
-        earningsByDay[completedKey] += Number(booking.amount || 0);
       }
     }
   });
 
   const maxCount = Math.max(
     1,
-    ...days.map((day) => requestByDay[day.key]),
     ...days.map((day) => completedByDay[day.key]),
   );
-  const reviewCount = (reviews || []).length;
-  const weekEarnings = days.reduce((sum, day) => sum + earningsByDay[day.key], 0);
-  const weekJobs = days.reduce((sum, day) => sum + completedByDay[day.key], 0);
 
   chart.innerHTML = `
     <div class="sn-provider-chart-head">
       <div>
-        <h3>Live activity · last 7 days</h3>
-        <p>Built from your actual bookings, completed jobs, and reviews. Updates every 3 seconds.</p>
+        <h3>Activity History</h3>
+        <p>Completed jobs in the last 7 days.</p>
       </div>
       <span class="sn-live-pill">Live ${liveClockLabel()}</span>
     </div>
     <div class="sn-provider-chart-bars">
       ${days.map((day) => {
         const completed = completedByDay[day.key];
-        const requests = requestByDay[day.key];
         const jobHeight = completed ? Math.max(10, Math.round((completed / maxCount) * 150)) : 0;
-        const requestHeight = requests ? Math.max(10, Math.round((requests / maxCount) * 150)) : 0;
         return `
-          <div class="sn-provider-chart-day" data-day="${day.label}" title="${day.label}: ${completed} completed, ${requests} requests, ${money(earningsByDay[day.key])}">
+          <div class="sn-provider-chart-day" data-day="${day.label}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
             <div class="sn-bar jobs ${completed ? 'is-filled' : ''}" style="height:${jobHeight}px"></div>
-            <div class="sn-bar rating ${requests ? 'is-filled' : ''}" style="height:${requestHeight}px"></div>
           </div>
         `;
       }).join('')}
     </div>
     <div class="sn-provider-chart-legend">
-      <span><i class="jobs"></i>Completed jobs</span>
-      <span><i class="rating"></i>Incoming requests</span>
-      <strong>${weekJobs} jobs · ${money(weekEarnings)} · ${reviewCount} review${reviewCount === 1 ? '' : 's'}</strong>
+      <span><i class="jobs"></i>Completed Jobs</span>
     </div>
   `;
 }

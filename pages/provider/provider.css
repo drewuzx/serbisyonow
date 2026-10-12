@@ -68,7 +68,7 @@ body {
 
 .sn-shell--provider .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -1615,7 +1615,8 @@ body {
 .sn-provider-chart-day {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   align-items: end;
   gap: 8px;
   min-width: 0;
@@ -1641,8 +1642,7 @@ body {
   min-height: 8px;
 }
 
-.sn-bar.jobs { background: var(--blue-main); }
-.sn-bar.rating { background: #8fc7ff; }
+.sn-bar.jobs { width: min(100%, 40px); background: var(--blue-main); }
 
 .sn-provider-chart-legend {
   display: flex;
@@ -1669,8 +1669,6 @@ body {
 }
 
 .sn-provider-chart-legend i.jobs { background: var(--blue-main); }
-.sn-provider-chart-legend i.rating { background: #8fc7ff; }
-.sn-provider-chart-legend strong { color: var(--blue-dark); }
 
 .sn-mini-heading {
   margin-top: 18px;
