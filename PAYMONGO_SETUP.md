@@ -1,8 +1,10 @@
 # PayMongo Booking Downpayments
 
+This guide applies to existing PayMongo bookings. New bookings now use [direct provider QR payments](PROVIDER_QR_PAYMENTS.md); do not remove the gateway configuration while existing checkouts still need settlement notifications or review.
+
 ## Booking Flow
 
-New requests stay Pending until the provider confirms the full service price, the customer agrees to that price, and PayMongo verifies the 30% downpayment. Only the signed `checkout_session.payment.paid` webhook changes the schedule to Upcoming. Redirects and checkout creation do not prove payment.
+Requests using the PayMongo channel stay Pending until the provider confirms the full service price, the customer agrees to that price, and PayMongo verifies the 30% downpayment. Only the signed `checkout_session.payment.paid` webhook changes those schedules to Upcoming. Redirects and checkout creation do not prove payment.
 
 The server rounds the downpayment to the nearest centavo and subtracts it from the confirmed total to calculate the remaining balance. PHP 333.35 gives PHP 100.01 downpayment and PHP 233.34 remaining. Existing bookings retain their original payment agreement and are not charged retroactively.
 

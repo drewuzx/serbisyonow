@@ -90,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_account
 
 CREATE TABLE IF NOT EXISTS uploaded_files (
   id SERIAL PRIMARY KEY,
-  folder TEXT NOT NULL CHECK (folder IN ('customer-ids', 'provider-docs')),
+  folder TEXT NOT NULL CHECK (folder IN ('customer-ids', 'provider-docs', 'booking-media', 'provider-payment-qrs')),
   filename TEXT NOT NULL,
   original_name TEXT NOT NULL DEFAULT '',
   mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',

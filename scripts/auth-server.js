@@ -20,6 +20,7 @@ const { issueSession, authenticateAccount, requestSessionToken, rememberSession,
 const { createPayMongo } = require('./paymongo');
 const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheckout, settleBookingPayment, expireCancelledCheckout, cancelBookingPayment, fail: paymentFail } = require('./booking-payments');
 const paymongo = createPayMongo();
+const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 
 const app = express();
 app.set('trust proxy', true);
@@ -77,7 +78,18 @@ const bookingUpload = multer({
   },
 });
 
-const UPLOAD_FOLDERS = new Set(['customer-ids', 'provider-docs', 'booking-media']);
+const paymentImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 6 },
+  fileFilter(_req, file, cb) {
+    if (['image/png', 'image/jpeg', 'image/webp'].includes(file.mimetype)) return cb(null, true);
+    const error = new Error('Upload a PNG, JPG or WebP image only.');
+    error.statusCode = 400;
+    cb(error);
+  },
+});
+
+const UPLOAD_FOLDERS = new Set(['customer-ids', 'provider-docs', 'booking-media', 'provider-payment-qrs']);
 
 const FIELD_LABELS = {
   provider_id: 'Service provider',
@@ -119,6 +131,19 @@ app.post('/api/payments/paymongo/webhook', express.raw({ type: 'application/json
   res.json(await settleBookingPayment(db, event));
 }));
 app.use(express.json());
+
+app.get('/api/payment-receipts/:receiptId/image', asyncRoute(async (req, res) => {
+  const role = req.query.role;
+  if (!['customer', 'provider'].includes(role)) paymentFail(400, 'Choose a valid account role.');
+  const actor = await authenticateAccount(db, req, role);
+  const ownerColumn = role === 'customer' ? 'b.customer_id' : 'b.provider_id';
+  const { rows: [receipt] } = await db.query(`SELECT r.mime_type, r.content FROM provider_direct_payment_receipts r
+    JOIN customer_bookings b ON b.id = r.booking_id WHERE r.id = $1 AND ${ownerColumn} = $2`, [req.params.receiptId, actor.id]);
+  if (!receipt) paymentFail(404, 'Payment receipt not found.');
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.type(receipt.mime_type).send(receipt.content);
+}));
 app.use('/uploads', express.static(uploadDir));
 
 app.get('/uploads/:folder/:filename', asyncRoute(async (req, res) => {
@@ -2524,7 +2549,36 @@ app.get('/api/customer/:id/bookings/:bookingId/payment', asyncRoute(async (req, 
   await authenticateAccount(db, req, 'customer', req.params.id);
   const { rows: [booking] } = await db.query('SELECT * FROM customer_bookings WHERE customer_id = $1 AND id = $2', [req.params.id, req.params.bookingId]);
   if (!booking) paymentFail(404, 'Booking not found.');
-  res.json({ booking: customerBookingRow(booking), checkout_configured: paymongo.ready, livemode: paymongo.livemode });
+  res.set('Cache-Control', 'no-store');
+  res.json({ booking: customerBookingRow(booking), checkout_configured: paymongo.ready, livemode: paymongo.livemode,
+    ...(booking.deposit_channel === 'provider_qr' ? await directPaymentDetails(db, booking) : {}) });
+}));
+
+app.post('/api/customer/:id/bookings/:bookingId/direct-payment', asyncRoute(async (req, res) => {
+  await verifiedPaymentAccount(req, 'customer', req.params.id);
+  const booking = await prepareDirectPayment(db, req.params.id, req.params.bookingId, req.body);
+  res.json({ booking: customerBookingRow(booking), ...await directPaymentDetails(db, booking) });
+}));
+
+app.post('/api/customer/:id/bookings/:bookingId/direct-payment/receipt',
+  asyncRoute(async (req, _res, next) => { await verifiedPaymentAccount(req, 'customer', req.params.id); next(); }),
+  paymentImageUpload.single('receipt'), asyncRoute(async (req, res) => {
+    const booking = await submitDirectReceipt(db, req.params.id, req.params.bookingId, req.body, req.file);
+    res.status(201).json({ booking: customerBookingRow(booking), ...await directPaymentDetails(db, booking) });
+  }));
+
+app.get('/api/provider/:providerId/bookings/:bookingId/direct-payment', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.providerId);
+  const { rows: [booking] } = await db.query('SELECT * FROM customer_bookings WHERE provider_id = $1 AND id = $2', [req.params.providerId, req.params.bookingId]);
+  if (!booking || booking.deposit_channel !== 'provider_qr') paymentFail(404, 'Direct payment not found.');
+  res.set('Cache-Control', 'no-store');
+  res.json({ booking: providerBookingRow(booking), ...await directPaymentDetails(db, booking) });
+}));
+
+app.patch('/api/provider/:providerId/bookings/:bookingId/direct-payment', asyncRoute(async (req, res) => {
+  await verifiedPaymentAccount(req, 'provider', req.params.providerId);
+  const booking = await reviewDirectReceipt(db, req.params.providerId, req.params.bookingId, req.body);
+  res.json({ booking: providerBookingRow(booking) });
 }));
 
 app.patch('/api/provider/:providerId/bookings/:bookingId/price', asyncRoute(async (req, res) => {
@@ -2862,6 +2916,21 @@ app.get('/api/auth/provider/status/:id', asyncRoute(async (req, res) => {
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
   res.json({ user: providerRow(result.rows[0]) });
 }));
+
+app.get('/api/provider/:id/payment-qr', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
+  const { rows: [provider] } = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
+  if (!provider) paymentFail(404, 'Provider not found.');
+  res.set('Cache-Control', 'no-store');
+  res.json({ payment_qr: qrView(provider) });
+}));
+
+app.put('/api/provider/:id/payment-qr',
+  asyncRoute(async (req, _res, next) => { await authenticateAccount(db, req, 'provider', req.params.id); next(); }),
+  paymentImageUpload.single('qr'), asyncRoute(async (req, res) => {
+    const provider = await saveProviderQr(db, req.params.id, req.body, req.file);
+    res.json({ payment_qr: qrView(provider) });
+  }));
 
 app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   requireFields(req.body, ['full_name', 'contact', 'address', 'category', 'service']);
@@ -3975,6 +4044,9 @@ app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
 }));
 
 app.use((error, _req, res, _next) => {
+  if (error instanceof multer.MulterError && /\/(payment-qr|direct-payment\/receipt)$/.test(_req.path)) {
+    return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Payment images must be 5 MB or smaller.' : 'Upload one payment image only.' });
+  }
   if (error instanceof multer.MulterError && /^\/api\/customer\/[^/]+\/bookings$/.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each uploaded file must be 10 MB or smaller.' : 'Upload up to 3 photos/videos for a booking.' });
   }

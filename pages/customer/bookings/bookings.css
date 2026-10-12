@@ -68,6 +68,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  align-items: start;
 }
 
 .sn-booking-create-grid label {
@@ -76,6 +77,9 @@
   color: var(--blue-dark);
   font-size: var(--text-sm);
   font-weight: 800;
+  min-width: 0;
+  align-content: start;
+  line-height: 1.45;
 }
 
 .sn-booking-payment-note {
@@ -673,9 +677,9 @@
 
 .sn-customer-booking-card {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) 190px;
   gap: 16px;
-  align-items: center;
+  align-items: start;
   background: var(--white);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
@@ -685,9 +689,21 @@
 
 .sn-customer-booking-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
+  min-width: 0;
 }
+
+.sn-customer-booking-main > div:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sn-customer-booking-main .sn-booking-provider-name,
+.sn-customer-booking-main .sn-booking-service-type { margin: 0; line-height: 1.45; }
 
 .sn-customer-booking-icon {
   width: 56px;
@@ -706,6 +722,8 @@
   gap: 5px;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  min-width: 0;
+  line-height: 1.5;
 }
 
 .sn-customer-booking-amount {
@@ -713,7 +731,11 @@
   gap: 8px;
   justify-items: end;
   text-align: right;
+  width: 100%;
+  min-width: 0;
 }
+
+.sn-customer-booking-amount > .sn-btn { width: 100%; }
 
 .sn-customer-booking-amount strong {
   color: var(--blue-dark);
@@ -888,6 +910,17 @@
   }
   .sn-customer-booking-amount,
   .sn-booking-amount { align-items: flex-start; }
+  .sn-customer-booking-amount {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-items: stretch;
+    align-items: center;
+    text-align: left;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .sn-customer-booking-amount > strong { grid-column: 1; }
+  .sn-customer-booking-amount > .sn-booking-status-wrap { grid-column: 2 / -1; margin: 0; }
 }
 @media (max-width: 600px) {
   .sn-booking-create-grid,
@@ -919,9 +952,11 @@
     grid-template-columns: 1fr;
   }
   .sn-customer-booking-amount {
+    grid-template-columns: minmax(0, 1fr);
     justify-items: stretch;
     text-align: left;
   }
+  .sn-customer-booking-amount > .sn-booking-status-wrap { grid-column: 1; }
   .sn-booking-status-wrap {
     justify-items: start;
   }

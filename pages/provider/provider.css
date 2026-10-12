@@ -102,7 +102,7 @@ body {
 
 .sn-shell--provider .stat-info .value {
   font-family: var(--font-heading);
-  font-size: clamp(1.3rem, 2vw, 1.8rem);
+  font-size: 1.75rem;
   font-weight: 900;
   line-height: 1.05;
   color: var(--blue-dark);
@@ -170,7 +170,7 @@ body {
   margin-top: 8px;
   color: var(--orange);
   font-family: var(--font-heading);
-  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  font-size: 1.5rem;
   font-weight: 900;
   line-height: 1.1;
   overflow-wrap: anywhere;
@@ -1603,10 +1603,11 @@ body {
 
 .sn-provider-chart-bars {
   min-height: 220px;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: end;
-  gap: 24px;
-  padding: 16px 18px 28px;
+  gap: 12px;
+  padding: 16px 8px 28px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 44px;
 }
@@ -1614,10 +1615,10 @@ body {
 .sn-provider-chart-day {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
   gap: 8px;
-  min-width: 48px;
+  min-width: 0;
   position: relative;
 }
 
@@ -1730,6 +1731,10 @@ body {
 }
 
 .sn-provider-service-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px 16px;
   background: var(--bg-input);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-md);
@@ -1738,8 +1743,25 @@ body {
 }
 
 .sn-provider-service-card h3 {
+  grid-row: 1;
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
   color: var(--blue-dark);
 }
+
+.sn-provider-service-card > .sn-actions-row {
+  grid-row: 1;
+  grid-column: 2;
+  margin-top: 0;
+  justify-content: flex-end;
+}
+
+.sn-provider-service-card > :is(p, strong, .sn-provider-payment-row) { grid-column: 1 / -1; }
 
 .sn-provider-payment-row {
   display: flex;
@@ -1753,6 +1775,8 @@ body {
   font-weight: 700;
   font-size: 0.82rem;
 }
+
+.sn-provider-payment-row label { display: inline-flex; align-items: center; gap: 6px; line-height: 1.45; }
 
 .sn-provider-toggle {
   width: 48px;
@@ -1809,6 +1833,8 @@ body {
 .sn-form-field {
   display: grid;
   gap: 6px;
+  min-width: 0;
+  align-content: start;
 }
 
 .sn-form-field label {
@@ -1877,6 +1903,7 @@ body {
 
 .sn-actions-row {
   display: flex;
+  align-items: stretch;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 14px;
@@ -2203,6 +2230,8 @@ textarea.sn-modal-input {
 
 .sn-modal-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
@@ -2262,6 +2291,15 @@ textarea.sn-modal-input {
   .sn-shell--provider .stat-card {
     min-height: auto;
   }
+
+  .sn-provider-chart-bars { gap: 8px; padding-inline: 0; }
+  .sn-provider-chart-day { gap: 3px; }
+  .sn-provider-chart-day::after { font-size: 0.7rem; }
+  .sn-provider-chart-head,
+  .sn-earnings-head { flex-wrap: wrap; }
+
+  .sn-provider-service-card { grid-template-columns: minmax(0, 1fr); }
+  .sn-provider-service-card > .sn-actions-row { grid-row: 2; grid-column: 1; }
 
   .sn-booking-request-card {
     flex-direction: column;

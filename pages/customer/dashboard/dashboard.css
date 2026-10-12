@@ -268,7 +268,7 @@ body {
 /* ── Service Categories — matches landing .service-cat-card ── */
 .sn-categories {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-4);
 }
 .sn-cat {
@@ -282,7 +282,10 @@ body {
   color: var(--text-secondary); font-family: var(--font-body);
   transition: all var(--transition-base);
   position: relative;
+  min-width: 0;
+  line-height: 1.45;
 }
+.sn-cat > span:last-child { min-height: 3em; display: flex; align-items: flex-start; justify-content: center; }
 .sn-cat:hover {
   border-color: var(--blue-main);
   box-shadow: var(--shadow-md);
@@ -340,10 +343,13 @@ body {
 /* ── Provider Cards ── */
 .sn-providers-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 .sn-provider-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   background: var(--white);
   border: 2px solid var(--border);
   border-radius: var(--radius-lg);
@@ -379,6 +385,7 @@ body {
 }
 .sn-provider-img {
   width: 100%; height: 156px;
+  flex: 0 0 156px;
 }
 .sn-provider-img--1 { background: linear-gradient(135deg, #93c5fd, #2563eb); }
 .sn-provider-img--2 { background: linear-gradient(135deg, #f9a8d4, #db2777); }
@@ -387,7 +394,7 @@ body {
 .sn-provider-img--5 { background: linear-gradient(135deg, #a5b4fc, #7c3aed); }
 .sn-provider-img--6 { background: linear-gradient(135deg, #fdba74, #ea580c); }
 
-.sn-provider-info { padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.sn-provider-info { padding: 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
 .sn-provider-name-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
 .sn-provider-title { font-family: var(--font-heading); font-weight: 800; font-size: var(--text-sm); color: var(--blue-dark); line-height: 1.3; }
 .sn-rating {
@@ -410,7 +417,7 @@ body {
   font-weight: 700;
   line-height: 1.35;
 }
-.sn-provider-meta   { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.sn-provider-meta   { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 4px; }
 .sn-provider-tag {
   font-size: var(--text-xs); font-weight: 700; color: var(--blue-main);
   background: var(--blue-pale); padding: 4px 10px; border-radius: var(--radius-full);
@@ -421,7 +428,8 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 10px;
+  margin-top: auto;
+  padding-top: 12px;
 }
 .sn-provider-action {
   display: inline-flex;

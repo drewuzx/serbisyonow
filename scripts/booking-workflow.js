@@ -28,7 +28,9 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
   if (!booking) fail(404, 'Booking not found.');
   if (booking.deposit_required && (actor?.role !== 'provider' || String(actor.id) !== String(providerId))) fail(401, 'Please log in again before managing this booking.');
   if (booking.deposit_required && ['upcoming', 'ongoing', 'completed'].includes(status)) {
-   const paid = await client.query("SELECT payment_id FROM booking_payment_receipts r JOIN booking_payments p ON p.id = r.checkout_id WHERE p.booking_id = $1 AND r.disposition = 'credited'", [bookingId]);
+   const paid = booking.deposit_channel === 'provider_qr'
+    ? await client.query("SELECT id FROM provider_direct_payment_receipts WHERE booking_id = $1 AND id = $2 AND status = 'verified'", [bookingId, booking.deposit_receipt_id])
+    : await client.query("SELECT payment_id FROM booking_payment_receipts r JOIN booking_payments p ON p.id = r.checkout_id WHERE p.booking_id = $1 AND r.disposition = 'credited'", [bookingId]);
    if (booking.deposit_status !== 'paid' || !paid.rowCount) fail(409, 'The 30% downpayment must be verified before confirming or starting the service.');
   }
   if (booking.provider_closed) fail(409, 'This booking has already been moved to history.');
@@ -55,7 +57,7 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
    WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time = $3
   `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
   await client.query('COMMIT');
-  if (status === 'cancelled' && booking.deposit_required) result.rows[0].deposit_status = booking.deposit_paid_at ? 'refund_review' : 'cancelled';
+  if (status === 'cancelled' && booking.deposit_required) result.rows[0].deposit_status = booking.deposit_paid_at || (booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id) ? 'refund_review' : 'cancelled';
   return result.rows[0];
  } catch (error) {
   await client.query('ROLLBACK');

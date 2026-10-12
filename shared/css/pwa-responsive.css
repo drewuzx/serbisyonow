@@ -955,3 +955,161 @@ button {
     max-height: 52dvh;
   }
 }
+
+/* Shared account controls override page-specific padding without changing actions. */
+:is(.sn-shell, .sn-modal-card, .sn-modal) :is(.btn, .sn-btn, .sn-provider-action, .sn-filter-action) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is(.sn-shell, .sn-modal-card, .sn-modal) :is(.btn-sm, .sn-btn-sm) {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: var(--text-xs);
+}
+
+.sn-shell :is(.sn-filter-tab, .sn-chip, .sn-edit-toggle-btn),
+.sn-shell .sn-request-filters button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 40px;
+  max-width: 100%;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sn-shell .sn-filter-tab:has(> strong) { flex-direction: column; }
+
+.sn-shell :is(h1, h2, h3, h4, p, span, label, strong, small) {
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.sn-shell :is(.sn-page-header, .sn-section-head, .sn-card-head, .sn-booking-create-head, .sn-requests-heading, .sn-profile-name-row) {
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.sn-shell :is(.sn-page-header, .sn-section-head, .sn-card-head, .sn-booking-create-head, .sn-requests-heading) > :first-child {
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.sn-shell :is(.sn-provider-title, .sn-result-name, .sn-info-value, .sn-dr-value, .sn-booking-detail-item strong) { min-width: 0; }
+
+.sn-shell :is(.sn-form-actions, .sn-actions-row, .sn-booking-nav-actions, .sn-universal-filter-actions, .sn-filter-panel-actions) {
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sn-shell :is(.sn-result-actions, .sn-fav-actions) { min-width: 140px; align-items: stretch; }
+
+.sn-shell .sn-provider-info-card .sn-btn,
+.sn-shell .sn-cust-actions .sn-btn { width: 100%; }
+
+.sn-shell .sn-booking-nav-actions > .btn { flex: 1 1 130px; }
+
+.sn-shell .sn-actions-row > .btn { flex: 0 1 auto; }
+
+.sn-provider-requests-page .sn-booking-request-side > .sn-actions-row {
+  margin-top: 0;
+  margin-left: auto;
+  display: flex;
+  width: auto;
+}
+
+.sn-provider-requests-page .sn-booking-request-side > .sn-actions-row > .btn { flex: 1 1 110px; }
+
+.sn-modal-head > h2,
+.sn-modal-title { min-width: 0; overflow-wrap: anywhere; }
+
+.sn-modal-close,
+.sn-modal-x { flex: 0 0 auto; display: grid; place-items: center; }
+
+.sn-modal-actions { flex-wrap: wrap; align-items: stretch; }
+.sn-modal-actions > :is(.btn, .sn-btn) { flex: 1 1 140px; }
+
+.sn-payment-qr-image {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #fff;
+  margin: 12px auto;
+}
+
+.sn-payment-receipt-image {
+  display: block;
+  width: 100%;
+  max-height: 380px;
+  object-fit: contain;
+  margin: 12px 0;
+}
+
+.sn-payment-receipt-image[hidden] { display: none; }
+.sn-direct-recipient,
+.sn-direct-receipt { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.sn-direct-recipient h4,
+.sn-direct-receipt h4 { margin: 0 0 8px; font-size: 1rem; }
+.sn-direct-recipient p,
+.sn-direct-receipt p { margin: 8px 0; overflow-wrap: anywhere; }
+.sn-direct-recipient > .btn { width: 100%; }
+.sn-direct-receipt-form { display: grid; gap: 14px; margin-top: 16px; }
+.sn-direct-receipt-form > label { display: grid; gap: 6px; font-weight: 600; min-width: 0; }
+.sn-direct-receipt-form input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.sn-direct-receipt-form > button { width: 100%; }
+.sn-provider-payment-settings { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 28px; }
+.sn-provider-payment-settings .sn-payment-consent,
+.sn-direct-review-form .sn-payment-consent { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; line-height: 1.5; }
+.sn-payment-consent > input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; margin: 3px 0 0; }
+.sn-direct-payment-breakdown { display: grid; gap: 10px; }
+.sn-direct-payment-breakdown > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; }
+.sn-direct-payment-breakdown dd { margin: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+body.sn-payment-dialog-open { overflow: hidden; }
+.sn-direct-review-dialog { z-index: 10050; }
+.sn-direct-review-dialog .sn-modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.sn-direct-review-dialog :is(p, span) { overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+  .sn-shell :is(.sn-result-actions, .sn-fav-actions) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sn-shell .sn-result-top { flex-wrap: wrap; }
+  .sn-shell .sn-result-price-wrap { align-items: flex-start; }
+  .sn-shell .sn-actions-row { display: flex; }
+  .sn-shell .sn-actions-row > .btn { flex: 1 1 150px; }
+  .sn-provider-requests-page .sn-booking-request-side > .sn-actions-row { width: 100%; margin-left: 0; }
+}
+
+@media (max-width: 560px) {
+  body > .sn-topbar .sn-topbar-actions .btn { min-height: 36px; }
+  .sn-shell .sn-form-actions > .sn-btn { flex: 1 1 120px; }
+  .sn-shell .sn-detail-right-col { grid-template-columns: minmax(0, 1fr); }
+}

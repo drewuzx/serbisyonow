@@ -867,14 +867,15 @@ async function showBookingPayment(bookingId, returnState = '') {
  let timer;
  let polls = 0;
  let loadVersion = 0;
+ let releaseReceiptImage = () => {};
  const message = modal.querySelector('[role="status"]');
  const pay = modal.querySelector('[data-payment-pay]');
  const refresh = modal.querySelector('[data-payment-refresh]');
- const close = () => { if (busy) return; clearTimeout(timer); document.removeEventListener('keydown', onKey); closeBookingModal(modal); previousFocus?.focus(); };
+ const close = () => { if (busy) return; clearTimeout(timer); releaseReceiptImage(); document.removeEventListener('keydown', onKey); closeBookingModal(modal); previousFocus?.focus(); };
  const onKey = event => {
   if (event.key === 'Escape') close();
   if (event.key === 'Tab') {
-   const controls = [...modal.querySelectorAll('button:not(:disabled):not([hidden]), input')];
+   const controls = [...modal.querySelectorAll('button:not(:disabled):not([hidden]), input, a[href]')];
    if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus(); }
    else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus(); }
   }
@@ -890,24 +891,53 @@ async function showBookingPayment(bookingId, returnState = '') {
    const data = await bookingFetch(`/api/customer/${customer.id}/bookings/${encodeURIComponent(bookingId)}/payment`);
    if (!modal.isConnected || version !== loadVersion) return;
    booking = data.booking;
+   const direct = booking.deposit_channel === 'provider_qr';
    const awaiting = booking.status === 'pending' && booking.deposit_status === 'awaiting_payment';
    const paid = booking.deposit_status === 'paid';
+   const qrUrl = direct && data.recipient && window.snDirectPayments?.qrUrl(BOOKING_API_BASE, data.recipient.qr_url);
+   releaseReceiptImage();
    modal.querySelector('.sn-downpayment-content').innerHTML = `<p><strong>${bookingEsc(booking.service)}</strong></p>
     ${booking.confirmed_price != null ? `<dl class="sn-downpayment-breakdown"><div><dt>Confirmed service total</dt><dd>${bookingMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment due now</dt><dd>${bookingMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${bookingMoney(booking.balance_due)}</dd></div></dl>` : '<p>Waiting for the provider to confirm the service price.</p>'}
     ${booking.price_notes ? `<p>${bookingEsc(booking.price_notes)}</p>` : ''}
-    ${awaiting ? '<label class="sn-payment-consent"><input type="checkbox" data-payment-consent /> <span>I agree to this service price and the 30% downpayment. The remaining balance is due after service. Canceled payments require refund review.</span></label>' : ''}`;
-   pay.hidden = !awaiting;
+    ${direct && qrUrl ? `<section class="sn-direct-recipient"><h4>Pay ${bookingEsc(data.recipient.wallet)} directly</h4><p><strong>${bookingEsc(data.recipient.account_name)}</strong><br>${bookingEsc(data.recipient.account_number)}</p>${awaiting ? `<img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider payment QR" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">Open QR</a><p>Send exactly <strong>${bookingMoney(booking.deposit_amount)}</strong>. Check the recipient name in your payment app before confirming.</p>` : ''}</section>` : ''}
+    ${direct && data.receipt ? `<section class="sn-direct-receipt"><h4>Submitted payment</h4><p>Reference: <strong>${bookingEsc(data.receipt.reference_number)}</strong></p><p>${bookingEsc(data.receipt.status.replace(/_/g, ' '))}${data.receipt.review_note ? ': ' + bookingEsc(data.receipt.review_note) : ''}</p><img class="sn-payment-receipt-image" data-payment-receipt-image alt="Your submitted receipt" hidden /><p data-receipt-error role="alert" hidden></p></section>` : ''}
+    ${awaiting && (!direct || !booking.customer_agreed_at) ? '<label class="sn-payment-consent"><input type="checkbox" data-payment-consent /> <span>I agree to this service price and the 30% downpayment. The remaining balance is due after service. Canceled payments require refund review.</span></label>' : ''}
+    ${direct && awaiting && qrUrl ? `<form class="sn-direct-receipt-form"><label>Transaction reference<input name="reference_number" minlength="4" maxlength="120" required autocomplete="off" /></label><label>Payment receipt<input name="receipt" type="file" accept="image/png,image/jpeg,image/webp" required /></label><button class="btn btn-primary" type="submit">Submit Payment Receipt</button></form>` : ''}`;
+   if (direct && data.receipt) releaseReceiptImage = window.snDirectPayments.loadReceiptImage(modal, BOOKING_API_BASE, 'customer', customer.auth_token, data.receipt.id);
+   pay.textContent = direct ? 'Show Provider QR' : 'Pay 30%';
+   pay.hidden = !awaiting || (direct && Boolean(booking.customer_agreed_at));
    pay.disabled = true;
-   modal.querySelector('[data-payment-consent]')?.addEventListener('change', event => { pay.disabled = !event.target.checked || !data.checkout_configured; });
+   modal.querySelector('[data-payment-consent]')?.addEventListener('change', event => { pay.disabled = !event.target.checked || (!direct && !data.checkout_configured); });
+   modal.querySelector('.sn-direct-receipt-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (busy || !form.reportValidity()) return;
+    const file = form.elements.receipt.files[0];
+    if (file.size > 5 * 1024 * 1024) { message.textContent = 'Receipt must be 5 MB or smaller.'; return; }
+    const body = new FormData(form);
+    body.append('price_version', booking.price_version);
+    busy = true;
+    form.querySelector('button').disabled = refresh.disabled = true;
+    try {
+     await bookingFetch(`/api/customer/${customer.id}/bookings/${booking.id}/direct-payment/receipt`, { method: 'POST', body });
+     busy = false;
+     await load();
+    } catch (error) { message.textContent = error.message; }
+    finally { busy = false; if (form.isConnected) form.querySelector('button').disabled = false; refresh.disabled = false; }
+   });
    message.textContent = paid
     ? (booking.deposit_livemode === false ? 'Test downpayment verified. The test booking schedule is confirmed; no real funds received.' : 'Downpayment verified. Your booking schedule is confirmed.')
-    : booking.deposit_status === 'refund_review' ? 'Payment received, but this booking is not confirmed. Contact support for refund review.'
+    : booking.deposit_status === 'refund_review' ? (direct ? 'Booking cancelled. Contact the provider to check the transfer and arrange any refund. Refunds are not automatic.' : 'Payment received, but this booking is not confirmed. Contact support for refund review.')
     : booking.status === 'cancelled' ? 'This booking is cancelled. No new payment is allowed.'
+    : direct ? (booking.deposit_status === 'awaiting_verification' ? 'Receipt submitted. The provider must check their wallet before your schedule is confirmed.'
+      : data.receipt?.status === 'rejected' ? 'Payment was not verified. Review the provider note and contact them before paying again.'
+      : !awaiting ? 'Waiting for the provider to confirm the service price.'
+      : qrUrl ? 'Payment goes directly to your provider. Submit the receipt after paying; do not pay twice.' : 'Review the price to view your provider\'s payment QR.')
     : !data.checkout_configured ? 'E-wallet checkout is not configured yet. Please contact support.'
     : returnState === 'success' ? 'Waiting for PayMongo payment verification. Your schedule is not confirmed yet.'
     : returnState === 'cancelled' ? 'Checkout was closed. The booking remains pending until a payment is verified.'
     : data.livemode === false ? 'PayMongo test checkout. Do not use real payment details.' : 'Pay securely with an e-wallet through PayMongo.';
-   if (paid && (window.snCustomerBookings || []).some(item => String(item.id) === String(bookingId) && item.status === 'pending')) {
+   if ((window.snCustomerBookings || []).some(item => String(item.id) === String(bookingId) && (item.status !== booking.status || item.deposit_status !== booking.deposit_status))) {
     const index = window.snCustomerBookings.findIndex(item => String(item.id) === String(bookingId));
     window.snCustomerBookings[index] = { ...window.snCustomerBookings[index], ...booking };
     const list = document.getElementById('sn-bookings');
@@ -915,6 +945,7 @@ async function showBookingPayment(bookingId, returnState = '') {
     document.dispatchEvent(new CustomEvent('sn:customer-bookings-rendered'));
    }
    if (returnState === 'success' && awaiting && polls++ < 5) timer = setTimeout(load, 3000);
+   if (direct && booking.deposit_status === 'awaiting_verification' && polls++ < 20) timer = setTimeout(load, 15000);
   } catch (error) { if (version === loadVersion) message.textContent = error.message; }
   finally { if (version === loadVersion) refresh.disabled = false; }
  };
@@ -924,7 +955,9 @@ async function showBookingPayment(bookingId, returnState = '') {
   busy = true;
   pay.disabled = refresh.disabled = true;
   try {
-   const data = await bookingFetch(`/api/customer/${customer.id}/bookings/${booking.id}/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accept_price: true, price_version: booking.price_version }) });
+   const direct = booking.deposit_channel === 'provider_qr';
+   const data = await bookingFetch(`/api/customer/${customer.id}/bookings/${booking.id}/${direct ? 'direct-payment' : 'checkout'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accept_price: true, price_version: booking.price_version }) });
+   if (direct) { busy = false; await load(); return; }
    const url = new URL(data.checkout_url);
    if (url.protocol !== 'https:' || url.hostname !== 'checkout.paymongo.com' || url.port || url.username || url.password) throw new Error('Invalid checkout address. Contact support.');
    window.location.assign(url.href);
@@ -1135,7 +1168,7 @@ async function renderBookingRequestForm(customer) {
    <label><span>Date</span><input id="sn-booking-date" name="scheduled_date" type="date" value="${todayInputValue()}" required /></label>
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
   <label><span>Remaining Balance Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">Remaining 70% is paid directly to the provider after service.</small></label>
-   <p class="sn-booking-downpayment-terms full">A 30% downpayment through PayMongo e-wallet checkout is required after the provider confirms the service price. Your schedule is confirmed only after payment is verified. The remaining 70% is due after service.</p>
+   <p class="sn-booking-downpayment-terms full">A 30% downpayment is paid directly using the provider's payment QR after the price is confirmed. Submit your payment receipt; your schedule is confirmed only after the provider verifies the transfer. The remaining 70% is due after service.</p>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>

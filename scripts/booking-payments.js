@@ -16,6 +16,7 @@ function bookingPaymentView(row) {
   deposit_percentage: 30, confirmed_price: amount('confirmed_price'), deposit_amount: amount('deposit_amount'), balance_due: amount('balance_due'),
   price_version: Number(row.price_version || 0), price_notes: row.price_notes || '', price_confirmed_at: row.price_confirmed_at || null,
   customer_agreed_at: row.customer_agreed_at || null, deposit_paid_at: row.deposit_paid_at || null, deposit_livemode: row.deposit_livemode ?? null,
+  deposit_channel: row.deposit_channel || 'paymongo', deposit_receipt_id: row.deposit_receipt_id || null,
  };
 }
 async function transaction(db, work) {
@@ -34,6 +35,10 @@ async function confirmBookingPrice(db, providerId, bookingId, body) {
   if (!booking.deposit_required || booking.status !== 'pending' || booking.provider_closed) fail(409, 'This booking cannot receive a new downpayment price.');
   if (booking.customer_agreed_at || booking.deposit_status === 'paid') fail(409, 'The customer has already started payment. The agreed price is locked.');
   if (Number(body.price_version) !== Number(booking.price_version)) fail(409, 'The price has changed. Refresh this booking first.');
+  if (booking.deposit_channel === 'provider_qr') {
+   const { rows: [provider] } = await client.query('SELECT payment_qr_file FROM providers WHERE id = $1 FOR SHARE', [providerId]);
+   if (!provider?.payment_qr_file) fail(409, 'Save your payment QR under Profile before requesting a downpayment.');
+  }
   const result = await client.query(`UPDATE customer_bookings SET confirmed_price = $3, amount = $3, deposit_amount = $4,
    balance_due = $5, price_notes = $6, price_version = price_version + 1, price_confirmed_at = NOW(),
    deposit_status = 'awaiting_payment', updated_at = NOW() WHERE provider_id = $1 AND id = $2 RETURNING *`,
@@ -49,6 +54,7 @@ async function createBookingCheckout(db, gateway, customerId, bookingId, body, r
   return await transaction(db, async client => {
    const { rows: [booking] } = await client.query('SELECT * FROM customer_bookings WHERE customer_id = $1 AND id = $2 FOR UPDATE', [customerId, bookingId]);
    if (!booking) fail(404, 'Booking not found.');
+   if (booking.deposit_channel === 'provider_qr') fail(409, 'This booking uses the provider payment QR, not PayMongo checkout.');
    if (!booking.deposit_required || booking.status !== 'pending' || booking.deposit_status !== 'awaiting_payment' || !booking.confirmed_price) fail(409, 'This booking is not waiting for a downpayment.');
    const dateFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore', year: 'numeric', month: '2-digit', day: '2-digit' });
    const scheduledDay = booking.scheduled_date instanceof Date ? dateFormat.format(booking.scheduled_date) : String(booking.scheduled_date || '').slice(0, 10);
@@ -126,6 +132,12 @@ async function expireCancelledCheckout(db, gateway, bookingId) {
 }
 async function cancelBookingPayment(client, booking) {
  if (!booking.deposit_required) return;
+ if (booking.deposit_channel === 'provider_qr') {
+  const needsReview = Boolean(booking.deposit_paid_at || booking.deposit_receipt_id);
+  await client.query('UPDATE customer_bookings SET deposit_status = $2, updated_at = NOW() WHERE id = $1', [booking.id, needsReview ? 'refund_review' : 'cancelled']);
+  await client.query("UPDATE provider_direct_payment_receipts SET status = 'refund_review' WHERE booking_id = $1 AND status IN ('pending', 'verified')", [booking.id]);
+  return;
+ }
  await client.query(`UPDATE customer_bookings SET deposit_status = CASE WHEN deposit_paid_at IS NOT NULL THEN 'refund_review' ELSE 'cancelled' END,
   updated_at = NOW() WHERE id = $1`, [booking.id]);
  await client.query(`UPDATE booking_payments SET status = CASE WHEN status = 'paid' THEN 'refund_review' ELSE 'expire_pending' END,

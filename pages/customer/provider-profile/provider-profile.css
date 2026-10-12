@@ -165,17 +165,19 @@ aside.sn-detail-panel {
 }
 
 .sn-actions-row a.btn {
-  padding: 14px 16px !important;
-  border-radius: 8px !important;
+  padding: 10px 16px;
+  border-radius: 8px;
   text-decoration: none;
-  display: block !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   transition: all 0.2s ease;
-  font-size: 0.98rem;
-  line-height: 1.4;
+  font-size: var(--text-sm);
+  line-height: 1.35;
   width: 100%;
   box-sizing: border-box;
-  border: 2px solid transparent !important;
+  border: 1.5px solid transparent;
 }
 
 .sn-actions-row a.btn-primary {

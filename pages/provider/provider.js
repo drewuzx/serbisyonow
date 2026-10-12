@@ -1150,12 +1150,12 @@ function renderProviderBookingAssessment(booking) {
 
 function renderProviderBookingPayment(booking) {
   if (!booking.deposit_required) return '';
-  const labels = { awaiting_price: 'Waiting for confirmed price', awaiting_payment: 'Waiting for 30% downpayment', paid: 'Downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Refund review required' };
+  const labels = { awaiting_price: 'Waiting for confirmed price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Payment receipt awaiting your review', paid: 'Downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Refund review required' };
   return `<section class="sn-booking-payment-summary"><strong>${esc(labels[booking.deposit_status] || 'Downpayment pending')}</strong>
     ${booking.confirmed_price != null ? `<dl><div><dt>Confirmed total</dt><dd>${providerMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment</dt><dd>${providerMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${providerMoney(booking.balance_due)}</dd></div></dl>` : ''}
     ${booking.price_notes ? `<p>${esc(booking.price_notes)}</p>` : ''}
     ${booking.deposit_livemode === false ? '<p>Test payment only. No real funds received.</p>' : ''}
-    ${booking.deposit_status === 'refund_review' ? '<p>Not automatically refunded. Contact support for review.</p>' : ''}</section>`;
+    ${booking.deposit_status === 'refund_review' ? `<p>${booking.deposit_channel === 'provider_qr' ? 'Check the transfer with the customer and arrange any refund directly.' : 'Not automatically refunded. Contact support for review.'}</p>` : ''}</section>`;
 }
 
 function showProviderPrice(booking) {
@@ -1249,6 +1249,7 @@ function renderRequests(bookings, provider) {
             </div>
             <div class="sn-booking-request-side" data-booking-id="${booking.id}">
               ${statusPill(booking.status, filters.find(item => item[0] === booking.status)?.[1])}
+              ${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? `<button class="btn btn-primary btn-sm" data-review-payment>${booking.deposit_status === 'awaiting_verification' ? 'Review Payment' : 'Payment Details'}</button>` : ''}
               ${booking.status === 'pending' ? `<div class="sn-actions-row">${booking.deposit_required
                 ? (!booking.customer_agreed_at && ['awaiting_price', 'awaiting_payment'].includes(booking.deposit_status) ? `<button class="btn btn-success btn-sm" data-confirm-price>${booking.confirmed_price == null ? 'Confirm Price' : 'Edit Price'}</button>` : '')
                 : '<button class="btn btn-success btn-sm" data-status="upcoming">Accept</button>'}<button class="btn btn-danger btn-sm" data-status="cancelled">Decline</button></div>` : ''}
@@ -1301,6 +1302,10 @@ function renderRequests(bookings, provider) {
   panel.querySelectorAll('[data-confirm-price]').forEach(button => button.addEventListener('click', () => {
     const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]').dataset.bookingId);
     if (booking) showProviderPrice(booking);
+  }));
+  panel.querySelectorAll('[data-review-payment]').forEach(button => button.addEventListener('click', () => {
+    const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]').dataset.bookingId);
+    if (booking) showProviderDirectPayment(booking);
   }));
   panel.querySelectorAll('[data-close-booking]').forEach((button) => {
     button.addEventListener('click', () => closeCompletedBooking(button.closest('[data-booking-id]')?.dataset.bookingId, button.closest('[data-booking-card]')));
@@ -2272,6 +2277,12 @@ function renderHistory(bookings) {
     detail.innerHTML = renderProviderHistoryDetail(booking);
   });
   search?.addEventListener('input', renderList);
+  detail?.addEventListener('click', event => {
+    const button = event.target.closest('[data-history-payment]');
+    if (!button) return;
+    const booking = normalizedBookings.find(item => String(item.id) === button.dataset.historyPayment);
+    if (booking) showProviderDirectPayment(booking);
+  });
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       tabs.forEach((item) => item.classList.remove('active'));
@@ -2345,6 +2356,8 @@ function renderProviderHistoryDetail(booking) {
           <div class="sn-dr"><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value">${esc(booking.payment_method || 'cash')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Status</span><span class="sn-dr-value">${providerHistoryStatusPill(booking.status)}</span></div>
         </div>
+        ${renderProviderBookingPayment(booking)}
+        ${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? `<div class="sn-actions-row"><button class="btn btn-outline" data-history-payment="${booking.id}">Payment Details</button></div>` : ''}
         ${renderProviderBookingPayment(booking)}
       </section>
       <aside class="sn-provider-info-card">
@@ -2515,6 +2528,122 @@ function renderProfile(provider, metrics, assessment) {
   document.getElementById('sn-provider-start-reassessment')?.addEventListener('click', () => startProviderReassessment(provider));
   document.getElementById('sn-provider-cancel-reassessment')?.addEventListener('click', cancelProviderReassessment);
   document.getElementById('sn-provider-submit-reassessment')?.addEventListener('click', () => submitProviderReassessment(provider));
+  const paymentSection = document.createElement('section');
+  paymentSection.className = 'sn-provider-payment-settings';
+  paymentSection.innerHTML = `<h2>Downpayment Account</h2><form id="sn-provider-payment-form">
+    <div class="sn-form-grid">
+      <div class="sn-form-field"><label for="sn-provider-payment-wallet">Payment app</label><select id="sn-provider-payment-wallet" name="wallet"><option>GCash</option><option>Maya</option><option>Bank / Other QR Ph</option></select></div>
+      <div class="sn-form-field"><label for="sn-provider-payment-name">Account name</label><input id="sn-provider-payment-name" name="account_name" maxlength="120" required /></div>
+      <div class="sn-form-field"><label for="sn-provider-payment-number">Account / mobile number</label><input id="sn-provider-payment-number" name="account_number" maxlength="60" required /></div>
+      <div class="sn-form-field"><label for="sn-provider-payment-qr">Receiving QR image</label><input id="sn-provider-payment-qr" name="qr" type="file" accept="image/png,image/jpeg,image/webp" /></div>
+    </div>
+    <div class="sn-provider-qr-preview" hidden><img class="sn-payment-qr-image" alt="Your saved receiving QR" /></div>
+    <label class="sn-payment-consent"><input type="checkbox" name="confirm_account" value="true" required /><span>This reusable QR belongs to my receiving account, and the account details match it.</span></label>
+    <p id="sn-provider-payment-status" role="status">Loading payment account...</p>
+    <div class="sn-actions-row"><button type="submit" class="btn btn-primary" disabled>Save Payment QR</button></div>
+  </form>`;
+  panel.appendChild(paymentSection);
+  loadProviderPaymentSettings(provider, paymentSection);
+  paymentSection.querySelector('form').addEventListener('submit', event => saveProviderPaymentSettings(event, provider, paymentSection));
+}
+
+async function loadProviderPaymentSettings(provider, section) {
+  const status = section.querySelector('[role="status"]');
+  try {
+    const { payment_qr: qr } = await providerGet(`/api/provider/${provider.id}/payment-qr`);
+    if (!section.isConnected) return;
+    const form = section.querySelector('form');
+    form.elements.wallet.value = qr.wallet || 'GCash';
+    form.elements.account_name.value = qr.account_name || '';
+    form.elements.account_number.value = qr.account_number || '';
+    const url = window.snDirectPayments?.qrUrl(PROVIDER_API_BASE, qr.qr_url);
+    section.querySelector('.sn-provider-qr-preview').hidden = !url;
+    if (url) section.querySelector('img').src = url;
+    form.elements.qr.required = !url;
+    status.textContent = url ? 'Payment QR saved.' : 'No payment QR saved yet.';
+    form.querySelector('[type="submit"]').disabled = false;
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function saveProviderPaymentSettings(event, provider, section) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+  const status = section.querySelector('[role="status"]');
+  const file = form.elements.qr.files[0];
+  if (file && file.size > 5 * 1024 * 1024) { status.textContent = 'QR image must be 5 MB or smaller.'; return; }
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  try {
+    await providerSendForm(`/api/provider/${provider.id}/payment-qr`, 'PUT', new FormData(form));
+    form.reset();
+    await loadProviderPaymentSettings(provider, section);
+    status.textContent = 'Payment QR saved. Payments already started keep their original receiving account.';
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function showProviderDirectPayment(booking) {
+  const provider = getProviderUser();
+  if (!provider?.id || document.querySelector('.sn-direct-review-dialog')) return;
+  const previousFocus = document.activeElement;
+  const overlay = document.createElement('div');
+  overlay.className = 'sn-modal-backdrop sn-direct-review-dialog';
+  overlay.innerHTML = `<div class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-direct-review-title"><div class="sn-modal-head"><h2 id="sn-direct-review-title">Review Downpayment</h2><button type="button" class="sn-modal-close" aria-label="Close">x</button></div><div class="sn-direct-review-content">Loading payment receipt...</div><p role="status"></p></div>`;
+  document.body.appendChild(overlay);
+  document.body.classList.add('sn-payment-dialog-open');
+  let busy = false;
+  let releaseImage = () => {};
+  const close = () => { if (busy) return; releaseImage(); overlay.remove(); document.body.classList.remove('sn-payment-dialog-open'); document.removeEventListener('keydown', onKey); previousFocus?.focus(); };
+  const onKey = event => {
+    if (event.key === 'Escape') close();
+    if (event.key === 'Tab') {
+      const controls = [...overlay.querySelectorAll('button:not(:disabled), input, textarea')];
+      if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1).focus(); }
+      else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus(); }
+    }
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.querySelector('.sn-modal-close').onclick = close;
+  overlay.onclick = event => { if (event.target === overlay) close(); };
+  const message = overlay.querySelector('[role="status"]');
+  try {
+    const data = await providerGet(`/api/provider/${provider.id}/bookings/${booking.id}/direct-payment`);
+    if (!overlay.isConnected) return;
+    const receipt = data.receipt;
+    if (!receipt) throw new Error('No payment receipt has been submitted.');
+    const canReview = data.booking.status === 'pending' && data.booking.deposit_status === 'awaiting_verification' && receipt.status === 'pending';
+    overlay.querySelector('.sn-direct-review-content').innerHTML = `<p><strong>${esc(booking.customer_name || 'Customer')}</strong> &middot; ${esc(booking.service)}</p>
+      <dl class="sn-direct-payment-breakdown"><div><dt>30% downpayment</dt><dd>${providerMoney(receipt.amount)}</dd></div><div><dt>Transaction reference</dt><dd>${esc(receipt.reference_number)}</dd></div><div><dt>Receiving account</dt><dd>${esc(data.recipient?.account_name || '')} (${esc(data.recipient?.wallet || '')})</dd></div></dl>
+      <img class="sn-payment-receipt-image" data-payment-receipt-image alt="Customer payment receipt" hidden /><p data-receipt-error role="alert" hidden></p>
+      ${canReview ? `<form class="sn-direct-review-form"><label class="sn-payment-consent"><input name="payment_received" type="checkbox" /><span>I checked my actual wallet or bank transactions. The reference matches and I received exactly ${providerMoney(receipt.amount)}. A screenshot alone is not proof of receipt.</span></label><label class="sn-modal-field">Review note<textarea class="sn-modal-input" name="notes" maxlength="1000"></textarea></label><div class="sn-modal-actions"><button type="button" class="btn btn-danger" data-payment-decision="reject">Reject Receipt</button><button type="button" class="btn btn-success" data-payment-decision="verify" disabled>Confirm Payment</button></div></form>` : `<p>Payment status: ${esc(receipt.status.replace(/_/g, ' '))}${receipt.review_note ? '. ' + esc(receipt.review_note) : ''}</p>${data.booking.deposit_status === 'refund_review' ? '<p>Check the transfer with the customer and arrange any refund directly. No automatic refund is issued.</p>' : ''}`}`;
+    releaseImage = window.snDirectPayments.loadReceiptImage(overlay, PROVIDER_API_BASE, 'provider', provider.auth_token, receipt.id);
+    const form = overlay.querySelector('form');
+    form?.elements.payment_received.addEventListener('change', event => { form.querySelector('[data-payment-decision="verify"]').disabled = !event.target.checked; });
+    form?.querySelectorAll('[data-payment-decision]').forEach(button => button.addEventListener('click', async () => {
+      if (busy) return;
+      const decision = button.dataset.paymentDecision;
+      if (decision === 'reject' && !form.elements.notes.value.trim()) { message.textContent = 'Add a reason so the customer can correct their receipt.'; form.elements.notes.focus(); return; }
+      busy = true;
+      form.querySelectorAll('button').forEach(control => { control.disabled = true; });
+      try {
+        const result = await providerSend(`/api/provider/${provider.id}/bookings/${booking.id}/direct-payment`, 'PATCH', {
+          decision, receipt_id: receipt.id, price_version: data.booking.price_version, payment_received: form.elements.payment_received.checked, notes: form.elements.notes.value,
+        });
+        Object.assign(booking, result.booking);
+        busy = false;
+        close();
+        setProviderRequestsNotice(decision === 'verify' ? 'Downpayment confirmed. The booking is now Upcoming.' : 'Receipt rejected. The customer can review your note and resubmit.', 'success');
+        renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
+      } catch (error) { message.textContent = error.message; }
+      finally {
+        busy = false;
+        form.querySelector('[data-payment-decision="reject"]').disabled = false;
+        form.querySelector('[data-payment-decision="verify"]').disabled = !form.elements.payment_received.checked;
+      }
+    }));
+  } catch (error) { message.textContent = error.message; }
+  overlay.querySelector('.sn-modal-close').focus();
 }
 
 function providerUploadUrl(folder, filename) {

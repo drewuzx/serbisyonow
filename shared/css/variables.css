@@ -186,10 +186,17 @@ ul, ol { list-style: none; }
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: 600;
-  border: none;
+  min-height: 44px;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.35;
+  text-align: center;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+  border: 1.5px solid transparent;
   transition: all var(--transition-base);
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .btn-primary {
@@ -232,8 +239,8 @@ ul, ol { list-style: none; }
   color: var(--blue-main);
 }
 
-.btn-sm { padding: 6px 14px; font-size: var(--text-xs); }
-.btn-lg { padding: 14px 28px; font-size: var(--text-base); }
+.btn-sm { min-height: 36px; padding: 7px 14px; font-size: var(--text-xs); }
+.btn-lg { min-height: 48px; padding: 14px 28px; font-size: var(--text-base); }
 .btn-full { width: 100%; }
 
 /* ── Cards ── */
