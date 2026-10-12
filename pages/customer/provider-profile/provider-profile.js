@@ -148,8 +148,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  let signature = '';
+  const refreshProvider = async () => {
+    const { user } = await ppGet(`/api/auth/provider/status/${providerId}`);
+    if (!window.snLiveRefresh?.isIdle()) return;
+    const next = JSON.stringify(user);
+    if (next === signature) return;
+    signature = next;
+    ppRenderProvider(user);
+  };
+  window.snStartLiveRefresh('provider-profile', refreshProvider);
   try {
     const providerData = await ppGet(`/api/auth/provider/status/${providerId}`);
+    signature = JSON.stringify(providerData.user);
     ppRenderProvider(providerData.user);
   } catch (error) {
     if (detail) {

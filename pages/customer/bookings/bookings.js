@@ -864,14 +864,15 @@ async function showBookingPayment(bookingId, returnState = '') {
  document.body.classList.add('sn-modal-open');
  let booking;
  let busy = false;
- let timer;
- let polls = 0;
+ let stopLiveRefresh = () => {};
+ let loading = false;
+ let paymentSignature = '';
  let loadVersion = 0;
  let releaseReceiptImage = () => {};
  const message = modal.querySelector('[role="status"]');
  const pay = modal.querySelector('[data-payment-pay]');
  const refresh = modal.querySelector('[data-payment-refresh]');
- const close = () => { if (busy) return; clearTimeout(timer); releaseReceiptImage(); document.removeEventListener('keydown', onKey); closeBookingModal(modal); previousFocus?.focus(); };
+ const close = () => { if (busy) return; stopLiveRefresh(); releaseReceiptImage(); document.removeEventListener('keydown', onKey); closeBookingModal(modal); previousFocus?.focus(); };
  const onKey = event => {
   if (event.key === 'Escape') close();
   if (event.key === 'Tab') {
@@ -883,13 +884,18 @@ async function showBookingPayment(bookingId, returnState = '') {
  document.addEventListener('keydown', onKey);
  modal.querySelector('.sn-modal-close').onclick = close;
  modal.onclick = event => { if (event.target === modal) close(); };
- const load = async () => {
+ const load = async ({ background = false } = {}) => {
+  if ((loading && background) || busy) return;
+  loading = true;
   const version = ++loadVersion;
-  refresh.disabled = true;
-  pay.disabled = true;
+  if (!background) { refresh.disabled = true; pay.disabled = true; }
   try {
    const data = await bookingFetch(`/api/customer/${customer.id}/bookings/${encodeURIComponent(bookingId)}/payment`);
+   if (background && !window.snLiveRefresh?.isIdle()) return;
    if (!modal.isConnected || version !== loadVersion) return;
+   const signature = JSON.stringify(data);
+   if (background && signature === paymentSignature) return;
+   paymentSignature = signature;
    booking = data.booking;
    const direct = booking.deposit_channel === 'provider_qr';
    const awaiting = booking.status === 'pending' && booking.deposit_status === 'awaiting_payment';
@@ -944,12 +950,10 @@ async function showBookingPayment(bookingId, returnState = '') {
     if (list) list.innerHTML = renderCustomerBookings(window.snCustomerBookings);
     document.dispatchEvent(new CustomEvent('sn:customer-bookings-rendered'));
    }
-   if (returnState === 'success' && awaiting && polls++ < 5) timer = setTimeout(load, 3000);
-   if (direct && booking.deposit_status === 'awaiting_verification' && polls++ < 20) timer = setTimeout(load, 15000);
-  } catch (error) { if (version === loadVersion) message.textContent = error.message; }
-  finally { if (version === loadVersion) refresh.disabled = false; }
+  } catch (error) { if (!background && version === loadVersion) message.textContent = error.message; }
+  finally { if (version === loadVersion) { loading = false; if (!busy) refresh.disabled = false; } }
  };
- refresh.onclick = () => { clearTimeout(timer); load(); };
+ refresh.onclick = () => load();
  pay.onclick = async () => {
   if (busy || !modal.querySelector('[data-payment-consent]')?.checked) return;
   busy = true;
@@ -964,6 +968,10 @@ async function showBookingPayment(bookingId, returnState = '') {
   } catch (error) { message.textContent = error.message; busy = false; pay.disabled = refresh.disabled = false; }
  };
  await load();
+ window.snStartLiveRefresh(`customer-payment-${bookingId}`, () => load({ background: true })).then(dispose => {
+  if (!dispose) return;
+  if (!modal.isConnected) dispose(); else stopLiveRefresh = dispose;
+ });
  modal.querySelector('.sn-modal-close').focus();
 }
 
@@ -1214,15 +1222,23 @@ async function renderBookingRequestForm(customer) {
  document.getElementById('sn-create-booking-form')?.addEventListener('submit', (event) => submitBookingRequest(event, customer, providerId));
  document.getElementById('sn-booking-date')?.addEventListener('change', () => loadProviderBookingSlots(providerId));
  await loadProviderBookingSlots(providerId);
+ window.snStartLiveRefresh('booking-availability', () => {
+  if (form.querySelector('[type="submit"]:disabled') || document.activeElement?.id === 'sn-booking-time') return;
+  return loadProviderBookingSlots(providerId, document.getElementById('sn-booking-time')?.value || '', { background: true });
+ });
 }
 
-async function loadProviderBookingSlots(providerId, preferredTime = '') {
+let bookingSlotsVersion = 0;
+let bookingSlotsSignature = '';
+async function loadProviderBookingSlots(providerId, preferredTime = '', { background = false } = {}) {
  const dateInput = document.getElementById('sn-booking-date');
  const timeSelect = document.getElementById('sn-booking-time');
  const note = document.getElementById('sn-booking-schedule-note');
  const alternatives = document.getElementById('sn-booking-alternatives');
  if (!dateInput || !timeSelect) return;
+ const version = ++bookingSlotsVersion;
 
+ if (!background) {
  timeSelect.innerHTML = '<option value="">Checking slots...</option>';
  timeSelect.disabled = true;
  if (alternatives) {
@@ -1230,25 +1246,35 @@ async function loadProviderBookingSlots(providerId, preferredTime = '') {
   alternatives.innerHTML = '';
  }
  if (note) note.textContent = 'Checking provider availability for your selected date...';
+ }
 
  try {
   const params = new URLSearchParams({ date: dateInput.value });
   const data = await bookingFetch(`/api/providers/${providerId}/availability?${params}`);
+  if (background && !window.snLiveRefresh?.isIdle()) return;
+  if (version !== bookingSlotsVersion || dateInput.value !== params.get('date')) return;
   const slots = data.availability || [];
+  const signature = JSON.stringify([params.get('date'), slots]);
+  if (background && (signature === bookingSlotsSignature || document.activeElement === timeSelect)) return;
+  bookingSlotsSignature = signature;
+  if (alternatives) alternatives.hidden = true;
   if (!slots.length) {
    timeSelect.innerHTML = '<option value="">No open slots for this date</option>';
+   timeSelect.disabled = true;
    if (note) note.textContent = 'No schedule is open for this date. Pick another date or choose an alternative below.';
    await loadAlternativeBookingSlots(providerId);
    return;
   }
 
+  const previousTime = background ? timeSelect.value : preferredTime;
   timeSelect.innerHTML = slots.map((slot) => {
-   const selected = preferredTime && preferredTime === slot.start_time ? ' selected' : '';
+   const selected = previousTime && previousTime === slot.start_time ? ' selected' : '';
    return `<option value="${bookingEsc(slot.start_time)}"${selected}>${bookingEsc(slot.start_time)} - ${bookingEsc(slot.end_time)}</option>`;
   }).join('');
   timeSelect.disabled = false;
   if (note) note.textContent = `${slots.length} open slot${slots.length === 1 ? '' : 's'} found. The backend will still re-check before submitting.`;
  } catch (error) {
+  if (background || version !== bookingSlotsVersion) return;
   timeSelect.innerHTML = '<option value="">Schedule unavailable</option>';
   if (note) note.textContent = error.message || 'Unable to load provider schedule.';
  }

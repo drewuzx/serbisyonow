@@ -249,9 +249,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const mapCanvas = document.getElementById('sn-map-canvas');
   const mapStatus = document.getElementById('sn-map-status');
 
-  async function loadProviders() {
+  let providerRequestId = 0;
+  let providerSignature = '';
+  let mapSignature = '';
+  async function loadProviders({ background = false } = {}) {
     if (!resultList) return;
-    resultList.innerHTML = '<p class="sn-search-empty">Loading providers...</p>';
+    const requestId = ++providerRequestId;
+    if (!background) resultList.innerHTML = '<p class="sn-search-empty">Loading providers...</p>';
     try {
       const params = new URLSearchParams({
         q: currentQuery,
@@ -264,16 +268,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       const res = await fetch(`${API_BASE}/api/customer/search/providers?${params}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Failed to load providers.');
-      renderSortSummary(data.algorithm);
-      renderProviders(data.providers || []);
-      loadLocationMap();
+      if (background && !window.snLiveRefresh?.isIdle()) return;
+      if (requestId !== providerRequestId) return;
+      const signature = JSON.stringify([String(params), data]);
+      if (!background || (signature !== providerSignature && !resultList.querySelector('button:disabled'))) {
+        providerSignature = signature;
+        renderSortSummary(data.algorithm);
+        renderProviders(data.providers || []);
+      }
+      await loadLocationMap({ background });
     } catch (error) {
+      if (background || requestId !== providerRequestId) return;
       resultList.innerHTML = `<p class="sn-search-empty">${esc(error.message || 'Failed to load providers.')}</p>`;
       if (countEl) countEl.textContent = '0 providers found';
     }
   }
 
-  async function loadLocationMap() {
+  async function loadLocationMap({ background = false } = {}) {
     if (!mapCanvas) return;
     const requestId = ++mapRequestId;
     const params = new URLSearchParams({
@@ -291,10 +302,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const res = await fetch(`${API_BASE}/api/customer/${currentCustomer.id}/location-map?${params}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Failed to load map.');
+      if (background && !window.snLiveRefresh?.isIdle()) return;
       if (requestId !== mapRequestId) return;
+      const signature = JSON.stringify([String(params), data]);
+      if (background && signature === mapSignature) return;
+      mapSignature = signature;
       renderLocationMap(data);
     } catch (error) {
-      if (requestId !== mapRequestId) return;
+      if (background || requestId !== mapRequestId) return;
       mapCanvas.innerHTML = `<div class="sn-map-grid"></div><p class="sn-search-empty">${esc(error.message || 'Map unavailable.')}</p>`;
     }
   }
@@ -843,4 +858,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   syncFilterControls();
   await loadProviders();
+  window.snStartLiveRefresh('customer-search', () => loadProviders({ background: true }));
 });

@@ -1,6 +1,14 @@
 'use strict';
 
 (function registerSerbisyoNowPwa() {
+  window.snLiveRefreshReady = new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = '/shared/js/live-refresh.js';
+    script.onload = () => resolve(window.snLiveRefresh);
+    script.onerror = () => resolve(null);
+    document.head.appendChild(script);
+  });
+  window.snStartLiveRefresh = (...args) => window.snLiveRefreshReady.then(live => live?.register(...args));
   if (/\/pages\/(customer|provider)\//.test(window.location.pathname)) {
     window.snAccountSessionReady = new Promise(resolve => {
       const script = document.createElement('script');

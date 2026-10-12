@@ -295,4 +295,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     setHistoryEmpty(error.message || 'Unable to load booking history.');
   }
+  document.addEventListener('sn:customer-data-updated', ({ detail: data }) => {
+    const next = (data.bookings || []).filter(booking => ['completed', 'cancelled'].includes(historyStatus(booking.status)));
+    if (JSON.stringify(next) === JSON.stringify(historyBookings)) return;
+    historyBookings = next;
+    renderHistoryList();
+  });
 });

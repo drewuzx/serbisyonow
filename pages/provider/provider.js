@@ -26,8 +26,9 @@ let providerNavBooking = null;
 let providerDirectionsRequestId = 0;
 let providerRequestsGpsRefreshStarted = false;
 let providerRequestsGpsInFlight = false;
-let providerDashboardRefreshActive = false;
 let providerNotificationRefreshActive = false;
+let providerDatabaseVersion = 0;
+const providerLiveSignatures = new Map();
 let lastProviderGpsPayload = { at: 0, lat: null, lng: null };
 let lastProviderRouteKey = '';
 const providerBookingActions = new Set();
@@ -408,20 +409,7 @@ function handleProviderNotifications(data, notify = false) {
 function startProviderNotificationRealtime(provider) {
   if (providerNotificationRefreshActive || !provider?.id) return;
   providerNotificationRefreshActive = true;
-  window.snProviderNotificationTimer = window.setInterval(async () => {
-    if (document.visibilityState !== 'visible') return;
-    try {
-      const data = await providerGet(`/api/provider/${provider.id}/dashboard`);
-      handleProviderNotifications(data, true);
-      if (window.location.pathname.includes('/requests/') && !providerBookingActions.size && !document.querySelector('.sn-modal-backdrop')) {
-        const signature = JSON.stringify([data.bookings, data.provider?.latitude, data.provider?.longitude]);
-        if (signature !== providerRequestsState.signature) renderRequests(data.bookings || [], data.provider || provider);
-      }
-    } catch (error) {
-      console.warn(error.message || error);
-    }
-  }, 5000);
-  window.addEventListener('beforeunload', () => window.clearInterval(window.snProviderNotificationTimer));
+  window.snProviderNotificationTimer = window.snStartLiveRefresh('provider-data', () => loadProviderDatabase({ background: true }));
 }
 
 function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', danger = false, options = [] }) {
@@ -598,38 +586,56 @@ document.addEventListener('DOMContentLoaded', async () => {
   attachProviderTopbarRealtime(provider);
   loadProviderDatabase();
   if (typeof startProviderBackgroundLiveGps === 'function') startProviderBackgroundLiveGps();
-  if (window.location.pathname.includes('/provider/dashboard/')) {
-    startProviderDashboardRealtime();
-  }
 });
 
-async function loadProviderDatabase() {
+async function loadProviderDatabase({ background = false } = {}) {
   const provider = getProviderUser();
   if (!provider?.id) return;
+  const version = ++providerDatabaseVersion;
 
   try {
     const data = await providerGet(`/api/provider/${provider.id}/dashboard`);
+    if (background && !window.snLiveRefresh?.isIdle()) return false;
+    if (version !== providerDatabaseVersion) return false;
+    if (String(getProviderUser()?.id || '') !== String(provider.id)) return false;
+    window.snProviderLiveData = data;
+    document.dispatchEvent(new CustomEvent('sn:provider-data-updated', { detail: data }));
     const path = window.location.pathname;
-    handleProviderNotifications(data, false);
-
-    renderProviderMetrics(data);
-    renderProviderEarnings(data);
-    if (path.includes('/dashboard/')) renderProviderDashboardAnalytics(data);
-    if (path.includes('/services/')) renderServices(data.services || []);
+    handleProviderNotifications(data, background);
+    if (data.provider) {
+      localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.provider }));
+      const name = document.getElementById('sn-user-name');
+      const status = document.getElementById('sn-user-status');
+      if (name) name.textContent = data.provider.full_name || 'Service Provider';
+      if (status) status.textContent = data.provider.verification_status === 'verified' ? 'Verified provider' : data.provider.verification_status === 'rejected' ? 'Verification declined' : 'Awaiting provider verification';
+    }
+    const renderChanged = (key, values, render) => {
+      const signature = JSON.stringify(values);
+      if (background && signature === providerLiveSignatures.get(key)) return;
+      render();
+      providerLiveSignatures.set(key, signature);
+    };
+    renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews, data.messages], () => {
+      renderProviderMetrics(data);
+      renderProviderEarnings(data);
+    });
+    if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.reviews, data.availability], () => renderProviderDashboardAnalytics(data));
+    const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
+    if (path.includes('/services/') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
     if (path.includes('/requests/')) {
-      renderRequests(data.bookings || [], data.provider || provider);
+      if (!background || !editing) renderChanged('requests', [data.bookings, data.provider?.latitude, data.provider?.longitude], () => renderRequests(data.bookings || [], data.provider || provider));
       refreshProviderGpsForRequests();
     }
-    if (path.includes('/schedule/')) renderSchedule(data.availability || [], data.bookings || []);
-    if (path.includes('/inbox/')) renderInbox(data.messages || []);
-    if (path.includes('/assessment/')) renderAssessment(data.assessment, data.metrics);
-    if (path.includes('/reviews/')) renderReviews(data.reviews || [], data.metrics);
-    if (path.includes('/history/')) renderHistory(data.history_bookings || data.bookings || []);
-    if (path.includes('/profile/')) renderProfile(data.provider || provider, data.metrics, data.assessment);
+    if (path.includes('/schedule/') && (!background || !editing)) renderChanged('schedule', [data.availability, data.bookings], () => renderSchedule(data.availability || [], data.bookings || [], background));
+    if (path.includes('/inbox/')) renderChanged('inbox', data.messages, () => renderInbox(data.messages || []));
+    if (path.includes('/assessment/')) renderChanged('assessment', [data.assessment, data.metrics], () => renderAssessment(data.assessment, data.metrics));
+    if (path.includes('/reviews/')) renderChanged('reviews', data.reviews, () => renderReviews(data.reviews || [], data.metrics));
+    if (path.includes('/history/')) renderChanged('history', data.history_bookings || data.bookings, () => renderHistory(data.history_bookings || data.bookings || []));
+    if (path.includes('/profile/')) renderChanged('profile', [data.provider, data.metrics, data.assessment], () => renderProfile(data.provider || provider, data.metrics, data.assessment, background));
     return true;
   } catch (error) {
     console.warn(error.message || error);
-    if (window.location.pathname.includes('/requests/')) {
+    if (!background && window.location.pathname.includes('/requests/')) {
       if (!document.getElementById('sn-provider-requests-notice')) renderRequests(providerRequestsState.bookings, providerRequestsState.provider || provider);
       setProviderRequestsNotice('Unable to refresh bookings. Check your connection and use Refresh.', 'error');
     }
@@ -785,17 +791,6 @@ function renderProviderMetrics(data) {
       <div class="stat-info"><div class="value">${value}</div><div class="label">${label}</div></div>
     </article>
   `).join('');
-}
-
-function startProviderDashboardRealtime() {
-  if (providerDashboardRefreshActive) return;
-  providerDashboardRefreshActive = true;
-  const refresh = () => {
-    if (document.visibilityState === 'visible') loadProviderDatabase();
-  };
-  window.snProviderDashboardRefreshTimer = window.setInterval(refresh, 3000);
-  document.addEventListener('visibilitychange', refresh);
-  window.addEventListener('beforeunload', () => window.clearInterval(window.snProviderDashboardRefreshTimer));
 }
 
 function renderProviderDashboardAnalytics(data) {
@@ -1867,7 +1862,7 @@ function setScheduleStatus(message, type = 'info') {
   status.className = `sn-profile-status sn-profile-status--${type}`;
 }
 
-function renderSchedule(availability, bookings) {
+function renderSchedule(availability, bookings, preserveDraft = false) {
   const grid = document.querySelector('.sn-page-grid');
   if (!grid) return;
   const today = providerDateInputValue();
@@ -1880,7 +1875,7 @@ function renderSchedule(availability, bookings) {
     return String(a.start_time || '').localeCompare(String(b.start_time || ''));
   });
 
-  grid.innerHTML = `
+  const markup = `
     <article class="sn-panel sn-schedule-create-panel">
       <h3>Add Availability</h3>
       <form id="sn-provider-availability-form" class="sn-form-grid sn-schedule-form">
@@ -1906,7 +1901,7 @@ function renderSchedule(availability, bookings) {
       </form>
       <p class="sn-profile-status" id="sn-provider-schedule-status" hidden></p>
     </article>
-    <article class="sn-panel">
+    <article class="sn-panel sn-schedule-appointments-panel">
       <h3>Appointments</h3>
       <div class="sn-panel-list">${activeBookings.map(booking => `
         <div class="sn-module-card">
@@ -1936,7 +1931,16 @@ function renderSchedule(availability, bookings) {
     </article>
   `;
 
-  document.getElementById('sn-provider-availability-form')?.addEventListener('submit', saveAvailabilitySlot);
+  if (preserveDraft && document.getElementById('sn-provider-availability-form')) {
+    const updated = document.createElement('div');
+    updated.innerHTML = markup;
+    for (const selector of ['.sn-schedule-appointments-panel', '.sn-schedule-slots-panel']) {
+      grid.querySelector(selector)?.replaceWith(updated.querySelector(selector));
+    }
+  } else {
+    grid.innerHTML = markup;
+    document.getElementById('sn-provider-availability-form')?.addEventListener('submit', saveAvailabilitySlot);
+  }
   grid.querySelectorAll('[data-schedule-action="toggle"]').forEach((button) => {
     button.addEventListener('click', () => updateAvailabilitySlot(
       button.closest('[data-slot-id]')?.dataset.slotId,
@@ -2205,10 +2209,15 @@ function renderHistory(bookings) {
   if (!panel) return;
   document.querySelector('.sn-hero')?.remove();
   panel.classList.add('sn-provider-history-shell');
-  const normalizedBookings = bookings.map((booking, index) => ({
+  const normalize = rows => rows.map((booking, index) => ({
     ...booking,
     avatarClass: `sn-hi-avatar--${(index % 5) + 1}`,
   }));
+  if (renderHistory.update && panel.querySelector('#sn-provider-history-list')) {
+    renderHistory.update(normalize(bookings));
+    return;
+  }
+  let normalizedBookings = normalize(bookings);
   const selected = normalizedBookings[0] || null;
 
   panel.innerHTML = `
@@ -2247,6 +2256,7 @@ function renderHistory(bookings) {
   const search = panel.querySelector('#sn-provider-history-search');
   const tabs = panel.querySelectorAll('#sn-provider-history-tabs .sn-filter-tab');
   let activeFilter = 'all';
+  let selectedId = selected?.id;
 
   function visibleBookings() {
     const query = search?.value.trim().toLowerCase() || '';
@@ -2263,8 +2273,9 @@ function renderHistory(bookings) {
 
   function renderList() {
     const visible = visibleBookings();
-    list.innerHTML = visible.map((booking, index) => renderProviderHistoryItem(booking, index === 0)).join('') || '<p class="sn-history-empty">No matching service records.</p>';
-    const first = visible[0];
+    const first = visible.find(booking => String(booking.id) === String(selectedId)) || visible[0];
+    selectedId = first?.id;
+    list.innerHTML = visible.map(booking => renderProviderHistoryItem(booking, booking === first)).join('') || '<p class="sn-history-empty">No matching service records.</p>';
     detail.innerHTML = first ? renderProviderHistoryDetail(first) : '<div class="sn-detail-empty"><div class="sn-empty-title">No matching record</div><div class="sn-empty-sub">Try another status or search term.</div></div>';
   }
 
@@ -2273,6 +2284,7 @@ function renderHistory(bookings) {
     if (!item) return;
     const booking = normalizedBookings.find((entry) => String(entry.id) === String(item.dataset.historyId));
     if (!booking) return;
+    selectedId = booking.id;
     list.querySelectorAll('.sn-history-item').forEach((button) => button.classList.toggle('active', button === item));
     detail.innerHTML = renderProviderHistoryDetail(booking);
   });
@@ -2291,6 +2303,7 @@ function renderHistory(bookings) {
       renderList();
     });
   });
+  renderHistory.update = rows => { normalizedBookings = rows; renderList(); };
 }
 
 function providerHistoryStatusPill(status) {
@@ -2493,9 +2506,27 @@ async function submitProviderReassessment(provider) {
   }
 }
 
-function renderProfile(provider, metrics, assessment) {
+function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
+  if (preserveDraft && document.getElementById('sn-provider-full-name')) {
+    const fields = { 'sn-provider-full-name': provider.full_name, 'sn-provider-contact': provider.contact, 'sn-provider-category': providerCategoryLabel(provider.category), 'sn-provider-service': provider.service, 'sn-provider-address': provider.address };
+    for (const [id, value] of Object.entries(fields)) {
+      const field = document.getElementById(id);
+      if (field && field.value === field.defaultValue) field.value = field.defaultValue = value || '';
+    }
+    const docs = panel.querySelector('.sn-provider-documents');
+    if (docs) docs.innerHTML = renderProviderCredentialLinks(provider);
+    const badge = [...panel.querySelectorAll('input[readonly]')][0];
+    if (badge) badge.value = metrics?.badge_status || provider.verification_status || '';
+    const score = panel.querySelector('.sn-reassessment-score');
+    if (score) {
+      const updated = document.createElement('div');
+      updated.innerHTML = renderProviderReassessmentSection(provider, metrics, assessment);
+      score.innerHTML = updated.querySelector('.sn-reassessment-score')?.innerHTML || '';
+    }
+    return;
+  }
   const accuracyLabel = provider.location_accuracy_m ? ` (+/- ${Math.round(provider.location_accuracy_m)}m)` : '';
   const updatedLabel = provider.location_updated_at ? ` - updated ${shortDateTime(provider.location_updated_at)}` : '';
   const locationLabel = provider.latitude && provider.longitude
@@ -2543,15 +2574,23 @@ function renderProfile(provider, metrics, assessment) {
     <div class="sn-actions-row"><button type="submit" class="btn btn-primary" disabled>Save Payment QR</button></div>
   </form>`;
   panel.appendChild(paymentSection);
+  paymentSection.querySelector('form').addEventListener('input', () => { paymentSection.dataset.dirty = 'true'; });
+  paymentSection.querySelector('form').addEventListener('change', () => { paymentSection.dataset.dirty = 'true'; });
   loadProviderPaymentSettings(provider, paymentSection);
+  window.snStartLiveRefresh('provider-payment-account', () => loadProviderPaymentSettings(provider, paymentSection, { background: true }));
   paymentSection.querySelector('form').addEventListener('submit', event => saveProviderPaymentSettings(event, provider, paymentSection));
 }
 
-async function loadProviderPaymentSettings(provider, section) {
+async function loadProviderPaymentSettings(provider, section, { background = false } = {}) {
   const status = section.querySelector('[role="status"]');
   try {
     const { payment_qr: qr } = await providerGet(`/api/provider/${provider.id}/payment-qr`);
+    if (background && !window.snLiveRefresh?.isIdle()) return;
     if (!section.isConnected) return;
+    if (background && (section.dataset.dirty || section.querySelector('button:disabled'))) return;
+    const signature = JSON.stringify(qr);
+    if (background && signature === section.dataset.signature) return;
+    section.dataset.signature = signature;
     const form = section.querySelector('form');
     form.elements.wallet.value = qr.wallet || 'GCash';
     form.elements.account_name.value = qr.account_name || '';
@@ -2562,7 +2601,7 @@ async function loadProviderPaymentSettings(provider, section) {
     form.elements.qr.required = !url;
     status.textContent = url ? 'Payment QR saved.' : 'No payment QR saved yet.';
     form.querySelector('[type="submit"]').disabled = false;
-  } catch (error) { status.textContent = error.message; }
+  } catch (error) { if (!background) status.textContent = error.message; }
 }
 
 async function saveProviderPaymentSettings(event, provider, section) {
@@ -2577,6 +2616,7 @@ async function saveProviderPaymentSettings(event, provider, section) {
   try {
     await providerSendForm(`/api/provider/${provider.id}/payment-qr`, 'PUT', new FormData(form));
     form.reset();
+    delete section.dataset.dirty;
     await loadProviderPaymentSettings(provider, section);
     status.textContent = 'Payment QR saved. Payments already started keep their original receiving account.';
   } catch (error) { status.textContent = error.message; }

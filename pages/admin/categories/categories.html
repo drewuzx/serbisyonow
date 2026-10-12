@@ -66,12 +66,13 @@
       }).join('') || '<article class="admin-card"><h3>No categories yet</h3><p>Add your first service category.</p></article>';
     }
 
-    async function loadCategories() {
+    async function loadCategories(options = {}) {
       try {
         const { categories } = await adminGet('/api/admin/categories');
+        if (!adminDataChanged('categories', categories, options)) return;
         renderCategories(categories);
       } catch (error) {
-        categoryList.innerHTML = `<article class="admin-card"><h3>${adminEscape(error.message)}</h3></article>`;
+        if (!options.background) categoryList.innerHTML = `<article class="admin-card"><h3>${adminEscape(error.message)}</h3></article>`;
       }
     }
 
@@ -109,6 +110,7 @@
     });
 
     loadCategories();
+    adminLive('categories', loadCategories);
   </script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>

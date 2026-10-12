@@ -1,6 +1,4 @@
 const API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
-const POLL_INTERVAL_MS = 5000;
-let verificationPollTimer = null;
 
 function getCurrentCustomer() {
   try {
@@ -71,46 +69,6 @@ function showVerificationToast(status) {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 400);
   }, 6000);
-}
-
-async function pollVerificationStatus() {
-  const customer = getCurrentCustomer();
-  if (!customer?.id) return;
-
-  if (customer.verification_status === 'verified' && customer.is_verified) {
-    stopPolling();
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/customer/status/${customer.id}`);
-    if (!response.ok) return;
-    const data = await response.json().catch(() => ({}));
-    if (!data.user) return;
-
-    const previousStatus = customer.verification_status || (customer.is_verified ? 'verified' : 'pending');
-    const nextStatus = data.user.verification_status || (data.user.is_verified ? 'verified' : 'pending');
-    const merged = { ...customer, ...data.user };
-    saveCurrentCustomer(merged);
-    applyVerificationState(merged);
-
-    if (previousStatus !== nextStatus) showVerificationToast(nextStatus);
-    if (nextStatus === 'verified' || nextStatus === 'rejected') stopPolling();
-  } catch {
-    // Keep polling quietly while the network/server is unavailable.
-  }
-}
-
-function startPolling() {
-  stopPolling();
-  verificationPollTimer = setInterval(pollVerificationStatus, POLL_INTERVAL_MS);
-}
-
-function stopPolling() {
-  if (verificationPollTimer) {
-    clearInterval(verificationPollTimer);
-    verificationPollTimer = null;
-  }
 }
 
 function attachDashboardShell() {
@@ -190,7 +148,6 @@ function attachDashboardShell() {
   });
 
   logoutBtn?.addEventListener('click', () => {
-    stopPolling();
     logoutBtn.disabled = true;
     logoutBtn.querySelector('span:last-child').textContent = 'Logging out...';
     window.setTimeout(() => {
@@ -216,7 +173,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyVerificationState(currentCustomer);
   attachDashboardShell();
 
-  if (currentCustomer.verification_status !== 'verified' || !currentCustomer.is_verified) {
-    startPolling();
-  }
+  let previousStatus = currentCustomer.verification_status;
+  document.addEventListener('sn:customer-account-updated', ({ detail: user }) => {
+    applyVerificationState(user);
+    if (previousStatus !== user.verification_status) showVerificationToast(user.verification_status);
+    previousStatus = user.verification_status;
+  });
 });

@@ -92,14 +92,15 @@
     return data;
   }
 
-  async function loadConversations() {
+  async function loadConversations({ fresh = false, background = false } = {}) {
     const ctx = currentContext();
     if (!ctx) return;
     if (ctx.role === 'customer') {
       const [messageData, dash] = await Promise.all([
         fetchJSON(`/api/customer/${ctx.user.id}/messages`),
-        fetchJSON(`/api/customer/${ctx.user.id}/dashboard`).catch(() => ({ bookings: [] })),
+        window.snCustomerLiveData || fetchJSON(`/api/customer/${ctx.user.id}/dashboard`).catch(() => ({ bookings: [] })),
       ]);
+      if (background && !window.snLiveRefresh?.isIdle()) return;
       const contacts = [...new Map((dash.bookings || [])
         .filter((booking) => booking.provider_id)
         .map((booking) => [String(booking.provider_id), {
@@ -109,7 +110,9 @@
         }])).values()];
       state.conversations = groupByPeer(messageData.messages || [], contacts, 'provider_id', 'provider', 'customer');
     } else {
-      const data = await fetchJSON(`/api/provider/${ctx.user.id}/dashboard`);
+      const data = (!fresh && window.snProviderLiveData) || await fetchJSON(`/api/provider/${ctx.user.id}/dashboard`);
+      if (background && !window.snLiveRefresh?.isIdle()) return;
+      if (fresh) window.snProviderLiveData = data;
       const contacts = [...new Map((data.bookings || data.history_bookings || [])
         .filter((booking) => booking.customer_id)
         .map((booking) => [String(booking.customer_id), {
@@ -203,7 +206,11 @@
     const body = root.querySelector('.sn-float-chat-body');
     if (name) name.textContent = convo?.name || 'Messages';
     if (meta) meta.textContent = convo?.meta || (convo ? 'Active chat' : 'Select a conversation');
-    if (body) {
+    const messageSignature = JSON.stringify([state.selectedId, convo?.messages]);
+    if (body && body.dataset.signature !== messageSignature) {
+      const followLatest = body.dataset.peer !== String(state.selectedId) || body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+      body.dataset.signature = messageSignature;
+      body.dataset.peer = String(state.selectedId);
       if (!convo) {
         body.innerHTML = '<p class="sn-float-empty">Choose someone from Chats to start messaging.</p>';
       } else if (!convo.messages.length) {
@@ -219,7 +226,7 @@
             </div>
           `;
         }).join('');
-        body.scrollTop = body.scrollHeight;
+        if (followLatest) body.scrollTop = body.scrollHeight;
       }
     }
   }
@@ -256,7 +263,7 @@
         });
       }
       if (input) input.value = '';
-      await loadConversations();
+      await loadConversations({ fresh: true });
     } catch (error) {
       const body = rootEl()?.querySelector('.sn-float-chat-body');
       if (body) {
@@ -274,7 +281,7 @@
   function openList() {
     state.listOpen = true;
     render();
-    loadConversations().then(render).catch(() => render());
+    loadConversations({ fresh: true }).then(render).catch(() => render());
   }
 
   function closeList() {
@@ -411,9 +418,10 @@
       })
       .catch(() => render());
 
-    const refresh = () => {
-      if (document.visibilityState !== 'visible') return;
-      loadConversations().then(() => {
+    const refresh = async () => {
+      if (!window.snLiveRefresh?.isIdle()) return;
+      await loadConversations({ background: true }).then(() => {
+        if (!window.snLiveRefresh?.isIdle()) return;
         const newest = state.conversations
           .flatMap((convo) => convo.messages)
           .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
@@ -423,7 +431,8 @@
         render();
       }).catch(() => {});
     };
-    window.setInterval(refresh, 3000);
+    window.snStartLiveRefresh('floating-chat', refresh);
+    document.addEventListener('sn:provider-data-updated', refresh);
   }
 
   function boot(attempt = 0) {

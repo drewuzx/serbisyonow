@@ -33,7 +33,7 @@ function showNotice(elId, message, type = 'success') {
  setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
-function populatePage(user) {
+function populatePage(user, { preserveDraft = false } = {}) {
  const status = user?.verification_status || (user?.is_verified? 'verified': 'pending');
  const isVerified = status === 'verified';
  const isRejected = status === 'rejected';
@@ -77,6 +77,7 @@ function populatePage(user) {
  document.getElementById('acc-status').textContent = statusLabels[status] || status;
 
  // Pre-fill edit form
+ if (preserveDraft) return;
  document.getElementById('edit-fullname').value = user?.full_name || '';
  document.getElementById('edit-email').value = user?.email || '';
  document.getElementById('edit-contact').value = user?.contact || '';
@@ -142,6 +143,10 @@ document.addEventListener('DOMContentLoaded', async () => {
  const profileView = document.getElementById('sn-profile-view');
  const profileForm = document.getElementById('sn-profile-form');
  const cancelEditBtn = document.getElementById('sn-cancel-edit');
+ document.addEventListener('sn:customer-account-updated', ({ detail: user }) => {
+  Object.assign(currentCustomer, user);
+  populatePage(user, { preserveDraft: profileForm.style.display !== 'none' });
+ });
 
  function enterEditMode() {
  profileView.style.display = 'none';

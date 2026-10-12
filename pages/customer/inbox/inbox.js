@@ -359,11 +359,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  async function loadMessages({ silent = false } = {}) {
+  async function loadMessages({ silent = false, background = false } = {}) {
     if (!silent && convoList) convoList.innerHTML = '<p class="sn-convo-end">Loading conversations...</p>';
     try {
       const res = await fetch(`${API_BASE}/api/customer/${currentCustomer.id}/messages`);
       const data = await res.json();
+      if (background && !window.snLiveRefresh?.isIdle()) return;
       const incoming = (data.messages || [])
         .filter((message) => message.sender_role === 'provider')
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
@@ -503,10 +504,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadProviderContacts();
   await loadMessages();
-  const refreshMessages = () => {
-    if (document.visibilityState === 'visible') loadMessages({ silent: true });
-  };
-  const inboxRefreshTimer = window.setInterval(refreshMessages, 3000);
-  window.addEventListener('beforeunload', () => window.clearInterval(inboxRefreshTimer));
-  document.addEventListener('visibilitychange', refreshMessages);
+  window.snStartLiveRefresh('customer-inbox', () => loadMessages({ silent: true, background: true }));
 });

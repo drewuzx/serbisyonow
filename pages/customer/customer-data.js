@@ -417,6 +417,7 @@ if (messageButton) {
  const dot = notificationButton?.querySelector('.sn-dot');
 
  function applyData(data, notify = false) {
+  window.snCustomerLiveData = data;
   currentData = data || {};
   const items = snNotificationItems(data);
   const unseenItems = snUnseenNotices('customer', customer.id, items);
@@ -452,15 +453,16 @@ if (messageButton) {
 
  applyData(initialData, false);
  if (!window.snCustomerNotificationTimer) {
-  window.snCustomerNotificationTimer = window.setInterval(async () => {
-   if (document.visibilityState !== 'visible') return;
-   try {
-    const data = await snCustomerGet(`/api/customer/${customer.id}/dashboard`);
-    applyData(data, true);
-   } catch (error) {
-    console.warn(error.message || error);
-   }
-  }, 5000);
+  window.snCustomerNotificationTimer = window.snStartLiveRefresh('customer-data', async () => {
+    try {
+      const data = await snCustomerGet(`/api/customer/${customer.id}/dashboard`);
+      if (!window.snLiveRefresh?.isIdle()) return;
+      applyData(data, true);
+      document.dispatchEvent(new CustomEvent('sn:customer-data-updated', { detail: data }));
+    } catch (error) {
+      console.warn(error.message || error);
+    }
+  });
  }
 }
 
@@ -564,9 +566,31 @@ document.addEventListener('DOMContentLoaded', async () => {
  snRenderCustomerChrome(customer);
  snAttachCustomerSidebarFallback();
  snAttachUniversalCustomerFilter(customer);
+ window.snStartLiveRefresh('customer-account', async () => {
+  const { user } = await snCustomerGet(`/api/auth/customer/status/${customer.id}`);
+  if (!window.snLiveRefresh?.isIdle()) return;
+  if (!user) return;
+  const current = snCurrentCustomer();
+  if (!current || String(current.id) !== String(customer.id)) return;
+  const next = { ...current, ...user };
+  if (JSON.stringify(current) === JSON.stringify(next)) return;
+  localStorage.setItem('sn_customer_user', JSON.stringify(next));
+  const status = next.verification_status || (next.is_verified ? 'verified' : 'pending');
+  const name = document.getElementById('sn-user-name');
+  const label = document.getElementById('sn-user-status');
+  if (name) name.textContent = next.full_name || 'Customer';
+  if (label) label.textContent = status === 'verified' ? 'Verified customer' : status === 'rejected' ? 'Verification declined' : 'Awaiting verification';
+  document.body.classList.toggle('sn-locked', status !== 'verified');
+  const banner = document.getElementById('sn-verify-banner');
+  if (banner) {
+   banner.hidden = status === 'verified';
+   if (status !== 'verified') banner.textContent = status === 'rejected' ? 'Your verification was declined. Please resubmit your documents in your profile.' : 'Your account is pending admin verification.';
+  }
+  document.dispatchEvent(new CustomEvent('sn:customer-account-updated', { detail: next }));
+ });
 
  try {
- const data = await snCustomerGet(`/api/customer/${customer.id}/dashboard`);
+ const data = await snCustomerGet(`/api/customer/${customer.id}/dashboard`).catch(() => ({}));
  const path = window.location.pathname;
  snAttachTopbarRealtime(customer, data);
 
@@ -578,7 +602,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   { name: 'Installation Services', description: 'Services that improve or upgrade household facilities.', image: 'Installationn.png', services: ['Furniture assembly', 'Cabinet installation', 'Curtain or blinds installation', 'Lighting installation', 'CCTV installation', 'Internet or router setup', 'Appliance Installation'] },
   { name: 'Outdoor and Property Maintenance', description: 'Services related to the maintenance of outdoor spaces.', image: 'Outdoor & Property Repair.png', services: ['Gardening services', 'Lawn mowing', 'Landscape maintenance', 'Tree trimming', 'Fence repair'] },
  ];
- const verifiedProviders = data.providers || [];
+ let verifiedProviders = data.providers || [];
  const categoryData = new Map((data.categories || []).map(category => [category.name, category]));
  const providerCountForCategory = (categoryName) => verifiedProviders.filter(provider => {
   const providerCategory = snCategoryLabel(provider.category).toLowerCase();
@@ -598,9 +622,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
  const providerGrid = document.querySelector('.sn-providers-grid');
  if (providerGrid) {
- const recommendedProviders = data.recommendations?.length? data.recommendations: data.providers || [];
-  const allProviders = [...new Map([...recommendedProviders, ...(data.providers || [])].map(provider => [provider.id, provider])).values()];
- const favoriteIds = new Set((data.favorites || []).map(provider => String(provider.id)));
+ let recommendedProviders = data.recommendations?.length? data.recommendations: data.providers || [];
+ let allProviders = [...new Map([...recommendedProviders, ...(data.providers || [])].map(provider => [provider.id, provider])).values()];
+ let favoriteIds = new Set((data.favorites || []).map(provider => String(provider.id)));
+ let activeProviderFilter = '';
  const hasRealProviderIds = [...providerGrid.querySelectorAll('.sn-fav-btn')].some(button => button.dataset.providerId);
  const providerTitle = providerGrid.closest('.sn-section')?.querySelector('.sn-section-head h2');
   const chipRow = document.querySelector('.sn-chips');
@@ -650,6 +675,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  };
  renderServiceChips();
  const filterDashboardProviders = (button, filter) => {
+  activeProviderFilter = filter;
   document.querySelectorAll('.sn-cat, .sn-chip').forEach(item => item.classList.remove('active'));
   button.classList.add('active');
   renderDashboardProviders(filter);
@@ -669,6 +695,22 @@ document.addEventListener('DOMContentLoaded', async () => {
  document.querySelectorAll('.sn-chip').forEach(button => button.addEventListener('click', () => {
   filterDashboardProviders(button, button.textContent.trim());
  }));
+ let providerSignature = JSON.stringify([data.providers, data.recommendations, data.favorites]);
+ document.addEventListener('sn:customer-data-updated', ({ detail: next }) => {
+  const signature = JSON.stringify([next.providers, next.recommendations, next.favorites]);
+  if (signature === providerSignature || providerGrid.querySelector('button:disabled')) return;
+  providerSignature = signature;
+  verifiedProviders = next.providers || [];
+  recommendedProviders = next.recommendations?.length ? next.recommendations : verifiedProviders;
+  allProviders = [...new Map([...recommendedProviders, ...verifiedProviders].map(provider => [provider.id, provider])).values()];
+  favoriteIds = new Set((next.favorites || []).map(provider => String(provider.id)));
+  renderDashboardProviders(activeProviderFilter);
+  categoryGrid?.querySelectorAll('[data-category]').forEach(button => {
+   const count = providerCountForCategory(button.dataset.category);
+   const label = button.querySelector('.sn-cat-count');
+   if (label) label.textContent = `${count} provider${count === 1 ? '' : 's'}`;
+  });
+ });
  }
 
  const bookings = document.getElementById('sn-bookings');
@@ -710,6 +752,24 @@ document.addEventListener('DOMContentLoaded', async () => {
  <div class="sn-msg ${message.sender_role === 'customer'? 'sn-msg--out': 'sn-msg--in'}"><div class="sn-msg-bubble">${snEsc(message.message)}</div><div class="sn-msg-time">${snDate(message.created_at)}</div></div>
  `).join('');
  }
+
+ let bookingSignature = JSON.stringify(data.bookings);
+ let favoriteSignature = JSON.stringify(data.favorites);
+ document.addEventListener('sn:customer-data-updated', ({ detail: next }) => {
+  const nextBookings = JSON.stringify(next.bookings);
+  if (bookings && nextBookings !== bookingSignature && !bookings.querySelector('button:disabled')) {
+   bookingSignature = nextBookings;
+   window.snCustomerBookings = next.bookings || [];
+   bookings.innerHTML = renderCustomerBookings(window.snCustomerBookings) || '<div class="sn-customer-card"><p>No bookings yet.</p></div>';
+   document.dispatchEvent(new CustomEvent('sn:customer-bookings-rendered', { detail: { bookings: window.snCustomerBookings } }));
+  }
+  const nextFavorites = JSON.stringify(next.favorites);
+  if (favCards && nextFavorites !== favoriteSignature && !favCards.querySelector('.is-removing,button:disabled')) {
+   favoriteSignature = nextFavorites;
+   window.snCustomerFavorites = next.favorites || [];
+   document.dispatchEvent(new CustomEvent('sn:customer-favorites-rendered', { detail: { favorites: window.snCustomerFavorites } }));
+  }
+ });
 
  } catch (error) {
  console.warn(error.message || error);

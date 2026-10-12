@@ -31,8 +31,9 @@
       feedbackMessage.hidden = !text;
     }
 
-    function loadFeedback() {
+    function loadFeedback(options) {
       return adminGet('/api/admin/feedback?status=all').then(({ feedback }) => {
+        if (!adminDataChanged('feedback', feedback, options)) return;
         document.getElementById('feedback-count').textContent = `${feedback.length} records`;
         document.getElementById('feedback-list').innerHTML = feedback.map(item => `
           <div class="admin-list-item">
@@ -70,6 +71,7 @@
     });
 
     loadFeedback().catch(error => setFeedbackMessage(error.message, 'error'));
+    adminLive('feedback', loadFeedback);
   </script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>

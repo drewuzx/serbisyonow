@@ -33,7 +33,8 @@
   </main>
   <script src="../admin-data.js"></script>
   <script>
-    adminGet('/api/admin/dashboard').then(({ metrics, categoryTrends, recentActivity }) => {
+    function loadDashboard(options) { return adminGet('/api/admin/dashboard').then(({ metrics, categoryTrends, recentActivity }) => {
+      if (!adminDataChanged('dashboard', [metrics, categoryTrends, recentActivity], options)) return;
       document.getElementById('metric-users').textContent = metrics.users;
       document.getElementById('metric-providers').textContent = metrics.providers;
       document.getElementById('metric-pending').textContent = metrics.pending;
@@ -49,7 +50,9 @@
       document.getElementById('trend-chart').innerHTML = (categoryTrends.length ? categoryTrends : [{ name: 'No provider categories yet', count: 0 }]).map(item => `
         <div class="admin-chart-row"><span>${adminEscape(item.name)}</span><div class="admin-chart-track"><div class="admin-chart-fill" style="width:${Math.round((Number(item.count) / max) * 100)}%"></div></div><strong>${item.count}</strong></div>
       `).join('');
-    }).catch(error => {
+    }); }
+    adminLive('dashboard', loadDashboard);
+    loadDashboard().catch(error => {
       document.getElementById('activity-list').innerHTML = `<div class="admin-list-item"><strong>${error.message}</strong></div>`;
     });
   </script>

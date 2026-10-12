@@ -1,4 +1,26 @@
 const ADMIN_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
+const adminLiveSignatures = new Map();
+
+function adminCanRefresh() {
+  return window.snLiveRefresh?.isIdle() && !document.querySelector('.admin-modal:not([hidden]), .sn-modal:not([hidden]), .admin-actions button:disabled, [data-feedback-status]:disabled, [data-feedback-status]:focus');
+}
+
+function adminDataChanged(key, data, { background = false } = {}) {
+  if (background && !adminCanRefresh()) return false;
+  const signature = JSON.stringify(data);
+  const changed = signature !== adminLiveSignatures.get(key);
+  adminLiveSignatures.set(key, signature);
+  return !background || changed;
+}
+
+function adminLive(key, refresh) {
+  document.addEventListener('DOMContentLoaded', () => {
+    window.snStartLiveRefresh(`admin-${key}`, () => {
+      if (!adminCanRefresh()) return;
+      return refresh({ background: true });
+    });
+  });
+}
 
 async function adminGet(path) {
   const response = await fetch(`${ADMIN_API_BASE}${path}`);

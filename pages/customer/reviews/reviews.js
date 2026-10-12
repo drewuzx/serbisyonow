@@ -152,7 +152,8 @@ function renderLiveReviews(bookings, reviews) {
     const booking = toRate.find((item) => String(item.id) === button.dataset.reviewBooking);
     if (!booking) return;
     button.disabled = true;
-   try { await submitReview(booking); } catch (error) { showReviewErrorToast(error.message); button.disabled = false; }
+   try { await submitReview(booking); } catch (error) { showReviewErrorToast(error.message); }
+   finally { button.disabled = false; }
    });
  });
 
@@ -171,6 +172,13 @@ function renderLiveReviews(bookings, reviews) {
 
 document.addEventListener('DOMContentLoaded', async () => {
  await window.snAccountSessionReady;
+ let liveSignature = '';
+ document.addEventListener('sn:customer-data-updated', ({ detail: data }) => {
+  const signature = JSON.stringify([data.bookings, data.reviews]);
+  if (signature === liveSignature || document.querySelector('.sn-modal, [data-review-booking]:disabled')) return;
+  liveSignature = signature;
+  renderLiveReviews(data.bookings || [], data.reviews || []);
+ });
  const currentCustomer = getCurrentCustomer();
  if (!currentCustomer) {
  window.location.href = '../../auth/customerLogin.html';

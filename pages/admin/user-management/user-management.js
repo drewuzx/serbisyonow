@@ -171,13 +171,17 @@ function confirmDeclineModal() {
   });
 }
 
-async function loadUsers() {
+async function loadUsers({ background = false } = {}) {
   const response = await fetch(`${AUTH_API_BASE}/api/admin/users?status=all`);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.message || 'Failed to load users.');
   }
-  allUsers = Array.isArray(data.users) ? data.users : [];
+  const users = Array.isArray(data.users) ? data.users : [];
+  if (background && !window.snLiveRefresh?.isIdle()) return;
+  if (background && document.querySelector('.sn-modal:not([hidden]), #pending-table-body button:disabled')) return;
+  if (background && JSON.stringify(users) === JSON.stringify(allUsers)) return;
+  allUsers = users;
   updateMetrics(allUsers);
   applyFilters();
 }
@@ -236,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const cancelBtn = document.getElementById('decline-cancel-btn');
   const closeBtn = document.getElementById('decline-close-btn');
   const confirmBtn = document.getElementById('decline-confirm-btn');
-  const AUTO_REFRESH_MS = 10000;
 
   cancelBtn?.addEventListener('click', () => closeDeclineModal(false));
   closeBtn?.addEventListener('click', () => closeDeclineModal(false));
@@ -255,12 +258,10 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch((error) => SN.toast.error(error.message || 'Failed to refresh.'));
   });
 
-  setInterval(() => {
-    if (document.hidden) return;
-    loadUsers().catch(() => {
-      // silent auto-refresh failure; user can still manually refresh
-    });
-  }, AUTO_REFRESH_MS);
+  window.snStartLiveRefresh('admin-users', () => {
+    if (document.querySelector('.sn-modal:not([hidden]), #pending-table-body button:disabled')) return;
+    return loadUsers({ background: true });
+  });
 
   searchInput?.addEventListener('input', applyFilters);
   statusFilter?.addEventListener('change', applyFilters);

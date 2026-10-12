@@ -106,8 +106,9 @@
       pendingDeleteProvider = null;
     }
 
-    function loadProviders() {
+    function loadProviders(options) {
       return adminGet('/api/admin/providers?status=all').then(({ providers }) => {
+        if (!adminDataChanged('providers', providers, options)) return;
         document.getElementById('provider-count').textContent = `${providers.length} providers`;
         document.getElementById('provider-list').innerHTML = (providers.length ? providers : [{ full_name: 'No provider registrations yet', category: '-', service: '-', verification_status: 'pending' }]).map(provider => `
         ${(() => { const status = adminVerificationStatus(provider.verification_status); return `
@@ -186,6 +187,7 @@
     loadProviders().catch(error => {
       document.getElementById('provider-list').innerHTML = `<div class="admin-list-item"><strong>${error.message}</strong></div>`;
     });
+    adminLive('providers', loadProviders);
   </script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>
