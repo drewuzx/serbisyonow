@@ -821,7 +821,7 @@ function renderProviderDashboardLists(activeBookings, allBookings, availability)
   if (requestsPanel) {
     const recent = activeBookings.slice(0, 5);
     requestsPanel.innerHTML = `
-      <h3>Recent Requests</h3>
+      <h3>Ongoing Services</h3>
       <table class="sn-provider-table">
         <thead><tr><th>Time</th><th>Customer Name</th><th>Service</th><th>Status</th></tr></thead>
         <tbody>
@@ -832,7 +832,7 @@ function renderProviderDashboardLists(activeBookings, allBookings, availability)
               <td>${esc(booking.service || 'Service')}</td>
               <td>${statusPill(booking.status)}</td>
             </tr>
-          `).join('') || '<tr><td colspan="4">No active booking requests.</td></tr>'}
+          `).join('') || '<tr><td colspan="4">No ongoing services.</td></tr>'}
         </tbody>
       </table>
     `;
