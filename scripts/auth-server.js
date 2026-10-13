@@ -22,6 +22,7 @@ const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheck
 const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
+const { profileDescription, credentialType, saveProviderCredentials } = require('./provider-profile');
 
 const app = express();
 app.set('trust proxy', true);
@@ -66,6 +67,15 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+const credentialUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 12, fields: 0 },
+  fileFilter(_req, file, cb) {
+    try { credentialType(file); cb(null, true); }
+    catch (error) { cb(error); }
+  },
 });
 
 const bookingUpload = multer({
@@ -170,6 +180,7 @@ app.get('/uploads/:folder/:filename', asyncRoute(async (req, res) => {
   }
 
   res.type(file.mime_type || 'application/octet-stream');
+  res.set('X-Content-Type-Options', 'nosniff');
   res.set('Cache-Control', 'private, max-age=3600');
   res.set('Content-Disposition', `inline; filename="${String(file.original_name || filename).replace(/["\r\n]/g, '')}"`);
   if (file.size_bytes) res.set('Content-Length', String(file.size_bytes));
@@ -1104,6 +1115,7 @@ function providerRow(row) {
     email: row.email,
     category: canonicalCategoryName(row.category),
     service: row.service,
+    description: row.description || '',
     experience: row.experience,
     experience_years: row.experience_years,
     experience_certification: row.experience_certification,
@@ -1229,6 +1241,7 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS google_sub TEXT;
 
     ALTER TABLE providers
+      ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS latitude NUMERIC(10,7),
       ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,7),
       ADD COLUMN IF NOT EXISTS location_accuracy_m NUMERIC(10,2),
@@ -2937,8 +2950,10 @@ app.put('/api/provider/:id/payment-qr',
   }));
 
 app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
   requireFields(req.body, ['full_name', 'contact', 'address', 'category', 'service']);
   const contact = normalizeContactNumber(req.body.contact);
+  const description = profileDescription(req.body.description);
   const result = await db.query(`
     UPDATE providers
     SET full_name = $2,
@@ -2946,6 +2961,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
         address = $4,
         category = $5,
         service = $6,
+        description = COALESCE($7, description),
         updated_at = NOW()
     WHERE id = $1
     RETURNING *
@@ -2956,6 +2972,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
     String(req.body.address || '').trim(),
     canonicalCategoryName(req.body.category),
     String(req.body.service || '').trim(),
+    description,
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
   await ensureProviderProfileService(result.rows[0]);
@@ -3005,39 +3022,15 @@ app.post('/api/provider/:id/reassessment', asyncRoute(async (req, res) => {
   });
 }));
 
-app.patch('/api/provider/:id/credentials', upload.fields([
+app.patch('/api/provider/:id/credentials',
+  asyncRoute(async (req, _res, next) => { await authenticateAccount(db, req, 'provider', req.params.id); next(); }),
+  credentialUpload.fields([
   { name: 'docs', maxCount: 10 },
   { name: 'idFront', maxCount: 1 },
   { name: 'idBack', maxCount: 1 },
 ]), asyncRoute(async (req, res) => {
-  const docs = (req.files?.docs || []).map((file) => file.filename);
-  const idFront = req.files?.idFront?.[0]?.filename || null;
-  const idBack = req.files?.idBack?.[0]?.filename || null;
-  if (!docs.length && !idFront && !idBack) {
-    return res.status(400).json({ message: 'Upload at least one credential file.' });
-  }
-
-  await persistRequestUploads(req, { role: 'provider', id: req.params.id });
-  const result = await db.query(`
-    UPDATE providers
-    SET documents_files = (
-          SELECT ARRAY(
-            SELECT DISTINCT item
-            FROM unnest(COALESCE(documents_files, ARRAY[]::TEXT[]) || $2::TEXT[]) AS item
-            WHERE item <> ''
-            ORDER BY item
-          )
-        ),
-        id_front_file = COALESCE($3, id_front_file),
-        id_back_file = COALESCE($4, id_back_file),
-        is_verified = FALSE,
-        verification_status = 'pending',
-        updated_at = NOW()
-    WHERE id = $1
-    RETURNING *
-  `, [req.params.id, docs, idFront, idBack]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
-  res.json({ user: providerRow(result.rows[0]) });
+  const provider = await saveProviderCredentials(db, req.params.id, requestUploadedFiles(req));
+  res.json({ user: providerRow(provider) });
 }));
 
 app.patch('/api/provider/:id/location', asyncRoute(async (req, res) => {
@@ -4077,6 +4070,9 @@ app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
 }));
 
 app.use((error, _req, res, _next) => {
+  if (error instanceof multer.MulterError && /^\/api\/provider\/[^/]+\/credentials$/.test(_req.path)) {
+    return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each credential file must be 10 MB or smaller.' : 'Upload up to 10 credentials and one file per ID side.' });
+  }
   if (error instanceof multer.MulterError && /\/(payment-qr|direct-payment\/receipt)$/.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Payment images must be 5 MB or smaller.' : 'Upload one payment image only.' });
   }

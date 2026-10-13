@@ -27,6 +27,7 @@ async function ppGet(path) {
 }
 
 function ppGetCleanAbout(provider) {
+  if (typeof provider.description === 'string' && provider.description.trim()) return provider.description.trim();
   const rawAbout = provider.about || provider.experience || '';
   
   // If it looks like JSON (starts with { or [), try to extract or skip it

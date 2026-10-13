@@ -32,6 +32,7 @@ const providerLiveSignatures = new Map();
 let lastProviderGpsPayload = { at: 0, lat: null, lng: null };
 let lastProviderRouteKey = '';
 const providerBookingActions = new Set();
+const providerProfileActions = new Set();
 const providerRequestsState = { bookings: [], provider: null, filter: 'active', notice: '', noticeType: 'info', signature: '' };
 
 async function providerGet(path, options = {}) {
@@ -589,6 +590,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadProviderDatabase({ background = false } = {}) {
+  if (background && providerProfileActions.size) return false;
   const provider = getProviderUser();
   if (!provider?.id) return;
   const version = ++providerDatabaseVersion;
@@ -597,6 +599,7 @@ async function loadProviderDatabase({ background = false } = {}) {
     const data = await providerGet(`/api/provider/${provider.id}/dashboard`);
     if (background && !window.snLiveRefresh?.isIdle()) return false;
     if (version !== providerDatabaseVersion) return false;
+    if (background && providerProfileActions.size) return false;
     if (String(getProviderUser()?.id || '') !== String(provider.id)) return false;
     window.snProviderLiveData = data;
     document.dispatchEvent(new CustomEvent('sn:provider-data-updated', { detail: data }));
@@ -632,6 +635,13 @@ async function loadProviderDatabase({ background = false } = {}) {
     return true;
   } catch (error) {
     console.warn(error.message || error);
+    if (!background && window.location.pathname.includes('/profile/') && !document.getElementById('sn-provider-profile-form')) {
+      const panel = document.querySelector('.sn-panel');
+      if (panel) {
+        panel.innerHTML = '<h2>Provider Information</h2><p role="status">Unable to load your profile. Please try again.</p><button class="btn btn-outline" id="sn-provider-retry-profile" type="button">Retry</button>';
+        panel.querySelector('button').addEventListener('click', () => loadProviderDatabase());
+      }
+    }
     if (!background && window.location.pathname.includes('/requests/')) {
       if (!document.getElementById('sn-provider-requests-notice')) renderRequests(providerRequestsState.bookings, providerRequestsState.provider || provider);
       setProviderRequestsNotice('Unable to refresh bookings. Check your connection and use Refresh.', 'error');
@@ -2421,14 +2431,14 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
   if (preserveDraft && document.getElementById('sn-provider-full-name')) {
-    const fields = { 'sn-provider-full-name': provider.full_name, 'sn-provider-contact': provider.contact, 'sn-provider-category': providerCategoryLabel(provider.category), 'sn-provider-service': provider.service, 'sn-provider-address': provider.address };
+    const fields = { 'sn-provider-full-name': provider.full_name, 'sn-provider-contact': provider.contact, 'sn-provider-category': providerCategoryLabel(provider.category), 'sn-provider-service': provider.service, 'sn-provider-address': provider.address, 'sn-provider-description': provider.description };
     for (const [id, value] of Object.entries(fields)) {
       const field = document.getElementById(id);
       if (field && field.value === field.defaultValue) field.value = field.defaultValue = value || '';
     }
     const docs = panel.querySelector('.sn-provider-documents');
     if (docs) docs.innerHTML = renderProviderCredentialLinks(provider);
-    const badge = [...panel.querySelectorAll('input[readonly]')][0];
+    const badge = document.getElementById('sn-provider-badge');
     if (badge) badge.value = metrics?.badge_status || provider.verification_status || '';
     const score = panel.querySelector('.sn-reassessment-score');
     if (score) {
@@ -2446,27 +2456,45 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   const documentLinks = renderProviderCredentialLinks(provider);
   panel.innerHTML = `
     <h2>Provider Information</h2>
-    <div class="sn-form-grid">
-      <div class="sn-form-field"><label>Business or Display Name</label><input id="sn-provider-full-name" value="${esc(provider.full_name || '')}" /></div>
-      <div class="sn-form-field"><label>Contact Number</label><input id="sn-provider-contact" value="${esc(provider.contact || '')}" /></div>
-      <div class="sn-form-field"><label>Primary Category</label><input id="sn-provider-category" value="${esc(providerCategoryLabel(provider.category) || '')}" /></div>
-      <div class="sn-form-field"><label>Main Service</label><input id="sn-provider-service" value="${esc(provider.service || '')}" /></div>
-      <div class="sn-form-field"><label>Verification Badge</label><input value="${esc(metrics?.badge_status || provider.verification_status || '')}" readonly /></div>
-      <div class="sn-form-field"><label>Supporting Documents</label><input id="sn-provider-docs" type="file" multiple accept="image/*,.pdf,.doc,.docx" /></div>
-      <div class="sn-form-field"><label>Front of ID</label><input id="sn-provider-id-front" type="file" accept="image/*,.pdf" /></div>
-      <div class="sn-form-field"><label>Back of ID</label><input id="sn-provider-id-back" type="file" accept="image/*,.pdf" /></div>
-      <div class="sn-form-field full"><label>Address</label><textarea id="sn-provider-address">${esc(provider.address || '')}</textarea></div>
-      <div class="sn-form-field full"><label>GPS Service Location</label><input id="sn-provider-gps-label" value="${esc(locationLabel)}" readonly /></div>
-    </div>
-    <div class="sn-provider-documents">${documentLinks}</div>
+    <form id="sn-provider-profile-form">
+      <div class="sn-form-grid">
+        <div class="sn-form-field"><label for="sn-provider-full-name">Business or Display Name</label><input id="sn-provider-full-name" value="${esc(provider.full_name || '')}" required /></div>
+        <div class="sn-form-field"><label for="sn-provider-contact">Contact Number</label><input id="sn-provider-contact" type="tel" value="${esc(provider.contact || '')}" required /></div>
+        <div class="sn-form-field"><label for="sn-provider-category">Primary Category</label><input id="sn-provider-category" value="${esc(providerCategoryLabel(provider.category) || '')}" required /></div>
+        <div class="sn-form-field"><label for="sn-provider-service">Main Service</label><input id="sn-provider-service" value="${esc(provider.service || '')}" required /></div>
+        <div class="sn-form-field full"><label for="sn-provider-description">Description</label><textarea id="sn-provider-description" maxlength="2000" rows="4">${esc(provider.description || '')}</textarea></div>
+        <div class="sn-form-field full"><label for="sn-provider-address">Address</label><textarea id="sn-provider-address" required>${esc(provider.address || '')}</textarea></div>
+        <div class="sn-form-field"><label for="sn-provider-badge">Verification Badge</label><input id="sn-provider-badge" value="${esc(metrics?.badge_status || provider.verification_status || '')}" readonly /></div>
+        <div class="sn-form-field"><label for="sn-provider-gps-label">GPS Service Location</label><input id="sn-provider-gps-label" value="${esc(locationLabel)}" readonly /></div>
+      </div>
+      <p class="sn-profile-status" id="sn-provider-profile-status" role="status" hidden></p>
+      <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-save-profile" type="submit">Save Profile</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button></div>
+    </form>
+    <section class="sn-provider-credentials" aria-labelledby="sn-provider-credentials-title">
+      <h2 id="sn-provider-credentials-title">Credentials &amp; Proof of Work</h2>
+      <form id="sn-provider-credentials-form">
+        <div class="sn-form-grid">
+          <div class="sn-form-field full"><label for="sn-provider-docs">Certificates, work photos or supporting documents</label><input id="sn-provider-docs" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx" aria-describedby="sn-provider-file-limits" /></div>
+          <div class="sn-form-field"><label for="sn-provider-id-front">Front of ID</label><input id="sn-provider-id-front" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" /></div>
+          <div class="sn-form-field"><label for="sn-provider-id-back">Back of ID</label><input id="sn-provider-id-back" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" /></div>
+        </div>
+        <p class="sn-credential-limits" id="sn-provider-file-limits">JPG, PNG, WebP, PDF, DOC or DOCX. Maximum 10 MB per file; up to 10 supporting documents.</p>
+        <div id="sn-provider-selected-files" class="sn-provider-selected-files" aria-live="polite"></div>
+        <p class="sn-profile-status" id="sn-provider-credential-status" role="status" hidden></p>
+        <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-upload-credentials" type="submit">Upload Credentials</button></div>
+      </form>
+      <div class="sn-provider-documents">${documentLinks}</div>
+    </section>
     ${renderProviderReassessmentSection(provider, metrics, assessment)}
-    <p class="sn-profile-status" id="sn-provider-profile-status" hidden></p>
-    <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-save-profile" type="button">Save Profile</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button><button class="btn btn-outline" id="sn-provider-upload-credentials" type="button">Upload Credentials</button></div>
   `;
-  document.getElementById('sn-provider-save-profile')?.addEventListener('click', saveProviderProfile);
+  document.getElementById('sn-provider-profile-form')?.addEventListener('submit', event => { event.preventDefault(); saveProviderProfile(); });
   document.getElementById('sn-provider-save-gps')?.addEventListener('click', saveProviderGpsLocation);
   document.getElementById('sn-provider-live-gps')?.addEventListener('click', toggleProviderLiveTracking);
-  document.getElementById('sn-provider-upload-credentials')?.addEventListener('click', uploadProviderCredentials);
+  document.getElementById('sn-provider-credentials-form')?.addEventListener('submit', event => { event.preventDefault(); uploadProviderCredentials(); });
+  document.getElementById('sn-provider-credentials-form')?.addEventListener('change', () => {
+    renderProviderSelectedFiles();
+    setProviderCredentialStatus('', 'info');
+  });
   document.getElementById('sn-provider-start-reassessment')?.addEventListener('click', () => startProviderReassessment(provider));
   document.getElementById('sn-provider-cancel-reassessment')?.addEventListener('click', cancelProviderReassessment);
   document.getElementById('sn-provider-submit-reassessment')?.addEventListener('click', () => submitProviderReassessment(provider));
@@ -2604,13 +2632,28 @@ function providerUploadUrl(folder, filename) {
 function renderProviderCredentialLinks(provider) {
   const docs = Array.isArray(provider.documents_files) ? provider.documents_files : [];
   const links = [
-    ...docs.map((filename, index) => `<a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">Document ${index + 1}</a>`),
+    ...docs.map((filename, index) => `<a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">${esc(String(filename).replace(/^\d+-(?:[a-f0-9]{24}|\d+)-/, '') || `Document ${index + 1}`)}</a>`),
     provider.id_front_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_front_file)}" target="_blank" rel="noopener noreferrer">Front ID</a>` : '',
     provider.id_back_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_back_file)}" target="_blank" rel="noopener noreferrer">Back ID</a>` : '',
   ].filter(Boolean);
   return links.length
     ? `<strong>Uploaded Credentials</strong><div>${links.join('')}</div>`
     : '<strong>Uploaded Credentials</strong><span>No credential files uploaded yet.</span>';
+}
+
+function setProviderCredentialStatus(message, type = 'info') {
+  const status = document.getElementById('sn-provider-credential-status');
+  if (!status) return;
+  status.textContent = message;
+  status.className = `sn-profile-status sn-profile-status--${type}`;
+  status.hidden = !message;
+}
+
+function renderProviderSelectedFiles() {
+  const summary = document.getElementById('sn-provider-selected-files');
+  if (!summary) return;
+  const files = [...document.querySelectorAll('#sn-provider-credentials-form input[type="file"]')].flatMap(input => [...input.files]);
+  summary.textContent = files.map(file => `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`).join(', ');
 }
 
 function setProviderProfileStatus(message, type = 'info') {
@@ -2623,7 +2666,7 @@ function setProviderProfileStatus(message, type = 'info') {
 
 async function saveProviderProfile() {
   const provider = getProviderUser();
-  if (!provider?.id) return;
+  if (!provider?.id || providerProfileActions.has('save')) return;
   const button = document.getElementById('sn-provider-save-profile');
   const body = {
     full_name: document.getElementById('sn-provider-full-name')?.value.trim() || '',
@@ -2631,25 +2674,38 @@ async function saveProviderProfile() {
     category: document.getElementById('sn-provider-category')?.value.trim() || '',
     service: document.getElementById('sn-provider-service')?.value.trim() || '',
     address: document.getElementById('sn-provider-address')?.value.trim() || '',
+    description: document.getElementById('sn-provider-description')?.value.trim() || '',
   };
-  if (Object.values(body).some((value) => !value)) {
+  if (['full_name', 'contact', 'category', 'service', 'address'].some(key => !body[key])) {
     setProviderProfileStatus('Please complete display name, contact, category, service, and address.', 'error');
     return;
   }
 
+  providerProfileActions.add('save');
+  ++providerDatabaseVersion;
   if (button) {
     button.disabled = true;
     button.textContent = 'Saving...';
   }
   try {
     const data = await providerSend(`/api/provider/${provider.id}/profile`, 'PATCH', body);
-    localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
+    const saved = Object.fromEntries(Object.keys(body).map(key => [key, data.user[key]]));
+    localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...saved }));
     const userName = document.getElementById('sn-user-name');
     if (userName) userName.textContent = data.user.full_name || 'Service Provider';
+    const fields = { full_name: 'full-name', contact: 'contact', category: 'category', service: 'service', address: 'address', description: 'description' };
+    for (const [key, id] of Object.entries(fields)) {
+      const field = document.getElementById(`sn-provider-${id}`);
+      if (!field) continue;
+      const current = field.value;
+      field.defaultValue = data.user[key] || '';
+      field.value = current.trim() === body[key] ? field.defaultValue : current;
+    }
     setProviderProfileStatus('Profile saved successfully.', 'success');
   } catch (error) {
     setProviderProfileStatus(error.message || 'Unable to save provider profile.', 'error');
   } finally {
+    providerProfileActions.delete('save');
     if (button) {
       button.disabled = false;
       button.textContent = 'Save Profile';
@@ -2659,7 +2715,7 @@ async function saveProviderProfile() {
 
 async function uploadProviderCredentials() {
   const provider = getProviderUser();
-  if (!provider?.id) return;
+  if (!provider?.id || providerProfileActions.has('upload')) return;
   const docsInput = document.getElementById('sn-provider-docs');
   const frontInput = document.getElementById('sn-provider-id-front');
   const backInput = document.getElementById('sn-provider-id-back');
@@ -2669,8 +2725,22 @@ async function uploadProviderCredentials() {
     ...(backInput?.files || []),
   ];
   if (!files.length) {
-    setProviderProfileStatus('Choose at least one document or ID image before uploading.', 'error');
+    setProviderCredentialStatus('Choose a credential or proof-of-work file to upload.', 'info');
+    docsInput?.click();
     return;
+  }
+  if (docsInput.files.length > 10) {
+    setProviderCredentialStatus('Upload up to 10 supporting documents at a time.', 'error');
+    return;
+  }
+  for (const input of [docsInput, frontInput, backInput]) {
+    for (const file of input.files) {
+      const allowed = input === docsInput ? /\.(jpe?g|png|webp|pdf|docx?)$/i : /\.(jpe?g|png|webp|pdf)$/i;
+      if (!allowed.test(file.name) || file.size === 0 || file.size > 10 * 1024 * 1024) {
+        setProviderCredentialStatus(`${file.name}: choose a supported, non-empty file of 10 MB or less.`, 'error');
+        return;
+      }
+    }
   }
 
   const button = document.getElementById('sn-provider-upload-credentials');
@@ -2679,18 +2749,30 @@ async function uploadProviderCredentials() {
   if (frontInput?.files?.[0]) form.append('idFront', frontInput.files[0]);
   if (backInput?.files?.[0]) form.append('idBack', backInput.files[0]);
 
+  providerProfileActions.add('upload');
+  ++providerDatabaseVersion;
+  for (const input of [docsInput, frontInput, backInput]) input.disabled = true;
   if (button) {
     button.disabled = true;
     button.textContent = 'Uploading...';
   }
   try {
     const data = await providerSendForm(`/api/provider/${provider.id}/credentials`, 'PATCH', form);
-    localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
-    await loadProviderDatabase();
-    setProviderProfileStatus('Credentials uploaded. Your verification is back under admin review.', 'success');
+    const current = getProviderUser();
+    const uploaded = { documents_files: data.user.documents_files, id_front_file: data.user.id_front_file, id_back_file: data.user.id_back_file, is_verified: data.user.is_verified, verification_status: data.user.verification_status };
+    localStorage.setItem('sn_provider_user', JSON.stringify({ ...current, ...uploaded }));
+    const docs = document.querySelector('.sn-provider-documents');
+    if (docs) docs.innerHTML = renderProviderCredentialLinks({ ...current, ...uploaded });
+    const status = document.getElementById('sn-user-status');
+    if (status) status.textContent = 'Awaiting provider verification';
+    for (const input of [docsInput, frontInput, backInput]) input.value = '';
+    renderProviderSelectedFiles();
+    setProviderCredentialStatus('Credentials uploaded successfully. Pending admin review.', 'success');
   } catch (error) {
-    setProviderProfileStatus(error.message || 'Unable to upload credentials.', 'error');
+    setProviderCredentialStatus(error.message || 'Unable to upload credentials. Please try again.', 'error');
   } finally {
+    providerProfileActions.delete('upload');
+    for (const input of [docsInput, frontInput, backInput]) input.disabled = false;
     if (button) {
       button.disabled = false;
       button.textContent = 'Upload Credentials';

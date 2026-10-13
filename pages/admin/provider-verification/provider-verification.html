@@ -57,7 +57,7 @@
 
     function providerFileName(filename) {
       return String(filename || '')
-        .replace(/^\d+-\d+-/, '')
+        .replace(/^\d+-(?:[a-f0-9]{24}|\d+)-/, '')
         .replace(/[-_]+/g, ' ')
         .trim() || 'Uploaded file';
     }
@@ -81,7 +81,7 @@
       const documentLinks = docs.map((filename, index) => providerFileLink('provider-docs', filename, `Document ${index + 1}`));
       const groups = [
         idLinks.length ? `<div class="admin-file-group"><span class="admin-file-heading">Identity uploads</span><div class="admin-file-grid">${idLinks.join('')}</div></div>` : '',
-        documentLinks.length ? `<div class="admin-file-group"><span class="admin-file-heading">Supporting documents / resume</span><div class="admin-file-grid">${documentLinks.join('')}</div></div>` : '',
+        documentLinks.length ? `<div class="admin-file-group"><span class="admin-file-heading">Credentials &amp; proof of work</span><div class="admin-file-grid">${documentLinks.join('')}</div></div>` : '',
       ].filter(Boolean);
       return groups.length ? `<div class="admin-provider-files">${groups.join('')}</div>` : '<span class="admin-file-empty">No files uploaded</span>';
     }

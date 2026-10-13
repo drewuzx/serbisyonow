@@ -135,7 +135,11 @@ aside.sn-detail-panel {
 .sn-profile-section {
   border-top: 1px solid var(--border);
   padding-top: 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+
+.sn-profile-section > p { white-space: pre-line; }
 
 .sn-profile-section h3 {
   text-transform: uppercase;
