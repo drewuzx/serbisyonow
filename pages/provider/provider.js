@@ -615,10 +615,7 @@ async function loadProviderDatabase({ background = false } = {}) {
       render();
       providerLiveSignatures.set(key, signature);
     };
-    renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews], () => {
-      renderProviderMetrics(data);
-      renderProviderEarnings(data);
-    });
+    renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews], () => renderProviderMetrics(data));
     if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.availability], () => renderProviderDashboardAnalytics(data));
     const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
     if (path.includes('/services/') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
@@ -641,19 +638,6 @@ async function loadProviderDatabase({ background = false } = {}) {
     }
     return false;
   }
-}
-
-function sumCompletedEarningsSince(bookings, days) {
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  return (bookings || []).reduce((acc, booking) => {
-    if (String(booking.status || '').toLowerCase() !== 'completed') return acc;
-    const stamp = new Date(booking.updated_at || booking.scheduled_date || booking.created_at).getTime();
-    if (!Number.isFinite(stamp) || stamp < cutoff) return acc;
-    return {
-      amount: acc.amount + Number(booking.amount || 0),
-      jobs: acc.jobs + 1,
-    };
-  }, { amount: 0, jobs: 0 });
 }
 
 function liveClockLabel() {
@@ -712,34 +696,6 @@ function computeLiveProviderMetrics(data) {
     total_earnings: completed.reduce((sum, booking) => sum + Number(booking.amount || 0), 0),
     badge_status: server.badge_status || data.provider?.assessment_badge || 'Pending',
   };
-}
-
-function renderProviderEarnings(data) {
-  const section = document.querySelector('.sn-earnings-section');
-  const grid = section?.querySelector('.sn-earnings-grid');
-  if (!grid) return;
-
-  const bookings = data.history_bookings || data.bookings || [];
-  const periods = [
-    { days: 30, label: 'Last 30 days' },
-    { days: 14, label: 'Last 2 weeks' },
-    { days: 7, label: 'Last 7 days' },
-  ];
-
-  const live = section.querySelector('.sn-earnings-live');
-  if (live) live.textContent = `Live ${liveClockLabel()}`;
-
-  grid.innerHTML = periods.map((period) => {
-    const computed = sumCompletedEarningsSince(bookings, period.days);
-    const jobLabel = `${computed.jobs} completed job${computed.jobs === 1 ? '' : 's'}`;
-    return `
-      <article class="sn-earnings-card">
-        <div class="sn-earnings-card-label">${period.label}</div>
-        <div class="sn-earnings-card-value">${money(computed.amount)}</div>
-        <div class="sn-earnings-card-meta">${jobLabel}</div>
-      </article>
-    `;
-  }).join('');
 }
 
 function renderProviderMetrics(data) {

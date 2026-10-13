@@ -116,73 +116,6 @@ body {
   font-weight: 700;
 }
 
-.sn-earnings-section {
-  background: var(--white);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  padding: 20px 22px 22px;
-}
-
-.sn-earnings-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.sn-earnings-head h2 {
-  margin: 0 0 4px;
-  color: var(--blue-dark);
-  font-family: var(--font-heading);
-  font-size: 1.2rem;
-  font-weight: 900;
-}
-
-.sn-earnings-head p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-
-.sn-earnings-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.sn-earnings-card {
-  min-width: 0;
-  background: var(--bg-input, #f8f9fb);
-  border: 1.5px solid var(--border);
-  border-radius: 16px;
-  padding: 16px 18px;
-}
-
-.sn-earnings-card-label {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.sn-earnings-card-value {
-  margin-top: 8px;
-  color: var(--orange);
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 900;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-
-.sn-earnings-card-meta {
-  margin-top: 6px;
-  color: var(--blue-dark);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
 .sn-shell--provider .btn-primary {
   background: linear-gradient(135deg, var(--sn-action-blue), var(--sn-action-blue-dark));
   color: var(--white);
@@ -2264,7 +2197,6 @@ textarea.sn-modal-input {
 
 @media (max-width: 1080px) {
   .sn-shell--provider .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sn-earnings-grid { grid-template-columns: 1fr; }
   .sn-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sn-provider-history-layout,
   .sn-provider-bottom-grid,
@@ -2294,7 +2226,6 @@ textarea.sn-modal-input {
   .sn-provider-chart-day { gap: 3px; }
   .sn-provider-chart-day::after { font-size: 0.7rem; }
   .sn-provider-chart-head,
-  .sn-earnings-head { flex-wrap: wrap; }
 
   .sn-provider-service-card { grid-template-columns: minmax(0, 1fr); }
   .sn-provider-service-card > .sn-actions-row { grid-row: 2; grid-column: 1; }
