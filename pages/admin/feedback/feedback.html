@@ -17,13 +17,25 @@
 </head>
 <body>
   <main class="admin-wrap">
-    <header class="admin-header shell"><div class="admin-brand"><p class="eyebrow">ADMIN FEEDBACK</p><h1>Feedback Page</h1><p>User-submitted feedback loaded from the database.</p></div><div class="admin-header-actions"><button class="btn btn-light" onclick="location.reload()">Refresh</button></div></header>
+    <header class="admin-header shell"><div class="admin-brand"><p class="eyebrow">ADMIN FEEDBACK</p><h1>Feedback</h1><p>System ratings and user feedback.</p></div><div class="admin-header-actions"><button class="btn btn-light" onclick="loadFeedback().catch(handleFeedbackError)">Refresh</button></div></header>
     <nav class="admin-module-nav"><a href="../dashboard/dashboard.html">Dashboard</a><a href="../user-management/user-management.html">Users</a><a href="../provider-verification/provider-verification.html">Provider Verification</a><a href="../categories/categories.html">Categories</a><a href="../reports/reports.html">Reports</a><a class="active" href="./feedback.html">Feedback</a></nav>
-    <section class="admin-panel"><div class="admin-panel-head"><h2>Feedback</h2><span class="pill" id="feedback-count">0 records</span></div><p class="admin-form-message" id="feedback-message" hidden></p><div class="admin-list" id="feedback-list"></div></section>
+    <section class="admin-panel">
+      <div class="admin-panel-head"><h2>All Feedback</h2><span class="pill" id="feedback-count">0 records</span></div>
+      <p id="feedback-summary" class="admin-feedback-summary"></p>
+      <div class="admin-feedback-filters">
+        <label>Feedback type<select class="form-control" id="feedback-source" aria-label="Feedback type"><option value="all">All feedback</option><option value="system">System ratings</option><option value="general">Other feedback</option></select></label>
+        <label>Account type<select class="form-control" id="feedback-role" aria-label="Account type"><option value="all">All accounts</option><option value="customer">Customer</option><option value="provider">Provider</option></select></label>
+        <label>Rating<select class="form-control" id="feedback-rating" aria-label="Rating"><option value="all">All ratings</option><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select></label>
+      </div>
+      <p class="admin-form-message" id="feedback-message" hidden></p>
+      <a class="btn btn-light" id="feedback-login" href="../../auth/adminLogin.html" hidden>Sign In as Admin</a>
+      <div class="admin-list" id="feedback-list" aria-live="polite"></div>
+    </section>
   </main>
   <script src="../admin-data.js"></script>
   <script>
     const feedbackMessage = document.getElementById('feedback-message');
+    let feedbackRows = [];
 
     function setFeedbackMessage(text, type = 'info') {
       feedbackMessage.textContent = text;
@@ -31,16 +43,34 @@
       feedbackMessage.hidden = !text;
     }
 
-    function loadFeedback(options) {
-      return adminGet('/api/admin/feedback?status=all').then(({ feedback }) => {
-        if (!adminDataChanged('feedback', feedback, options)) return;
-        document.getElementById('feedback-count').textContent = `${feedback.length} records`;
-        document.getElementById('feedback-list').innerHTML = feedback.map(item => `
+    function handleFeedbackError(error) {
+      setFeedbackMessage(error.message, 'error');
+      if (error.status === 401 || error.status === 403) {
+        adminLiveSignatures.delete('feedback');
+        document.getElementById('feedback-login').hidden = false;
+        feedbackRows = [];
+        renderFeedback();
+      }
+    }
+
+    function renderFeedback() {
+      const source = document.getElementById('feedback-source').value;
+      const role = document.getElementById('feedback-role').value;
+      const rating = document.getElementById('feedback-rating').value;
+      const visible = feedbackRows.filter(item => (source === 'all' || (item.source || 'general') === source)
+        && (role === 'all' || item.submitted_role === role) && (rating === 'all' || Number(item.rating) === Number(rating)));
+      const rated = feedbackRows.filter(item => item.source === 'system' && item.rating);
+      document.getElementById('feedback-summary').textContent = rated.length
+        ? `${(rated.reduce((sum, item) => sum + Number(item.rating), 0) / rated.length).toFixed(1)}/5 average system rating | ${rated.length} system rating${rated.length === 1 ? '' : 's'}` : 'No system ratings yet.';
+      document.getElementById('feedback-count').textContent = `${visible.length} of ${feedbackRows.length} records`;
+      document.getElementById('feedback-list').innerHTML = visible.map(item => `
           <div class="admin-list-item">
-            <div><strong>${adminEscape(item.subject)}</strong><span>${adminEscape(item.submitted_by)}${item.related_party ? ` | ${adminEscape(item.related_party)}` : ''} - ${adminFormatDate(item.created_at)}</span><p>${adminEscape(item.message)}</p></div>
+            <div class="admin-feedback-content"><strong>${adminEscape(item.subject)}</strong>
+              ${item.source === 'system' ? `<div class="admin-feedback-rating" aria-label="${Number(item.rating)} out of 5 stars"><span aria-hidden="true">${'&#9733;'.repeat(Number(item.rating))}${'&#9734;'.repeat(5 - Number(item.rating))}</span><b>${Number(item.rating)}/5</b></div>` : ''}
+              <span>${adminEscape(item.submitted_by)}${item.submitted_role ? ` | ${item.submitted_role === 'provider' ? 'Provider' : 'Customer'}` : ''}${item.related_party ? ` | ${adminEscape(item.related_party)}` : ''} - ${adminFormatDate(item.created_at)}</span><p>${adminEscape(item.message || 'No comment provided.')}</p></div>
             <div class="admin-actions">
               <span class="status-badge ${item.status === 'resolved' || item.status === 'logged' ? 'verified' : 'pending'}">${adminEscape(item.status)}</span>
-              <select class="form-control" data-feedback-status="${item.id}">
+              <select class="form-control" data-feedback-status="${item.id}" aria-label="Status for feedback ${item.id}">
                 <option value="open" ${item.status === 'open' ? 'selected' : ''}>Open</option>
                 <option value="review" ${item.status === 'review' ? 'selected' : ''}>Review</option>
                 <option value="resolved" ${item.status === 'resolved' ? 'selected' : ''}>Resolved</option>
@@ -48,9 +78,19 @@
               </select>
             </div>
           </div>
-        `).join('') || '<div class="admin-list-item"><strong>No feedback records yet</strong></div>';
+        `).join('') || `<div class="admin-list-item"><strong>${feedbackRows.length ? 'No feedback matches these filters' : 'No feedback records yet'}</strong></div>`;
+    }
+
+    function loadFeedback(options) {
+      return adminGet('/api/admin/feedback?status=all').then(({ feedback }) => {
+        if (!adminDataChanged('feedback', feedback, options)) return;
+        feedbackRows = feedback;
+        document.getElementById('feedback-login').hidden = true;
+        renderFeedback();
       });
     }
+
+    document.querySelector('.admin-feedback-filters').addEventListener('change', renderFeedback);
 
     document.getElementById('feedback-list').addEventListener('change', async (event) => {
       const select = event.target.closest('[data-feedback-status]');
@@ -64,14 +104,15 @@
         });
         setFeedbackMessage('Feedback status updated.', 'success');
       } catch (error) {
-        setFeedbackMessage(error.message, 'error');
+        handleFeedbackError(error);
       } finally {
-        await loadFeedback();
+        select.disabled = false;
+        await loadFeedback().catch(handleFeedbackError);
       }
     });
 
-    loadFeedback().catch(error => setFeedbackMessage(error.message, 'error'));
-    adminLive('feedback', loadFeedback);
+    loadFeedback().catch(handleFeedbackError);
+    adminLive('feedback', options => loadFeedback(options).catch(handleFeedbackError));
   </script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>

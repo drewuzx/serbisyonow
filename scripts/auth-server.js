@@ -21,6 +21,7 @@ const { createPayMongo } = require('./paymongo');
 const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheckout, settleBookingPayment, expireCancelledCheckout, cancelBookingPayment, fail: paymentFail } = require('./booking-payments');
 const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
+const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
 
 const app = express();
 app.set('trust proxy', true);
@@ -1474,6 +1475,9 @@ function feedbackRow(row) {
     related_party: row.related_party,
     status: row.status,
     created_at: row.created_at,
+    source: row.source || 'general',
+    rating: row.rating == null ? null : Number(row.rating),
+    submitted_role: row.submitted_role || null,
   };
 }
 
@@ -3676,8 +3680,33 @@ app.post('/api/auth/admin/login', asyncRoute(async (req, res) => {
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
-  res.json({ user: { id: admin.id, username: admin.username, role: 'admin' } });
+  const authToken = await issueSession(db, 'admin', admin.id, { req, res });
+  res.json({ user: { id: admin.id, username: admin.username, role: 'admin', auth_token: authToken } });
 }));
+
+app.get('/api/system-feedback', asyncRoute(async (req, res) => {
+  const actor = await authenticateAccount(db, req, feedbackRole(req.query.role));
+  res.set('Cache-Control', 'private, no-store');
+  res.json(await feedbackState(db, actor));
+}));
+
+app.post('/api/system-feedback', asyncRoute(async (req, res) => {
+  const actor = await authenticateAccount(db, req, feedbackRole(req.body.role));
+  res.set('Cache-Control', 'private, no-store');
+  res.status(201).json(await submitSystemFeedback(db, actor, req.body));
+}));
+
+async function requireFeedbackAdmin(req) {
+  if (!requestSessionToken(req, 'admin')) paymentFail(401, 'Sign in as an admin to view feedback.');
+  let actor;
+  try { actor = await authenticateAccount(db, req, 'admin'); }
+  catch (error) {
+    if (error.statusCode === 401 || error.statusCode === 403) error.message = 'Sign in as an admin to view feedback.';
+    throw error;
+  }
+  const result = await db.query('SELECT id FROM admins WHERE id = $1', [actor.id]);
+  if (!result.rowCount) paymentFail(403, 'An admin account is required.');
+}
 
 app.get('/api/admin/customers', asyncRoute(async (req, res) => {
   const status = String(req.query.status || 'pending');
@@ -3746,7 +3775,6 @@ app.get('/api/admin/dashboard', asyncRoute(async (_req, res) => {
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status IN ('open', 'review'))::int AS open
       FROM admin_feedback
-      WHERE lower(subject) <> 'positive feedback'
     `),
   ]);
 
@@ -3901,14 +3929,16 @@ app.get('/api/admin/reports', asyncRoute(async (_req, res) => {
 }));
 
 app.get('/api/admin/feedback', asyncRoute(async (req, res) => {
+  await requireFeedbackAdmin(req);
+  res.set('Cache-Control', 'private, no-store');
   const status = String(req.query.status || 'all');
   const params = [];
-  const whereClauses = ["lower(subject) <> 'positive feedback'"];
+  const whereClauses = [];
   if (['open', 'review', 'resolved', 'logged'].includes(status)) {
     params.push(status);
     whereClauses.push(`status = $${params.length}`);
   }
-  const where = `WHERE ${whereClauses.join(' AND ')}`;
+  const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
   const result = await db.query(`SELECT * FROM admin_feedback ${where} ORDER BY created_at DESC`, params);
   res.json({ feedback: result.rows.map(feedbackRow) });
@@ -3987,6 +4017,7 @@ app.patch('/api/admin/providers/:id/verify', asyncRoute(async (req, res) => {
 }));
 
 app.post('/api/admin/feedback', asyncRoute(async (req, res) => {
+  await requireFeedbackAdmin(req);
   requireFields(req.body, ['type', 'subject', 'message', 'submitted_by']);
   const result = await db.query(`
     INSERT INTO admin_feedback (type, subject, message, submitted_by, related_party, status, customer_id, provider_id, booking_id)
@@ -4007,7 +4038,9 @@ app.post('/api/admin/feedback', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/feedback/:id/status', asyncRoute(async (req, res) => {
+  await requireFeedbackAdmin(req);
   requireFields(req.body, ['status']);
+  if (!['open', 'review', 'resolved', 'logged'].includes(req.body.status)) paymentFail(400, 'Choose a valid feedback status.');
   const result = await db.query(`
     UPDATE admin_feedback
     SET status = $2, updated_at = NOW()
@@ -4055,11 +4088,12 @@ app.use((error, _req, res, _next) => {
   }
   console.error(error);
   const status = error.statusCode || 500;
-  res.status(status).json({ message: status === 500 ? 'Server error.' : error.message, ...(error.alternatives ? { alternatives: error.alternatives } : {}) });
+  res.status(status).json({ message: status === 500 ? 'Server error.' : error.message, ...(error.alternatives ? { alternatives: error.alternatives } : {}), ...(error.nextPromptAt ? { next_prompt_at: error.nextPromptAt } : {}) });
 });
 
 ensureAdminSupportTables()
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'payment-schema.sql'), 'utf8')))
+  .then(() => db.query(fs.readFileSync(path.join(__dirname, 'feedback-schema.sql'), 'utf8')))
   .then(() => {
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);

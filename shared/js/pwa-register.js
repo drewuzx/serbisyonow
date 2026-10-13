@@ -17,6 +17,11 @@
       script.onerror = () => resolve();
       document.head.appendChild(script);
     });
+    window.snAccountSessionReady.then(() => {
+      const script = document.createElement('script');
+      script.src = '/shared/js/system-feedback.js';
+      document.head.appendChild(script);
+    });
   }
   if (!('serviceWorker' in navigator)) return;
 

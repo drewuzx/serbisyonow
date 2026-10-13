@@ -23,21 +23,29 @@ function adminLive(key, refresh) {
 }
 
 async function adminGet(path) {
-  const response = await fetch(`${ADMIN_API_BASE}${path}`);
+  const response = await fetch(`${ADMIN_API_BASE}${path}`, { headers: adminAuthHeaders(), credentials: 'same-origin' });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Failed to load admin data.');
+  if (!response.ok) { const error = new Error(data.message || 'Failed to load admin data.'); error.status = response.status; throw error; }
   return data;
 }
 
 async function adminSend(path, { method = 'POST', body } = {}) {
   const response = await fetch(`${ADMIN_API_BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...adminAuthHeaders() },
+    credentials: 'same-origin',
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Admin request failed.');
+  if (!response.ok) { const error = new Error(data.message || 'Admin request failed.'); error.status = response.status; throw error; }
   return data;
+}
+
+function adminAuthHeaders() {
+  try {
+    const token = JSON.parse(localStorage.getItem('sn_admin_user') || 'null')?.auth_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch { return {}; }
 }
 
 function adminFormatDate(value) {
