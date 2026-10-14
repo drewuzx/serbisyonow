@@ -17,10 +17,8 @@ function favMoney(value) {
 }
 
 function favBadge(provider) {
- const tier = provider.verified_tier || (provider.verification_status === 'verified' ? 'skilled' : 'basic');
- if (tier === 'top') return '<div class="sn-provider-badge sn-badge--top">Top Verified</div>';
- if (tier === 'skilled') return '<div class="sn-provider-badge sn-badge--verified">Skilled Verified</div>';
- return '<div class="sn-provider-badge sn-badge--basic">Basic Verified</div>';
+ const style = provider.verified_tier === 'top' ? 'top' : provider.verified_tier === 'skilled' ? 'verified' : 'basic';
+ return `<div class="sn-provider-badge sn-badge--${style}">${favEsc(provider.badge_status || 'Pending Verification')}</div>`;
 }
 
 async function favFetch(path, options = {}) {
@@ -37,7 +35,7 @@ function renderFavoriteCard(provider, index) {
    <div class="sn-fav-info">
     <div class="sn-fav-name-row">
      <span class="sn-fav-name">${favEsc(provider.full_name || provider.fullName || 'Service Provider')}</span>
-     <span class="sn-fav-rating">* ${Number(provider.rating || 4.8).toFixed(1)}</span>
+     <span class="sn-fav-rating">${provider.rating == null ? 'Not rated' : `* ${Number(provider.rating).toFixed(1)}`}</span>
     </div>
     ${favBadge(provider)}
     <div class="sn-fav-price">Starts at <strong>${favMoney(provider.starting_price || 350)}</strong></div>

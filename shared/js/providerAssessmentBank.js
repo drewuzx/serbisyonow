@@ -203,7 +203,11 @@
     ],
   };
 
-  window.SN_PROVIDER_ASSESSMENT_FALLBACK = fallbackQuestionBank;
-  window.SN_PROVIDER_ASSESSMENT_BANKS = assessmentQuestionBanks;
-  window.SN_PROVIDER_SERVICES_BY_CATEGORY = servicesByCategory;
+  if (typeof module === 'object' && module.exports) {
+    module.exports = { fallbackQuestionBank, assessmentQuestionBanks, servicesByCategory };
+  } else {
+    window.SN_PROVIDER_ASSESSMENT_FALLBACK = fallbackQuestionBank;
+    window.SN_PROVIDER_ASSESSMENT_BANKS = assessmentQuestionBanks;
+    window.SN_PROVIDER_SERVICES_BY_CATEGORY = servicesByCategory;
+  }
 })();

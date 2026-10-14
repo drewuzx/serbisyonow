@@ -23,6 +23,7 @@ const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
 const { profileDescription, credentialType, saveProviderCredentials } = require('./provider-profile');
+const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
 const app = express();
 app.set('trust proxy', true);
@@ -834,32 +835,8 @@ function hasAssessmentSubmission(experienceText) {
   return /assessment\s*score\s*:\s*\d{1,3}\s*%/i.test(text) && /answers\s*:/i.test(text);
 }
 
-function parseExperienceYears(label) {
-  const value = String(label || '').toLowerCase();
-  if (value.includes('less') || value.includes('below')) return { min: 0, max: 1 };
-  if (value.includes('5+')) return { min: 5, max: 99 };
-
-  const numbers = value.match(/\d+/g)?.map(Number) || [];
-  if (numbers.length >= 2) return { min: numbers[0], max: numbers[1] };
-  if (numbers.length === 1) return { min: numbers[0], max: numbers[0] };
-  return { min: 0, max: 0 };
-}
-
-function calculateProviderBadge(scoreValue, experienceYears) {
-  const score = clampScore(scoreValue);
-  const years = parseExperienceYears(experienceYears);
-
-  if (score >= 80 && years.min >= 3) return 'Top-Tier Verified';
-  if (score >= 70 && years.max >= 2) return 'Skilled Verified';
-  if (score >= 60) return 'Basic Verified';
-  return 'Needs Reassessment';
-}
-
-function providerTierFromBadge(badge) {
-  const value = String(badge || '').toLowerCase();
-  if (value.includes('top')) return 'top';
-  if (value.includes('skilled')) return 'skilled';
-  return 'basic';
+function calculateProviderBadge(scoreValue, provider = {}) {
+  return providerBadge({ ...provider, assessment_score: clampScore(scoreValue) }).badge;
 }
 
 const LOCATION_POINTS = [
@@ -1101,7 +1078,7 @@ function providerRow(row) {
   const assessmentScore = row.assessment_score === undefined
     ? extractAssessmentScore(row.experience)
     : Number(row.assessment_score || 0);
-  const badgeStatus = calculateProviderBadge(assessmentScore, row.experience_years);
+  const details = row.badge_details || providerBadge({ ...row, assessment_score: assessmentScore });
 
   return {
     role: 'provider',
@@ -1127,11 +1104,25 @@ function providerRow(row) {
     location_accuracy_m: row.location_accuracy_m === null || row.location_accuracy_m === undefined ? null : Number(row.location_accuracy_m),
     location_updated_at: row.location_updated_at || null,
     assessment_score: assessmentScore,
-    badge_status: badgeStatus,
+    badge_status: details.badge,
+    badge_details: details,
+    verified_tier: details.tier,
+    rating: details.average_rating,
+    review_count: details.review_count,
+    completed_jobs: details.completed_jobs,
+    assessed_at: row.assessed_at || null,
     is_verified: row.is_verified,
     verification_status: row.verification_status,
     created_at: row.created_at,
   };
+}
+
+async function providerViews(rows) {
+  return (await loadProviderBadgeData(db, rows)).map(row => ({ ...providerRow(row), ...(row.favorite_id !== undefined ? { favorite_id: row.favorite_id } : {}) }));
+}
+
+async function providerView(row) {
+  return (await providerViews([row]))[0];
 }
 
 async function ensureAdminSupportTables() {
@@ -1412,7 +1403,7 @@ async function backfillProviderProfileData() {
       provider.id,
       provider.category || 'General',
       extractAssessmentScore(provider.experience),
-      calculateProviderBadge(extractAssessmentScore(provider.experience), provider.experience_years),
+      calculateProviderBadge(extractAssessmentScore(provider.experience), provider),
     ]);
   }
 }
@@ -1621,17 +1612,6 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
       COALESCE(ch.collaborative_score, 0) AS collaborative_score,
       EXISTS (SELECT 1 FROM my_interactions mi WHERE mi.provider_id = p.id) AS is_previous_interaction,
       COALESCE(psa.score, extract_score.score, 0)::int AS assessment_score,
-      CASE
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 AND lower(p.experience_years) ~ '(3|5|higher|\\+)' THEN 'Top-Tier Verified'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 AND lower(p.experience_years) ~ '(2|3|5|higher|\\+)' THEN 'Skilled Verified'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 60 THEN 'Basic Verified'
-        ELSE 'Needs Reassessment'
-      END AS assessment_badge,
-      CASE
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 AND lower(p.experience_years) ~ '(3|5|higher|\\+)' THEN 'top'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 AND lower(p.experience_years) ~ '(2|3|5|higher|\\+)' THEN 'skilled'
-        ELSE 'basic'
-      END AS verified_tier,
       (
         COALESCE(ch.collaborative_score, 0) * 10
         + CASE WHEN EXISTS (SELECT 1 FROM my_interactions mi WHERE mi.provider_id = p.id) THEN 12 ELSE 0 END
@@ -1667,9 +1647,9 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
     LIMIT $2
   `, [customerId, limit]);
 
-  return result.rows.map((row) => ({
+  return (await loadProviderBadgeData(db, result.rows)).map((row) => ({
     ...providerRow(row),
-    rating: Number(row.rating || 4.8),
+    rating: row.rating,
     completed_jobs: Number(row.completed_jobs || 0),
     favorite_count: Number(row.favorite_count || 0),
     starting_price: Number(row.starting_price || 350),
@@ -1677,7 +1657,7 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
     is_previous_interaction: Boolean(row.is_previous_interaction),
     verified_tier: row.verified_tier,
     assessment_score: Number(row.assessment_score || 0),
-    badge_status: row.assessment_badge,
+    badge_status: row.badge_status,
     collaborative_score: Number(row.collaborative_score || 0),
     recommendation_score: Number(row.recommendation_score || 0),
     recommendation_reason: row.recommendation_reason,
@@ -1834,7 +1814,7 @@ app.get('/api/auth/:role/session', asyncRoute(async (req, res) => {
   if (!result.rowCount) return res.status(401).json({ message: 'Account is no longer available.' });
   const token = requestSessionToken(req, role);
   rememberSession(req, res, role, token);
-  res.json({ user: { ...(role === 'provider' ? providerRow(result.rows[0]) : customerRow(result.rows[0])), auth_token: token } });
+  res.json({ user: { ...(role === 'provider' ? await providerView(result.rows[0]) : customerRow(result.rows[0])), auth_token: token } });
 }));
 
 app.post('/api/auth/:role/logout', asyncRoute(async (req, res) => {
@@ -1939,7 +1919,7 @@ app.post('/api/auth/google/complete', asyncRoute(async (req, res) => {
       action: 'login',
       role,
       redirect: googleDashboardPath(role),
-      user: { ...(role === 'provider' ? providerRow(requestedAccount) : customerRow(requestedAccount)), auth_token: await issueSession(db, role, requestedAccount.id, { req, res }) },
+      user: { ...(role === 'provider' ? await providerView(requestedAccount) : customerRow(requestedAccount)), auth_token: await issueSession(db, role, requestedAccount.id, { req, res }) },
     });
   }
 
@@ -1980,7 +1960,7 @@ app.post('/api/auth/google/account-status', asyncRoute(async (req, res) => {
       action: 'login',
       role,
       redirect: googleDashboardPath(role),
-      user: role === 'provider' ? providerRow(requestedAccount) : customerRow(requestedAccount),
+      user: role === 'provider' ? await providerView(requestedAccount) : customerRow(requestedAccount),
     });
   }
 
@@ -2361,7 +2341,7 @@ app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
       LIMIT 20
     `, [customerId]),
     db.query(`
-      SELECT f.id, f.customer_id, f.provider_id, f.created_at, p.*
+      SELECT f.id AS favorite_id, f.customer_id, f.provider_id, f.created_at, p.*
       FROM customer_favorites f
       JOIN providers p ON p.id = f.provider_id
       WHERE f.customer_id = $1
@@ -2379,11 +2359,11 @@ app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
 
   res.json({
     categories: categories.rows.map(categoryRow),
-    providers: providers.rows.map(providerRow),
+    providers: await providerViews(providers.rows),
     recommendations,
     bookings: bookings.rows.map(customerBookingRow),
     messages: messages.rows.map(customerMessageRow),
-    favorites: favorites.rows.map((row) => ({ favorite_id: row.id, ...providerRow(row) })),
+    favorites: await providerViews(favorites.rows),
     reviews: reviews.rows.map(customerReviewRow),
   });
 }));
@@ -2444,11 +2424,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
       COALESCE(MIN(s.starting_price), 350) AS starting_price,
       COUNT(DISTINCT av.id)::int AS available_slots,
       COALESCE(psa.score, extract_score.score, 0)::int AS assessment_score,
-      CASE
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 AND lower(p.experience_years) ~ '(3|5|higher|\\+)' THEN 'top'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 AND lower(p.experience_years) ~ '(2|3|5|higher|\\+)' THEN 'skilled'
-        ELSE 'basic'
-      END AS verified_tier
+      p.verification_status AS verification_state
     FROM providers p
     LEFT JOIN provider_services s ON s.provider_id = p.id AND s.is_active = TRUE
     LEFT JOIN customer_reviews r ON r.provider_id = p.id
@@ -2469,7 +2445,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
     LIMIT 40
   `, params);
 
-  const providers = result.rows.map((row) => {
+  const providers = (await loadProviderBadgeData(db, result.rows)).map((row) => {
     const point = geoPointFromRow(row);
     const distance = distanceKm(customerPoint, point);
     const sameArea = String(row.address || '').toLowerCase().split(/\W+/)
@@ -2477,7 +2453,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
     const isAccurate = customerPoint.source !== 'estimated' && point.source === 'saved-gps';
     return {
       ...providerRow(row),
-      rating: Number(row.rating || 4.8),
+      rating: row.rating,
       completed_jobs: Number(row.completed_jobs || 0),
       starting_price: Number(row.starting_price || 350),
       available_slots: Number(row.available_slots || 0),
@@ -2727,7 +2703,7 @@ app.get('/api/customer/:id/favorites', asyncRoute(async (req, res) => {
     WHERE f.customer_id = $1
     ORDER BY f.created_at DESC
   `, [req.params.id]);
-  res.json({ favorites: result.rows.map((row) => ({ favorite_id: row.favorite_id, ...providerRow(row) })) });
+  res.json({ favorites: await providerViews(result.rows) });
 }));
 
 app.post('/api/customer/:id/favorites', asyncRoute(async (req, res) => {
@@ -2805,6 +2781,10 @@ app.post('/api/auth/provider/register', upload.fields([
   if (!hasAssessmentSubmission(req.body.experience)) {
     return res.status(400).json({ message: 'Please complete the provider skill assessment before submitting.' });
   }
+  let registrationAnswers;
+  try { registrationAnswers = JSON.parse(String(req.body.experience).split(/Answers:\s*/i)[1]); }
+  catch { return res.status(400).json({ message: 'Please retake the provider skill assessment.' }); }
+  req.body.experience = gradeAssessment(canonicalCategoryName(req.body.category), registrationAnswers).experience;
 
   const email = String(req.body.email || '').trim().toLowerCase();
   const googleSub = String(req.body.googleSub || '').trim();
@@ -2883,14 +2863,14 @@ app.post('/api/auth/provider/register', upload.fields([
     );
 
     const assessmentScore = extractAssessmentScore(req.body.experience);
-    const badge = calculateProviderBadge(assessmentScore, req.body.experienceYears);
+    const badge = calculateProviderBadge(assessmentScore, result.rows[0]);
     await persistRequestUploads(req, { role: 'provider', id: result.rows[0].id });
     await db.query(`
       INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
       VALUES ($1, $2, $3, $4)
     `, [result.rows[0].id, category || 'General', assessmentScore, badge]);
     await ensureProviderProfileService(result.rows[0]);
-    return res.status(201).json({ user: providerRow(result.rows[0]) });
+    return res.status(201).json({ user: await providerView(result.rows[0]) });
   }
 
   const result = await db.query(
@@ -2905,7 +2885,7 @@ app.post('/api/auth/provider/register', upload.fields([
   );
 
   const assessmentScore = extractAssessmentScore(req.body.experience);
-  const badge = calculateProviderBadge(assessmentScore, req.body.experienceYears);
+  const badge = calculateProviderBadge(assessmentScore, result.rows[0]);
   await persistRequestUploads(req, { role: 'provider', id: result.rows[0].id });
   await db.query(`
     INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
@@ -2913,7 +2893,7 @@ app.post('/api/auth/provider/register', upload.fields([
   `, [result.rows[0].id, category || 'General', assessmentScore, badge]);
   await ensureProviderProfileService(result.rows[0]);
 
-  res.status(201).json({ user: { ...providerRow(result.rows[0]), auth_token: await issueSession(db, 'provider', result.rows[0].id, { req, res }) } });
+  res.status(201).json({ user: { ...await providerView(result.rows[0]), auth_token: await issueSession(db, 'provider', result.rows[0].id, { req, res }) } });
 }));
 
 app.post('/api/auth/provider/login', asyncRoute(async (req, res) => {
@@ -2925,13 +2905,13 @@ app.post('/api/auth/provider/login', asyncRoute(async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
 
-  res.json({ user: { ...providerRow(provider), auth_token: await issueSession(db, 'provider', provider.id, { req, res }) } });
+  res.json({ user: { ...await providerView(provider), auth_token: await issueSession(db, 'provider', provider.id, { req, res }) } });
 }));
 
 app.get('/api/auth/provider/status/:id', asyncRoute(async (req, res) => {
   const result = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
-  res.json({ user: providerRow(result.rows[0]) });
+  res.json({ user: await providerView(result.rows[0]) });
 }));
 
 app.get('/api/provider/:id/payment-qr', asyncRoute(async (req, res) => {
@@ -2976,24 +2956,19 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
   await ensureProviderProfileService(result.rows[0]);
-  res.json({ user: providerRow(result.rows[0]) });
+  res.json({ user: await providerView(result.rows[0]) });
 }));
 
 app.post('/api/provider/:id/reassessment', asyncRoute(async (req, res) => {
-  requireFields(req.body, ['category', 'score', 'answers']);
+  await authenticateAccount(db, req, 'provider', req.params.id);
+  requireFields(req.body, ['answers']);
   const providerResult = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   const provider = providerResult.rows[0];
   if (!provider) return res.status(404).json({ message: 'Provider not found.' });
 
-  const answers = Array.isArray(req.body.answers) ? req.body.answers : [];
-  if (!answers.length) {
-    return res.status(400).json({ message: 'Assessment answers are required.' });
-  }
-
-  const score = clampScore(req.body.score);
-  const category = canonicalCategoryName(req.body.category || provider.category || 'General') || 'General';
-  const badge = calculateProviderBadge(score, provider.experience_years);
-  const experience = `Assessment score: ${score}%. Answers: ${JSON.stringify(answers)}`;
+  const category = canonicalCategoryName(provider.category || 'General');
+  const { score, experience } = gradeAssessment(category, req.body.answers);
+  const badge = calculateProviderBadge(score, provider);
 
   const assessmentResult = await db.query(`
     INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
@@ -3009,17 +2984,8 @@ app.post('/api/provider/:id/reassessment', asyncRoute(async (req, res) => {
     RETURNING *
   `, [req.params.id, experience]);
 
-  res.json({
-    assessment: {
-      ...assessmentResult.rows[0],
-      badge,
-    },
-    user: providerRow({
-      ...updatedProvider.rows[0],
-      assessment_score: score,
-      assessment_badge: badge,
-    }),
-  });
+  const user = await providerView(updatedProvider.rows[0]);
+  res.json({ assessment: { ...assessmentResult.rows[0], badge: user.badge_status }, user });
 }));
 
 app.patch('/api/provider/:id/credentials',
@@ -3030,7 +2996,7 @@ app.patch('/api/provider/:id/credentials',
   { name: 'idBack', maxCount: 1 },
 ]), asyncRoute(async (req, res) => {
   const provider = await saveProviderCredentials(db, req.params.id, requestUploadedFiles(req));
-  res.json({ user: providerRow(provider) });
+  res.json({ user: await providerView(provider) });
 }));
 
 app.patch('/api/provider/:id/location', asyncRoute(async (req, res) => {
@@ -3051,7 +3017,7 @@ app.patch('/api/provider/:id/location', asyncRoute(async (req, res) => {
     RETURNING *
   `, [req.params.id, latitude, longitude, Number.isFinite(accuracy) ? accuracy : null]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
-  res.json({ user: providerRow(result.rows[0]) });
+  res.json({ user: await providerView(result.rows[0]) });
 }));
 
 app.get('/api/providers/search', asyncRoute(async (req, res) => {
@@ -3102,19 +3068,11 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
   params.push(location.toLowerCase());
   const locationParam = `$${params.length}`;
 
-  const orderBy = sort === 'rating'
-    ? 'rating DESC, completed_jobs DESC, proximity_score DESC, p.created_at DESC'
-    : sort === 'nearest'
-      ? 'proximity_score DESC, p.is_verified DESC, rating DESC, p.created_at DESC'
-      : sort === 'top'
-        ? "CASE WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 AND lower(p.experience_years) ~ '(3|5|higher|\\+)' THEN 3 WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 AND lower(p.experience_years) ~ '(2|3|5|higher|\\+)' THEN 2 ELSE 1 END DESC, rating DESC, completed_jobs DESC, proximity_score DESC, p.created_at DESC"
-        : sort === 'highest'
-          ? "CASE WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 THEN 4 WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 THEN 3 WHEN COALESCE(psa.score, extract_score.score, 0) >= 60 THEN 2 ELSE 1 END DESC, rating DESC, completed_jobs DESC, proximity_score DESC, p.created_at DESC"
-          : sort === 'basic'
-            ? "CASE WHEN COALESCE(psa.score, extract_score.score, 0) >= 60 THEN 2 ELSE 0 END DESC, rating DESC, completed_jobs DESC, proximity_score DESC, p.created_at DESC"
-            : sort === 'available'
-              ? 'available_slots DESC, recommendation_score DESC, rating DESC, p.created_at DESC'
-              : 'recommendation_score DESC, p.is_verified DESC, rating DESC, completed_jobs DESC, p.created_at DESC';
+  const orderBy = ['top', 'highest', 'basic'].includes(sort) ? 'p.id'
+    : sort === 'rating' ? 'rating DESC, completed_jobs DESC, proximity_score DESC, p.created_at DESC'
+    : sort === 'nearest' ? 'proximity_score DESC, p.is_verified DESC, rating DESC, p.created_at DESC'
+    : sort === 'available' ? 'available_slots DESC, recommendation_score DESC, rating DESC, p.created_at DESC'
+    : 'recommendation_score DESC, p.is_verified DESC, rating DESC, completed_jobs DESC, p.created_at DESC';
 
   const result = await db.query(`
     SELECT
@@ -3131,17 +3089,6 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
           AND av.is_available = TRUE
       ) AS available_slots,
       COALESCE(psa.score, extract_score.score, 0)::int AS assessment_score,
-      CASE
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 AND lower(p.experience_years) ~ '(3|5|higher|\\+)' THEN 'Top-Tier Verified'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 AND lower(p.experience_years) ~ '(2|3|5|higher|\\+)' THEN 'Skilled Verified'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 60 THEN 'Basic Verified'
-        ELSE 'Needs Reassessment'
-      END AS assessment_badge,
-      CASE
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 80 AND lower(p.experience_years) ~ '(3|5|higher|\\+)' THEN 'top'
-        WHEN COALESCE(psa.score, extract_score.score, 0) >= 70 AND lower(p.experience_years) ~ '(2|3|5|higher|\\+)' THEN 'skilled'
-        ELSE 'basic'
-      END AS verified_tier,
       CASE
         WHEN ${locationParam} <> '' AND lower(p.address) LIKE '%' || ${locationParam} || '%' THEN 3
         WHEN ${locationParam} <> '' AND EXISTS (
@@ -3191,9 +3138,14 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
     WHERE ${where.join(' AND ')}
     GROUP BY p.id, psa.score, psa.badge, extract_score.score, extract_score.badge
     ORDER BY ${orderBy}
-    LIMIT 30
+    ${['top', 'highest', 'basic'].includes(sort) ? '' : 'LIMIT 30'}
   `, params);
 
+  const providerRows = await loadProviderBadgeData(db, result.rows);
+  if (['top', 'highest', 'basic'].includes(sort)) {
+    const rank = row => sort === 'basic' ? Number(row.verified_tier === 'basic') : sort === 'highest' ? row.badge_details.total_points : ({ top: 3, skilled: 2, basic: 1 }[row.verified_tier] || 0);
+    providerRows.sort((a, b) => rank(b) - rank(a) || b.badge_details.total_points - a.badge_details.total_points || Number(b.rating) - Number(a.rating) || b.completed_jobs - a.completed_jobs);
+  }
   res.json({
     algorithm: {
       search_filtering: 'Filters providers by search text, category/service, verification status, and availability-ready records.',
@@ -3201,16 +3153,16 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
       location_based: 'Boosts providers whose address matches the customer address or location tokens.',
       sorting: sort,
     },
-    providers: result.rows.map((row) => ({
+    providers: providerRows.slice(0, 30).map((row) => ({
       ...providerRow(row),
-      rating: Number(row.rating || 4.8),
+      rating: row.rating,
       completed_jobs: Number(row.completed_jobs || 0),
       favorite_count: Number(row.favorite_count || 0),
       starting_price: Number(row.starting_price || 350),
       available_slots: Number(row.available_slots || 0),
       verified_tier: row.verified_tier,
       assessment_score: Number(row.assessment_score || 0),
-      badge_status: row.assessment_badge,
+      badge_status: row.badge_status,
       proximity_score: Number(row.proximity_score || 0),
       recommendation_score: Number(row.recommendation_score || 0),
     })),
@@ -3427,7 +3379,7 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
       ORDER BY available_date ASC, start_time ASC
       LIMIT 20
     `, [providerId]),
-    db.query('SELECT * FROM provider_skill_assessments WHERE provider_id = $1 ORDER BY created_at DESC LIMIT 1', [providerId]),
+    db.query('SELECT * FROM provider_skill_assessments WHERE provider_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]),
   ]);
 
   if (!provider.rowCount) return res.status(404).json({ message: 'Provider not found.' });
@@ -3435,9 +3387,6 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
   const bookingRows = bookings.rows;
   const completed = bookingRows.filter((row) => row.status === 'completed');
   const pending = bookingRows.filter((row) => row.status === 'pending');
-  const ratingAvg = reviews.rows.length
-    ? reviews.rows.reduce((sum, row) => sum + Number(row.rating || 0), 0) / reviews.rows.length
-    : null;
   const earnings = completed.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const earnings30 = sumCompletedEarningsSince(bookingRows, 30);
   const earnings14 = sumCompletedEarningsSince(bookingRows, 14);
@@ -3445,17 +3394,14 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
   const providerRecord = provider.rows[0];
   const assessmentRecord = assessment.rows[0] || null;
   const assessmentScore = assessmentRecord?.score ?? extractAssessmentScore(providerRecord.experience);
-  const computedBadge = calculateProviderBadge(assessmentScore, providerRecord.experience_years);
+  const providerData = await providerView(providerRecord);
+  const computedBadge = providerData.badge_status;
 
   res.json({
-    provider: providerRow({
-      ...providerRecord,
-      assessment_score: assessmentScore,
-      assessment_badge: computedBadge,
-    }),
+    provider: providerData,
     metrics: {
-      rating: ratingAvg === null ? null : Number(ratingAvg.toFixed(1)),
-      review_count: reviews.rows.length,
+      rating: providerData.rating,
+      review_count: providerData.review_count,
       completed_jobs: completed.length,
       response_rate: bookingResponseRate(bookingRows),
       pending_requests: pending.length,
@@ -3730,7 +3676,7 @@ app.get('/api/admin/users', asyncRoute(async (req, res) => {
 
   const users = [
     ...customersResult.rows.map(customerRow),
-    ...providersResult.rows.map(providerRow),
+    ...await providerViews(providersResult.rows),
   ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   res.json({ users });
@@ -3828,7 +3774,7 @@ app.get('/api/admin/providers', asyncRoute(async (req, res) => {
     ${where}
     ORDER BY p.created_at DESC
   `, params);
-  res.json({ providers: result.rows.map(providerRow) });
+  res.json({ providers: await providerViews(result.rows) });
 }));
 
 app.get('/api/categories', asyncRoute(async (_req, res) => {
@@ -3917,7 +3863,7 @@ app.get('/api/admin/reports', asyncRoute(async (_req, res) => {
   res.json({
     userSummary: userSummary.rows,
     categorySummary: categorySummary.rows,
-    topProviders: providerSummary.rows.map(providerRow),
+    topProviders: await providerViews(providerSummary.rows),
   });
 }));
 
@@ -3962,20 +3908,21 @@ app.patch('/api/admin/customers/:id/reject', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/providers/:id/verify', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
   const providerLookup = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   if (!providerLookup.rowCount) return res.status(404).json({ message: 'Provider not found.' });
 
   const existingAssessment = await db.query(`
     SELECT * FROM provider_skill_assessments
     WHERE provider_id = $1
-    ORDER BY updated_at DESC, created_at DESC
+    ORDER BY created_at DESC, id DESC
     LIMIT 1
   `, [req.params.id]);
 
   const provider = providerLookup.rows[0];
   const assessmentScore = existingAssessment.rows[0]?.score ?? extractAssessmentScore(provider.experience);
-  const badge = calculateProviderBadge(assessmentScore, provider.experience_years);
-  if (badge === 'Needs Reassessment') {
+  const badge = calculateProviderBadge(assessmentScore, { ...provider, is_verified: true, verification_status: 'verified' });
+  if (assessmentScore < 60) {
     return res.status(400).json({
       message: 'Provider cannot be verified yet. Skill assessment must be at least 60%.',
       assessment_score: assessmentScore,
@@ -3995,13 +3942,8 @@ app.patch('/api/admin/providers/:id/verify', asyncRoute(async (req, res) => {
     SELECT $1, $2, $3, $4
     WHERE NOT EXISTS (SELECT 1 FROM provider_skill_assessments WHERE provider_id = $1)
   `, [req.params.id, result.rows[0].category || 'General', assessmentScore, badge]);
-  await db.query(`
-    UPDATE provider_skill_assessments
-    SET score = $2, badge = $3, updated_at = NOW()
-    WHERE provider_id = $1
-  `, [req.params.id, assessmentScore, badge]);
   res.json({
-    provider: providerRow({
+    provider: await providerView({
       ...result.rows[0],
       assessment_score: assessmentScore,
       assessment_badge: badge,
@@ -4045,6 +3987,7 @@ app.patch('/api/admin/feedback/:id/status', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE providers
      SET is_verified = FALSE, verification_status = 'rejected', updated_at = NOW()
@@ -4053,7 +3996,7 @@ app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
     [req.params.id]
   );
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
-  res.json({ provider: providerRow(result.rows[0]) });
+  res.json({ provider: await providerView(result.rows[0]) });
 }));
 
 app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {

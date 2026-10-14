@@ -628,7 +628,7 @@ async function loadProviderDatabase({ background = false } = {}) {
     }
     if (path.includes('/schedule/') && (!background || !editing)) renderChanged('schedule', [data.availability, data.bookings], () => renderSchedule(data.availability || [], data.bookings || [], background));
     if (path.includes('/inbox/')) renderChanged('inbox', data.messages, () => renderInbox(data.messages || []));
-    if (path.includes('/assessment/')) renderChanged('assessment', [data.assessment, data.metrics], () => renderAssessment(data.assessment, data.metrics));
+    if (path.includes('/assessment/')) renderChanged('assessment', [data.assessment, data.metrics, data.provider?.badge_details], () => renderAssessment(data.assessment, data.metrics, data.provider));
     if (path.includes('/reviews/')) renderChanged('reviews', data.reviews, () => renderReviews(data.reviews || [], data.metrics));
     if (path.includes('/history/')) renderChanged('history', data.history_bookings || data.bookings, () => renderHistory(data.history_bookings || data.bookings || []));
     if (path.includes('/profile/')) renderChanged('profile', [data.provider, data.metrics, data.assessment], () => renderProfile(data.provider || provider, data.metrics, data.assessment, background));
@@ -698,8 +698,8 @@ function computeLiveProviderMetrics(data) {
     : null;
   const server = data.metrics || {};
   return {
-    rating: rating ?? (server.rating ?? null),
-    review_count: reviews.length || server.review_count || 0,
+    rating: data.provider?.badge_details ? server.rating : rating ?? (server.rating ?? null),
+    review_count: data.provider?.badge_details ? server.review_count : reviews.length || server.review_count || 0,
     completed_jobs: completed.length,
     response_rate: bookingResponseRate(bookings),
     pending_requests: pending.length,
@@ -2107,11 +2107,44 @@ function renderInbox(messages) {
   renderChat();
 }
 
-function renderAssessment(assessment, metrics) {
+function renderAssessment(assessment, metrics, provider = {}) {
   const grid = document.querySelector('.sn-page-grid');
   if (!grid) return;
+  const details = provider.badge_details;
+  grid.classList.add('sn-assessment-page');
+  if (!details) {
+    grid.innerHTML = `<section class="sn-assessment-section"><h2>Skill Status</h2><p>Assessment Score: ${Number(assessment?.score || 0)}%</p><p>${esc(metrics?.badge_status || assessment?.badge || 'Pending Verification')}</p><p>Badge breakdown is unavailable. Please try again.</p><button type="button" class="btn btn-outline" id="sn-assessment-retry">Retry</button></section>`;
+    document.getElementById('sn-assessment-retry').addEventListener('click', () => loadProviderDatabase());
+    return;
+  }
+  const rules = details.rules;
+  const points = value => Number(value).toLocaleString('en-PH', { maximumFractionDigits: 2 });
+  const rows = [
+    { label: 'Skill Assessment', value: `${points(details.assessment_score)}% score`, formula: `${points(details.assessment_score)} x ${rules.assessment_weight}%`, earned: details.assessment_points, max: rules.assessment_weight, status: details.assessment_score >= rules.passing_assessment ? 'Passed' : 'Needs reassessment' },
+    { label: 'Supporting Credentials', value: details.documents_approved ? 'Admin-approved documents' : details.document_count ? 'Pending approval' : 'No supporting documents', formula: details.documents_approved ? `${rules.credentials_weight} points awarded` : '0 points until documents are approved', earned: details.credential_points, max: rules.credentials_weight, status: `${details.document_count} document${details.document_count === 1 ? '' : 's'}` },
+    { label: 'Customer Ratings', value: details.average_rating === null ? 'No completed-service reviews' : `${points(details.average_rating)} / 5 average`, formula: details.average_rating === null ? '0 points without reviews' : `${points(details.average_rating)} / 5 x ${rules.ratings_weight}`, earned: details.rating_points, max: rules.ratings_weight, status: `${details.review_count} review${details.review_count === 1 ? '' : 's'}` },
+  ];
+  const statusMessage = details.assessment_score < rules.passing_assessment ? 'A passing assessment score of 60% is required.' : !details.admin_verified ? 'Admin verification is required before a verified badge is awarded.' : details.total_points < rules.basic_points ? 'A minimum of 60 badge points is required for Basic Verified.' : details.badge === 'Top-Rated' ? 'All Top-Rated requirements are met.' : 'Top-Rated requires the score and service-history requirements below.';
   grid.innerHTML = `
-    <article class="sn-panel"><h3>Skill Status</h3><p>Assessment Score: ${assessment?.score || 0}%</p><div class="sn-actions-row"><span class="sn-status-pill active">${assessment?.badge || metrics?.badge_status || 'Basic Verified'}</span></div></article>
+    <section class="sn-assessment-section sn-assessment-summary" aria-labelledby="sn-skill-status-title">
+      <div><h2 id="sn-skill-status-title">Skill Status</h2><div class="sn-badge-result" data-tier="${esc(details.tier)}"><img src="/shared/icons/lucide/star.svg" width="24" height="24" alt="" /><strong>${esc(details.badge)}</strong></div><p>${esc(statusMessage)}</p></div>
+      <dl class="sn-assessment-totals"><div><dt>Badge Score</dt><dd>${points(details.total_points)}<small> / 100</small></dd></div><div><dt>Assessment Score</dt><dd>${points(details.assessment_score)}<small>%</small></dd></div></dl>
+      <div class="sn-assessment-meta"><span>${esc(provider.category || assessment?.category || 'General')}</span><span>${provider.assessed_at ? `Last assessment: ${esc(shortDateTime(provider.assessed_at))}` : 'No assessment recorded'}</span></div>
+      <div class="sn-actions-row"><a class="btn btn-primary" href="../profile/profile.html#sn-provider-start-reassessment">Retake Assessment</a><a class="btn btn-outline" href="../profile/profile.html#sn-provider-credentials-title">Manage Credentials</a></div>
+    </section>
+    <section class="sn-assessment-section" aria-labelledby="sn-badge-breakdown-title">
+      <h2 id="sn-badge-breakdown-title">Badge Score Breakdown</h2>
+      <div class="sn-badge-breakdown">${rows.map(row => `<div class="sn-badge-component"><div><h3>${row.label}</h3><p>${esc(row.value)}</p><small>Weight: ${row.max}% | ${esc(row.status)}</small></div><div class="sn-badge-calculation"><span>${row.formula}</span><progress value="${row.earned}" max="${row.max}" aria-label="${row.label} points"></progress></div><strong>${points(row.earned)}<small> / ${row.max} pts</small></strong></div>`).join('')}</div>
+      <div class="sn-badge-total"><span>${points(details.assessment_points)} + ${points(details.credential_points)} + ${points(details.rating_points)}</span><strong>${points(details.total_points)} / 100 points</strong></div>
+    </section>
+    <section class="sn-assessment-section" aria-labelledby="sn-badge-levels-title">
+      <h2 id="sn-badge-levels-title">Badge Levels</h2><p>All verified badges require a passing assessment of 60% and admin approval.</p>
+      <div class="sn-badge-levels">${[['Basic Verified',rules.basic_points,'basic'],['Skilled Verified',rules.skilled_points,'skilled'],['Top-Rated',rules.top_points,'top']].map(([name, score, tier]) => `<article class="sn-badge-level${details.tier === tier ? ' is-current' : ''}"><h3>${name}</h3><strong>${score}+ points</strong><p>${tier === 'top' ? 'Plus completed-service and customer-rating requirements.' : 'Assessment, approved credentials and customer ratings.'}</p>${details.tier === tier ? '<span>Current badge</span>' : ''}</article>`).join('')}</div>
+    </section>
+    <section class="sn-assessment-section" aria-labelledby="sn-top-rated-title"><h2 id="sn-top-rated-title">Top-Rated Eligibility</h2>
+      <dl class="sn-assessment-service-stats"><div><dt>Completed Services</dt><dd>${details.completed_jobs}</dd></div><div><dt>Customer Reviews</dt><dd>${details.review_count}</dd></div><div><dt>Average Rating</dt><dd>${details.average_rating === null ? 'Not rated' : `${points(details.average_rating)} / 5`}</dd></div></dl>
+      <ul class="sn-badge-requirements">${details.top_rated_requirements.map(item => `<li data-met="${item.met}"><span>${esc(item.label)}</span><strong>${item.met ? 'Met' : 'Not yet met'}</strong></li>`).join('')}</ul>
+    </section>
   `;
 }
 
@@ -2312,7 +2345,7 @@ function renderProviderHistoryDetail(booking) {
 function renderProviderReassessmentSection(provider, metrics, assessment) {
   const category = resolveProviderAssessmentCategory(provider, assessment);
   const currentScore = Number(assessment?.score ?? provider.assessment_score ?? 0);
-  const currentBadge = assessment?.badge || metrics?.badge_status || provider.badge_status || 'Needs Reassessment';
+  const currentBadge = provider.badge_status || metrics?.badge_status || assessment?.badge || 'Needs Reassessment';
   const questionCount = providerAssessmentBank(category).length;
   const hasQuestionBank = questionCount >= 10;
 
@@ -2416,7 +2449,8 @@ async function submitProviderReassessment(provider) {
     if (data.user) localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
     activeProviderReassessmentQuestions = [];
     await loadProviderDatabase();
-    setProviderProfileStatus(`Reassessment submitted. New score: ${score}% (${data.assessment?.badge || data.user?.badge_status || 'updated'}).`, score >= 60 ? 'success' : 'error');
+    const savedScore = data.assessment?.score ?? data.user?.assessment_score;
+    setProviderProfileStatus(`Reassessment submitted. New score: ${savedScore}% (${data.user?.badge_status || data.assessment?.badge || 'updated'}).`, savedScore >= 60 ? 'success' : 'error');
   } catch (error) {
     setProviderProfileStatus(error.message || 'Unable to submit reassessment.', 'error');
   } finally {

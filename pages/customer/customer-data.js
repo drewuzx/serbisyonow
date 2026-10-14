@@ -94,10 +94,8 @@ async function snDeleteCustomerFavorite(customerId, providerId) {
 }
 
 function snBadge(provider) {
- const tier = provider.verified_tier || (provider.verification_status === 'verified'? 'skilled': 'basic');
- if (tier === 'top') return '<div class="sn-provider-badge sn-badge--top">Top-Tier Verified</div>';
- if (tier === 'skilled') return '<div class="sn-provider-badge sn-badge--verified">Skilled Verified</div>';
- return '<div class="sn-provider-badge sn-badge--basic">Basic Verified</div>';
+ const style = provider.verified_tier === 'top' ? 'top' : provider.verified_tier === 'skilled' ? 'verified' : 'basic';
+ return `<div class="sn-provider-badge sn-badge--${style}">${snEsc(provider.badge_status || 'Pending Verification')}</div>`;
 }
 
 function snRenderCustomerChrome(customer) {
@@ -177,7 +175,7 @@ function snAttachUniversalCustomerFilter(customer) {
   <div class="sn-universal-filter-grid">
    <label><span>Search</span><input id="sn-universal-filter-q" type="text" value="${snEsc(searchInput?.value || '')}" placeholder="Search service or provider" /></label>
    <label><span>Category</span><select id="sn-universal-filter-category">${categories.map((category, index) => `<option value="${index === 0 ? '' : snEsc(category)}">${snEsc(category)}</option>`).join('')}</select></label>
-   <label><span>Sort</span><select id="sn-universal-filter-sort"><option value="recommended">Recommended</option><option value="top">Top Verified</option><option value="highest">Highest Verified</option><option value="basic">Basic Verified</option><option value="available">Available First</option></select></label>
+   <label><span>Sort</span><select id="sn-universal-filter-sort"><option value="recommended">Recommended</option><option value="top">Top-Rated</option><option value="highest">Highest Verified</option><option value="basic">Basic Verified</option><option value="available">Available First</option></select></label>
    <label><span>Location</span><input id="sn-universal-filter-location" type="text" value="${snEsc(customer?.address || '')}" placeholder="City, barangay, or address" /></label>
    <label class="sn-universal-filter-check"><input id="sn-universal-filter-available" type="checkbox" /><span>Available only</span></label>
   </div>
@@ -473,7 +471,7 @@ function renderProviderCard(provider, favoriteIds = new Set()) {
  const profileUrl = `../provider-profile/provider-profile.html?id=${encodeURIComponent(providerId)}`;
  const bookingUrl = `../bookings/bookings.html?provider_id=${encodeURIComponent(providerId)}`;
  return `
- <div class="sn-provider-card"><button class="sn-fav-btn ${isFavorite ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${snEsc(providerId)}" aria-label="${isFavorite ? 'Saved to favorites' : 'Favorite provider'}">♥</button><div class="sn-provider-img sn-provider-img--1"></div><div class="sn-provider-info"><div class="sn-provider-name-row"><span class="sn-provider-title">${snEsc(provider.full_name)}</span><span class="sn-rating">${Number(provider.rating || 4.8).toFixed(1)}</span></div>
+ <div class="sn-provider-card"><button class="sn-fav-btn ${isFavorite ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${snEsc(providerId)}" aria-label="${isFavorite ? 'Saved to favorites' : 'Favorite provider'}">♥</button><div class="sn-provider-img sn-provider-img--1"></div><div class="sn-provider-info"><div class="sn-provider-name-row"><span class="sn-provider-title">${snEsc(provider.full_name)}</span><span class="sn-rating">${provider.rating == null ? 'Not rated' : Number(provider.rating).toFixed(1)}</span></div>
  ${snBadge(provider)}
  <div class="sn-provider-loc">${snEsc(provider.address || 'Angeles City')}</div>
  ${provider.recommendation_reason? `<div class="sn-recommend-reason">${snEsc(provider.recommendation_reason)}</div>`: ''}

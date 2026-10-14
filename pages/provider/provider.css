@@ -1963,6 +1963,57 @@ body {
 .sn-reassessment-form[hidden],
 .sn-reassessment-intro[hidden] { display: none; }
 
+.sn-assessment-page { display: block; background: #fff; border: 1px solid var(--border); }
+.sn-assessment-section { padding: 24px; border-bottom: 1px solid var(--border); min-width: 0; }
+.sn-assessment-section:last-child { border-bottom: 0; }
+.sn-assessment-section h2 { font-size: 21px; margin: 0 0 14px; color: var(--blue-dark); }
+.sn-assessment-section h3 { font-size: 15px; margin: 0 0 5px; }
+.sn-assessment-section p { margin: 6px 0; color: var(--text-muted); font-size: 14px; line-height: 1.6; }
+.sn-assessment-section :is(span, p, strong, small, dd, dt) { overflow-wrap: anywhere; }
+.sn-assessment-summary { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+.sn-badge-result { display: flex; align-items: center; gap: 10px; color: #6b4c0a; font-size: 19px; }
+.sn-badge-result[data-tier="top"] { color: #986708; }
+.sn-badge-result[data-tier="skilled"] { color: #087443; }
+.sn-badge-result[data-tier="basic"] { color: #214da7; }
+.sn-badge-result img { flex: 0 0 24px; }
+.sn-assessment-totals, .sn-assessment-service-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 0; }
+.sn-assessment-totals dt, .sn-assessment-service-stats dt { font-size: 13px; color: var(--text-muted); }
+.sn-assessment-totals dd { font-size: 30px; font-weight: 800; margin: 5px 0 0; color: var(--blue-dark); }
+.sn-assessment-totals dd small { font-size: 15px; font-weight: 500; }
+.sn-assessment-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 13px; color: var(--text-muted); }
+.sn-assessment-summary .sn-actions-row { grid-column: 1 / -1; margin-top: 0; }
+.sn-badge-component { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 115px; gap: 20px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.sn-badge-component small { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.sn-badge-component > strong { text-align: right; font-size: 21px; }
+.sn-badge-calculation { display: grid; gap: 8px; font-size: 13px; }
+.sn-badge-calculation progress { width: 100%; height: 10px; accent-color: #237bad; }
+.sn-badge-component:nth-child(2) progress { accent-color: #119260; }
+.sn-badge-component:nth-child(3) progress { accent-color: #d09a20; }
+.sn-badge-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 18px; }
+.sn-badge-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.sn-badge-level { padding: 16px; border: 1px solid var(--border); border-radius: 8px; }
+.sn-badge-level.is-current { border-color: #15905a; background: #f2fbf6; }
+.sn-badge-level > strong { font-size: 22px; }
+.sn-badge-level > span { color: #087443; font-size: 13px; font-weight: 700; }
+.sn-assessment-service-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sn-assessment-service-stats dd { margin: 6px 0 0; font-weight: 800; font-size: 20px; }
+.sn-badge-requirements { margin: 20px 0 0; padding: 0; list-style: none; }
+.sn-badge-requirements li { display: flex; justify-content: space-between; gap: 18px; border-top: 1px solid var(--border); padding: 12px 0; font-size: 14px; }
+.sn-badge-requirements strong { flex: 0 0 92px; text-align: right; color: #86600d; font-size: 13px; }
+.sn-badge-requirements [data-met="true"] strong { color: #087443; }
+@media (max-width: 900px) {
+  .sn-assessment-summary { grid-template-columns: minmax(0, 1fr); }
+  .sn-badge-component { grid-template-columns: minmax(0, 1fr) 105px; gap: 12px; }
+  .sn-badge-calculation { grid-row: 2; grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .sn-assessment-section { padding: 18px 14px; }
+  .sn-badge-levels { grid-template-columns: minmax(0, 1fr); }
+  .sn-assessment-service-stats { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sn-assessment-service-stats > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .sn-assessment-totals dd { font-size: 26px; }
+}
+
 .sn-reassessment-list {
   display: grid;
   gap: 12px;

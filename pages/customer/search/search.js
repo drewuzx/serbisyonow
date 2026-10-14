@@ -34,10 +34,8 @@ function categoryLabel(value) {
 }
 
 function providerBadge(provider) {
-  const tier = provider.verified_tier || (provider.badge_status || '').toLowerCase();
-  if (String(tier).includes('top')) return '<div class="sn-provider-badge sn-badge--top">Top-Tier Verified</div>';
-  if (String(tier).includes('skilled')) return '<div class="sn-provider-badge sn-badge--verified">Skilled Verified</div>';
-  return '<div class="sn-provider-badge sn-badge--basic">Basic Verified</div>';
+  const style = provider.verified_tier === 'top' ? 'top' : provider.verified_tier === 'skilled' ? 'verified' : 'basic';
+  return `<div class="sn-provider-badge sn-badge--${style}">${esc(provider.badge_status || 'Pending Verification')}</div>`;
 }
 
 async function saveCustomerFavorite(customerId, providerId) {
@@ -138,7 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       text: 'Based on nearest location match.',
     },
     top: {
-      title: 'Top Verified',
+      title: 'Top-Rated',
       text: 'Based on assessment, supporting documents, and ratings.',
     },
     highest: {
@@ -200,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <span>Sort Results</span>
         <select id="sn-filter-sort">
           <option value="recommended">Recommended</option>
-          <option value="top">Top Verified</option>
+          <option value="top">Top-Rated</option>
           <option value="highest">Highest Verified</option>
           <option value="basic">Basic Verified</option>
           <option value="available">Available First</option>
@@ -356,17 +354,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tierRank = { top: 3, skilled: 2, basic: 1 };
       if (currentSort === 'top') {
         return (tierRank[b.verified_tier] || 0) - (tierRank[a.verified_tier] || 0)
-          || Number(b.assessment_score || 0) - Number(a.assessment_score || 0)
+          || Number(b.badge_details?.total_points || 0) - Number(a.badge_details?.total_points || 0)
           || Number(b.rating || 0) - Number(a.rating || 0)
           || Number(a.distance_km || 0) - Number(b.distance_km || 0);
       }
       if (currentSort === 'highest') {
-        return Number(b.assessment_score || 0) - Number(a.assessment_score || 0)
+        return Number(b.badge_details?.total_points || 0) - Number(a.badge_details?.total_points || 0)
           || Number(b.rating || 0) - Number(a.rating || 0)
           || Number(a.distance_km || 0) - Number(b.distance_km || 0);
       }
       if (currentSort === 'basic') {
-        return Number(a.assessment_score || 0) - Number(b.assessment_score || 0)
+        return Number(b.verified_tier === 'basic') - Number(a.verified_tier === 'basic')
           || Number(b.rating || 0) - Number(a.rating || 0)
           || Number(a.distance_km || 0) - Number(b.distance_km || 0);
       }
@@ -616,7 +614,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
           </div>
           ${providerBadge(provider)}
-          <div class="sn-result-rating">Rating ${Number(provider.rating || 0).toFixed(1)} - ${Number(provider.completed_jobs || 0)} completed jobs - ${Number(provider.available_slots || 0)} open slots</div>
+          <div class="sn-result-rating">${provider.rating == null ? 'Not rated' : `Rating ${Number(provider.rating).toFixed(1)}`} - ${Number(provider.completed_jobs || 0)} completed jobs - ${Number(provider.available_slots || 0)} open slots</div>
           <div class="sn-ranking-signals">
             <span>Rank #${index + 1}</span>
             <span>${esc(sortLabels[currentSort]?.title || 'Recommended')}</span>

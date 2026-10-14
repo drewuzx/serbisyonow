@@ -13,10 +13,9 @@ function ppMoney(value) {
 }
 
 function ppBadge(provider) {
-  const badge = String(provider.badge_status || provider.verification_status || '').toLowerCase();
-  if (badge.includes('top')) return '<div class="sn-provider-badge sn-badge--top">Top-Tier Verified</div>';
-  if (badge.includes('skilled') || provider.is_verified) return '<div class="sn-provider-badge sn-badge--verified">Skilled Verified</div>';
-  return '<div class="sn-provider-badge sn-badge--basic">Basic Verified</div>';
+  const tier = provider.verified_tier;
+  const style = tier === 'top' ? 'top' : tier === 'skilled' ? 'verified' : 'basic';
+  return `<div class="sn-provider-badge sn-badge--${style}">${ppEsc(provider.badge_status || 'Pending Verification')}</div>`;
 }
 
 async function ppGet(path) {
@@ -48,23 +47,21 @@ function ppRenderProvider(provider) {
   if (!detail) return;
 
   const startingRate = Number(provider.starting_price || provider.service_price || 350);
-  const rating = Number(provider.rating || 4.8);
-  const completedJobs = Number(provider.completed_jobs || 24);
-  const experienceYears = provider.experience_years || provider.experience || '3+ years';
+  const rating = provider.rating;
+  const completedJobs = Number(provider.completed_jobs || 0);
+  const reviewCount = Number(provider.review_count || 0);
+  const experienceYears = provider.experience_years || 'Not provided';
   const serviceLabel = provider.service || provider.category || 'Home Service';
   const locationLabel = provider.address || 'Angeles City';
   const cleanAbout = ppGetCleanAbout(provider);
 
   const proofItems = [
-    `${provider.full_name || 'This service provider'} has ${experienceYears} of hands-on service experience in ${serviceLabel.toLowerCase()}.`,
-    `${completedJobs}+ completed jobs and recent customer bookings in the area.`,
-    'Project photos, work samples, and before-and-after results are available upon request.',
+    `Reported service experience: ${experienceYears}.`,
+    `${completedJobs} completed services on SerbisyoNow.`,
   ];
 
   const credentials = [
-    'Trade certification or valid government ID verified by the platform.',
-    'Work permits and service documents submitted for review.',
-    'Current compliance with local service and safety standards.',
+    provider.badge_details?.documents_approved ? `${provider.badge_details.document_count} supporting documents approved by the admin.` : 'No approved supporting credentials yet.',
   ];
 
   detail.innerHTML = `
@@ -107,17 +104,9 @@ function ppRenderProvider(provider) {
 
         <section class="sn-profile-section">
           <h3>RATINGS</h3>
-          <p class="sn-rating-line">${Number(rating).toFixed(1)} out of 5.0 from ${completedJobs} completed jobs and customer feedback.</p>
+          <p class="sn-rating-line">${reviewCount ? `${Number(rating).toFixed(1)} out of 5 from ${reviewCount} completed-service reviews.` : 'No completed-service reviews yet.'}</p>
         </section>
 
-        <section class="sn-profile-section">
-          <h3>FEEDBACK &amp; REVIEWS</h3>
-          <ul class="sn-profile-list">
-            <li>"Professional, punctual, and very clean with every service call."</li>
-            <li>"Quick response and clear communication from booking to completion."</li>
-            <li>"Very reasonable pricing and good workmanship for repair services."</li>
-          </ul>
-        </section>
       </div>
     </div>
     <aside class="sn-detail-panel">

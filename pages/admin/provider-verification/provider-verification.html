@@ -117,6 +117,7 @@
             <strong>${adminEscape(provider.full_name)}</strong>
             <span>${adminEscape(adminCategoryLabel(provider.category) || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
             <span>Assessment: ${provider.assessment_score ?? 0}% - Experience: ${adminEscape(provider.experience_years || '-')} - Badge: ${adminEscape(provider.badge_status || 'Needs Reassessment')}</span>
+            ${provider.badge_details ? `<span>Badge score: ${provider.badge_details.total_points}/100 (Assessment ${provider.badge_details.assessment_points} + Credentials ${provider.badge_details.credential_points} + Ratings ${provider.badge_details.rating_points})</span>` : ''}
             <div class="admin-upload-block">
               <span class="admin-upload-title">Uploaded files</span>
               ${providerDocumentLinks(provider)}
