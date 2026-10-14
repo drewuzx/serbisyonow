@@ -171,6 +171,7 @@ function fixture() {
       assert.equal(await page.locator('.sn-schedule-slot').count(), 2);
     });
     await scenario('provider/profile/profile.html', '#sn-provider-payment-name', async (page, data, tick) => {
+      await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
       await page.locator('#sn-provider-full-name').fill('Unsaved provider');
       await page.locator('#sn-provider-payment-name').fill('Unsaved recipient');
       await page.locator('#sn-provider-payment-qr').setInputFiles({ name: 'qr.png', mimeType: 'image/png', buffer: image });

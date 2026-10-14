@@ -2461,15 +2461,82 @@ async function submitProviderReassessment(provider) {
   }
 }
 
+function providerProfileDate(value, display = false) {
+  const date = String(value || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return display ? 'Not provided' : '';
+  return display ? new Date(`${date}T00:00:00Z`).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : date;
+}
+
+function providerProfileFields(provider) {
+  return { 'full-name': provider.full_name, email: provider.email, contact: provider.contact, gender: provider.gender, dob: providerProfileDate(provider.dob), category: providerCategoryLabel(provider.category), service: provider.service, address: provider.address, description: provider.description };
+}
+
+function updateProviderProfileSummary(provider) {
+  const verification = provider.is_verified && provider.verification_status === 'verified' ? 'Verified' : provider.verification_status === 'rejected' ? 'Declined' : 'Pending';
+  const rows = values => values.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value || 'Not provided')}</dd></div>`).join('');
+  const info = document.getElementById('sn-provider-profile-view');
+  if (info) info.innerHTML = `<dl class="sn-provider-info-list">${rows([['Full Name', provider.full_name], ['Email', provider.email], ['Contact', provider.contact], ['Address', provider.address], ['Gender', provider.gender], ['Date of Birth', providerProfileDate(provider.dob, true)], ['Verification', verification]])}</dl><h3>Service Details</h3><dl class="sn-provider-info-list">${rows([['Primary Category', providerCategoryLabel(provider.category)], ['Main Service', provider.service], ['Experience', provider.experience_years]])}</dl><h3>Description</h3><p class="sn-provider-about">${esc(provider.description || 'No description added yet.')}</p>`;
+  const account = document.getElementById('sn-provider-account-status');
+  if (account) account.innerHTML = rows([['Member Since', providerProfileDate(provider.created_at, true)], ['Verification', verification], ['Account Type', 'Service Provider'], ['Skill Badge', provider.badge_status || 'Needs Reassessment']]);
+}
+
+function toggleProviderProfileEdit(editing) {
+  if (providerProfileActions.has('save')) return;
+  const form = document.getElementById('sn-provider-profile-form');
+  for (const [key, value] of Object.entries(providerProfileFields(getProviderUser() || {}))) {
+    const field = document.getElementById(`sn-provider-${key}`);
+    if (field) field.value = field.dataset.savedValue = value || '';
+  }
+  form.hidden = !editing;
+  document.getElementById('sn-provider-profile-view').hidden = editing;
+  const button = document.getElementById('sn-provider-edit-profile');
+  button.hidden = editing;
+  button.setAttribute('aria-expanded', String(editing));
+  setProviderProfileStatus('');
+  if (editing) document.getElementById('sn-provider-full-name').focus();
+  else button.focus();
+}
+
+async function changeProviderProfilePassword(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (providerProfileActions.has('password')) return;
+  const status = document.getElementById('sn-provider-password-status');
+  const message = (text, type = 'error') => { status.textContent = text; status.className = `sn-profile-status sn-profile-status--${type}`; status.hidden = !text; };
+  const body = { currentPassword: form.elements.currentPassword.value, newPassword: form.elements.newPassword.value, confirmPassword: form.elements.confirmPassword.value };
+  if (!body.currentPassword || !body.newPassword || !body.confirmPassword) { message('Please fill in all password fields.'); return; }
+  if (body.newPassword.length < 8 || new TextEncoder().encode(body.newPassword).length > 72) { message('New password must be at least 8 characters and no more than 72 bytes.'); return; }
+  if (body.newPassword !== body.confirmPassword) { message('New passwords do not match.'); return; }
+  if (body.newPassword === body.currentPassword) { message('Choose a new password different from your current password.'); return; }
+  const button = form.querySelector('[type="submit"]');
+  providerProfileActions.add('password');
+  ++providerDatabaseVersion;
+  form.querySelectorAll('input, button').forEach(control => { control.disabled = true; });
+  button.textContent = 'Updating...';
+  message('');
+  try {
+    const result = await providerSend(`/api/provider/${getProviderUser().id}/change-password`, 'PATCH', body);
+    form.reset();
+    form.querySelectorAll('[data-password-input]').forEach(input => { input.type = 'password'; });
+    message(result.message, 'success');
+  } catch (error) { message(error.message || 'Unable to update password. Please try again.'); }
+  finally {
+    providerProfileActions.delete('password');
+    form.querySelectorAll('input, button').forEach(control => { control.disabled = false; });
+    button.innerHTML = '<img src="/shared/icons/lucide/key-round.svg" width="16" height="16" alt="" />Update Password';
+  }
+}
+
 function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
   if (preserveDraft && document.getElementById('sn-provider-full-name')) {
-    const fields = { 'sn-provider-full-name': provider.full_name, 'sn-provider-contact': provider.contact, 'sn-provider-category': providerCategoryLabel(provider.category), 'sn-provider-service': provider.service, 'sn-provider-address': provider.address, 'sn-provider-description': provider.description };
+    const fields = providerProfileFields(provider);
     for (const [id, value] of Object.entries(fields)) {
-      const field = document.getElementById(id);
-      if (field && field.value === field.defaultValue) field.value = field.defaultValue = value || '';
+      const field = document.getElementById(`sn-provider-${id}`);
+      if (field && field.value === field.dataset.savedValue) field.value = field.dataset.savedValue = value || '';
     }
+    updateProviderProfileSummary(provider);
     const docs = panel.querySelector('.sn-provider-documents');
     if (docs) docs.innerHTML = renderProviderCredentialLinks(provider);
     const badge = document.getElementById('sn-provider-badge');
@@ -2488,12 +2555,19 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
     ? `${Number(provider.latitude).toFixed(6)}, ${Number(provider.longitude).toFixed(6)}${accuracyLabel}${updatedLabel}`
     : 'GPS location not saved yet';
   const documentLinks = renderProviderCredentialLinks(provider);
+  panel.classList.add('sn-provider-account-page');
   panel.innerHTML = `
-    <h2>Provider Information</h2>
-    <form id="sn-provider-profile-form">
+    <div class="sn-provider-account-grid">
+    <section class="sn-provider-personal" aria-labelledby="sn-provider-personal-title">
+    <div class="sn-provider-section-heading"><h2 id="sn-provider-personal-title">Profile Information</h2><button class="btn btn-outline" id="sn-provider-edit-profile" type="button" aria-controls="sn-provider-profile-form" aria-expanded="false"><img src="/shared/icons/lucide/pencil.svg" width="16" height="16" alt="" />Edit Profile</button></div>
+    <div id="sn-provider-profile-view"></div>
+    <form id="sn-provider-profile-form" hidden>
       <div class="sn-form-grid">
-        <div class="sn-form-field"><label for="sn-provider-full-name">Business or Display Name</label><input id="sn-provider-full-name" value="${esc(provider.full_name || '')}" required /></div>
+        <div class="sn-form-field"><label for="sn-provider-full-name">Full Name</label><input id="sn-provider-full-name" autocomplete="name" value="${esc(provider.full_name || '')}" required /></div>
+        <div class="sn-form-field"><label for="sn-provider-email">Email</label><input id="sn-provider-email" type="email" value="${esc(provider.email || '')}" readonly /></div>
         <div class="sn-form-field"><label for="sn-provider-contact">Contact Number</label><input id="sn-provider-contact" type="tel" value="${esc(provider.contact || '')}" required /></div>
+        <div class="sn-form-field"><label for="sn-provider-gender">Gender</label><select id="sn-provider-gender" required><option value="">Select gender</option>${['Male', 'Female', 'Prefer not to say'].map(gender => `<option${gender === provider.gender ? ' selected' : ''}>${gender}</option>`).join('')}</select></div>
+        <div class="sn-form-field"><label for="sn-provider-dob">Date of Birth</label><input id="sn-provider-dob" type="date" autocomplete="bday" min="1900-01-01" max="${new Date().toLocaleDateString('en-CA')}" value="${providerProfileDate(provider.dob)}" required /></div>
         <div class="sn-form-field"><label for="sn-provider-category">Primary Category</label><input id="sn-provider-category" value="${esc(providerCategoryLabel(provider.category) || '')}" required /></div>
         <div class="sn-form-field"><label for="sn-provider-service">Main Service</label><input id="sn-provider-service" value="${esc(provider.service || '')}" required /></div>
         <div class="sn-form-field full"><label for="sn-provider-description">Description</label><textarea id="sn-provider-description" maxlength="2000" rows="4">${esc(provider.description || '')}</textarea></div>
@@ -2501,9 +2575,23 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
         <div class="sn-form-field"><label for="sn-provider-badge">Verification Badge</label><input id="sn-provider-badge" value="${esc(metrics?.badge_status || provider.verification_status || '')}" readonly /></div>
         <div class="sn-form-field"><label for="sn-provider-gps-label">GPS Service Location</label><input id="sn-provider-gps-label" value="${esc(locationLabel)}" readonly /></div>
       </div>
-      <p class="sn-profile-status" id="sn-provider-profile-status" role="status" hidden></p>
-      <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-save-profile" type="submit">Save Profile</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button></div>
+      <div class="sn-actions-row"><button class="btn btn-primary" id="sn-provider-save-profile" type="submit">Save Profile</button><button class="btn btn-outline" id="sn-provider-cancel-edit" type="button">Cancel</button><button class="btn btn-outline" id="sn-provider-save-gps" type="button">Use GPS Location</button><button class="btn btn-outline" id="sn-provider-live-gps" type="button">${providerLocationWatchId === null ? 'Start Live Tracking' : 'Stop Live Tracking'}</button></div>
     </form>
+    <p class="sn-profile-status" id="sn-provider-profile-status" role="status" hidden></p>
+    </section>
+    <div class="sn-provider-account-side">
+      <section aria-labelledby="sn-provider-account-title"><h2 id="sn-provider-account-title">Account Status</h2><dl class="sn-provider-info-list" id="sn-provider-account-status"></dl><a class="sn-provider-assessment-link" href="../assessment/assessment.html">View Skill Assessment</a></section>
+      <section class="sn-provider-password-section" aria-labelledby="sn-provider-password-title"><h2 id="sn-provider-password-title">Change Password</h2>
+        <form id="sn-provider-password-form" novalidate>
+          <input type="text" name="username" autocomplete="username" value="${esc(provider.email || '')}" hidden />
+          ${[['currentPassword', 'Current Password', 'current-password'], ['newPassword', 'New Password', 'new-password'], ['confirmPassword', 'Confirm New Password', 'new-password']].map(([name, label, autocomplete]) => `<div class="sn-form-field"><label for="sn-provider-${name}">${label}</label><input id="sn-provider-${name}" name="${name}" type="password" autocomplete="${autocomplete}" data-password-input required /></div>`).join('')}
+          <label class="sn-provider-show-password"><input type="checkbox" id="sn-provider-show-password" />Show passwords</label>
+          <p id="sn-provider-password-status" class="sn-profile-status" role="status" hidden></p>
+          <div class="sn-actions-row"><button type="submit" class="btn btn-primary"><img src="/shared/icons/lucide/key-round.svg" width="16" height="16" alt="" />Update Password</button><a href="../../auth/forgotPassword.html?role=provider">Forgot Password?</a></div>
+        </form>
+      </section>
+    </div>
+    </div>
     <section class="sn-provider-credentials" aria-labelledby="sn-provider-credentials-title">
       <h2 id="sn-provider-credentials-title">Credentials &amp; Proof of Work</h2>
       <form id="sn-provider-credentials-form">
@@ -2521,6 +2609,17 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
     </section>
     ${renderProviderReassessmentSection(provider, metrics, assessment)}
   `;
+  updateProviderProfileSummary(provider);
+  for (const key of Object.keys(providerProfileFields(provider))) {
+    const field = document.getElementById(`sn-provider-${key}`);
+    if (field) field.dataset.savedValue = field.value;
+  }
+  document.getElementById('sn-provider-edit-profile').addEventListener('click', () => toggleProviderProfileEdit(true));
+  document.getElementById('sn-provider-cancel-edit').addEventListener('click', () => toggleProviderProfileEdit(false));
+  document.getElementById('sn-provider-password-form').addEventListener('submit', changeProviderProfilePassword);
+  document.getElementById('sn-provider-show-password').addEventListener('change', event => {
+    document.querySelectorAll('[data-password-input]').forEach(input => { input.type = event.target.checked ? 'text' : 'password'; });
+  });
   document.getElementById('sn-provider-profile-form')?.addEventListener('submit', event => { event.preventDefault(); saveProviderProfile(); });
   document.getElementById('sn-provider-save-gps')?.addEventListener('click', saveProviderGpsLocation);
   document.getElementById('sn-provider-live-gps')?.addEventListener('click', toggleProviderLiveTracking);
@@ -2709,9 +2808,11 @@ async function saveProviderProfile() {
     service: document.getElementById('sn-provider-service')?.value.trim() || '',
     address: document.getElementById('sn-provider-address')?.value.trim() || '',
     description: document.getElementById('sn-provider-description')?.value.trim() || '',
+    gender: document.getElementById('sn-provider-gender')?.value || '',
+    dob: document.getElementById('sn-provider-dob')?.value || '',
   };
   if (['full_name', 'contact', 'category', 'service', 'address'].some(key => !body[key])) {
-    setProviderProfileStatus('Please complete display name, contact, category, service, and address.', 'error');
+    setProviderProfileStatus('Please complete full name, contact, category, service, and address.', 'error');
     return;
   }
 
@@ -2727,14 +2828,15 @@ async function saveProviderProfile() {
     localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...saved }));
     const userName = document.getElementById('sn-user-name');
     if (userName) userName.textContent = data.user.full_name || 'Service Provider';
-    const fields = { full_name: 'full-name', contact: 'contact', category: 'category', service: 'service', address: 'address', description: 'description' };
+    const fields = { full_name: 'full-name', contact: 'contact', category: 'category', service: 'service', address: 'address', description: 'description', gender: 'gender', dob: 'dob' };
     for (const [key, id] of Object.entries(fields)) {
       const field = document.getElementById(`sn-provider-${id}`);
       if (!field) continue;
       const current = field.value;
-      field.defaultValue = data.user[key] || '';
-      field.value = current.trim() === body[key] ? field.defaultValue : current;
+      field.dataset.savedValue = key === 'dob' ? providerProfileDate(data.user[key]) : data.user[key] || '';
+      field.value = current.trim() === body[key] ? field.dataset.savedValue : current;
     }
+    updateProviderProfileSummary(data.user);
     setProviderProfileStatus('Profile saved successfully.', 'success');
   } catch (error) {
     setProviderProfileStatus(error.message || 'Unable to save provider profile.', 'error');

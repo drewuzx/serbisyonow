@@ -1856,6 +1856,43 @@ body {
   padding-top: 24px;
 }
 
+.sn-panel.sn-provider-account-page { border-radius: 0; box-shadow: none; padding: 24px; }
+.sn-provider-account-page [hidden] { display: none !important; }
+.sn-provider-account-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.8fr); gap: 32px; align-items: start; }
+.sn-provider-account-grid > * { min-width: 0; }
+.sn-provider-account-side { padding-left: 28px; border-left: 1px solid var(--border); }
+.sn-provider-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.sn-provider-section-heading h2 { margin: 0; }
+.sn-provider-info-list { margin: 0; }
+.sn-provider-info-list > div { display: grid; grid-template-columns: minmax(95px, 0.65fr) minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.sn-provider-info-list dt { color: var(--text-muted); font-size: 13px; }
+.sn-provider-info-list dd { margin: 0; color: var(--text-main, #243047); font-weight: 600; font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; }
+.sn-provider-personal h3 { margin: 24px 0 8px; font-size: 16px; }
+.sn-provider-account-page .sn-provider-about { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.sn-provider-password-section { border-top: 1px solid var(--border); margin-top: 26px; padding-top: 22px; }
+#sn-provider-password-form { display: grid; gap: 14px; }
+.sn-provider-show-password { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; }
+.sn-provider-show-password input { width: 17px; height: 17px; accent-color: var(--blue-main); }
+.sn-provider-account-page .sn-actions-row { align-items: center; }
+.sn-provider-account-page .btn img { width: 16px; height: 16px; flex-shrink: 0; }
+.sn-provider-account-page .btn-primary img { filter: brightness(0) invert(1); }
+.sn-provider-account-page .sn-actions-row a,
+.sn-provider-assessment-link { font-size: 13px; color: var(--blue-main); font-weight: 600; }
+.sn-provider-assessment-link { display: inline-block; margin-top: 14px; }
+.sn-provider-account-page input[readonly] { color: var(--text-muted); background: #f6f7f9; }
+.sn-provider-account-page :is(input, select, textarea, button) { max-width: 100%; }
+.sn-provider-account-page :is(input, select, textarea) { border-radius: 8px; }
+.sn-provider-account-page .sn-provider-documents { border-radius: 8px; }
+@media (max-width: 1100px) {
+  .sn-provider-account-grid { grid-template-columns: minmax(0, 1fr); }
+  .sn-provider-account-side { padding: 24px 0 0; border-left: 0; border-top: 1px solid var(--border); }
+}
+@media (max-width: 600px) {
+  .sn-panel.sn-provider-account-page { padding: 18px 14px 80px; }
+  .sn-provider-info-list > div { gap: 10px; grid-template-columns: 95px minmax(0, 1fr); }
+  .sn-provider-account-page .sn-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .sn-provider-credentials :is(input, .sn-form-field) { min-width: 0; max-width: 100%; }
 .sn-provider-credentials input[type="file"] { font-size: 13px; }
 .sn-credential-limits,

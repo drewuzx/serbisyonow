@@ -2,7 +2,49 @@
 
 const crypto = require('node:crypto');
 const path = require('node:path');
+const bcrypt = require('bcryptjs');
 const { transaction, fail } = require('./booking-payments');
+const { authenticateAccount, requestSessionToken, hashToken } = require('./account-sessions');
+
+function profileBirthDate(value) {
+  // PostgreSQL DATE is a local-midnight Date, not a UTC timestamp.
+  if (value && typeof value.getFullYear === 'function') return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  return value ? String(value).slice(0, 10) : null;
+}
+
+function profilePersonalFields(body) {
+  const gender = body.gender === undefined ? null : body.gender;
+  const dob = body.dob === undefined ? null : body.dob;
+  if (gender !== null && !['Male', 'Female', 'Prefer not to say'].includes(gender)) fail(400, 'Choose a valid gender.');
+  if (dob !== null) {
+    const date = typeof dob === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dob) ? new Date(`${dob}T00:00:00Z`) : null;
+    if (!date || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dob || dob < '1900-01-01' || date > new Date()) fail(400, 'Enter a valid date of birth that is not in the future.');
+  }
+  return { gender, dob };
+}
+
+async function changeProviderPassword(db, req) {
+  const account = await authenticateAccount(db, req, 'provider', req.params.id);
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+  if (typeof currentPassword !== 'string' || !currentPassword || Buffer.byteLength(currentPassword) > 1024) fail(400, 'Enter your current password.');
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword) > 72) fail(400, 'New password must be at least 8 characters and no more than 72 bytes.');
+  if (newPassword !== confirmPassword) fail(400, 'New passwords do not match.');
+  return transaction(db, async client => {
+    const { rows: [provider] } = await client.query('SELECT password_hash, auth_provider FROM providers WHERE id = $1 FOR UPDATE', [account.id]);
+    if (!provider) fail(404, 'Provider not found.');
+    if (provider.auth_provider === 'google' || !provider.password_hash) fail(409, 'This account uses Google sign-in. Use Forgot Password to set an email password first.');
+    if (!await bcrypt.compare(currentPassword, provider.password_hash)) fail(400, 'Current password is incorrect.');
+    if (await bcrypt.compare(newPassword, provider.password_hash)) fail(400, 'Choose a new password different from your current password.');
+    // Keep this browser signed in, but invalidate other sessions and outstanding reset links.
+    const currentHash = hashToken(requestSessionToken(req, 'provider'));
+    const active = await client.query("SELECT token_hash FROM account_sessions WHERE token_hash = $1 AND account_role = 'provider' AND account_id = $2 AND expires_at > NOW() FOR UPDATE", [currentHash, account.id]);
+    if (!active.rowCount) fail(401, 'Please sign in again before changing your password.');
+    await client.query("UPDATE providers SET password_hash = $2, auth_provider = 'password', updated_at = NOW() WHERE id = $1", [account.id, await bcrypt.hash(newPassword, 12)]);
+    await client.query("DELETE FROM account_sessions WHERE account_role = 'provider' AND account_id = $1 AND token_hash <> $2", [account.id, currentHash]);
+    await client.query("DELETE FROM password_reset_tokens WHERE account_type = 'provider' AND account_id = $1", [account.id]);
+    return { ok: true, message: 'Password updated. This device stays signed in; other sessions have been signed out.' };
+  });
+}
 
 function profileDescription(value) {
   if (value === undefined) return null;
@@ -60,4 +102,4 @@ async function saveProviderCredentials(db, providerId, files) {
   });
 }
 
-module.exports = { profileDescription, credentialType, validateCredential, saveProviderCredentials };
+module.exports = { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, validateCredential, saveProviderCredentials };

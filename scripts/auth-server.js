@@ -22,7 +22,7 @@ const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheck
 const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
-const { profileDescription, credentialType, saveProviderCredentials } = require('./provider-profile');
+const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
 const app = express();
@@ -1088,7 +1088,7 @@ function providerRow(row) {
     address: row.address,
     gender: row.gender,
     contact: row.contact,
-    dob: row.dob,
+    dob: profileBirthDate(row.dob),
     email: row.email,
     category: canonicalCategoryName(row.category),
     service: row.service,
@@ -2934,6 +2934,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   requireFields(req.body, ['full_name', 'contact', 'address', 'category', 'service']);
   const contact = normalizeContactNumber(req.body.contact);
   const description = profileDescription(req.body.description);
+  const { gender, dob } = profilePersonalFields(req.body);
   const result = await db.query(`
     UPDATE providers
     SET full_name = $2,
@@ -2942,6 +2943,8 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
         category = $5,
         service = $6,
         description = COALESCE($7, description),
+        gender = COALESCE($8, gender),
+        dob = COALESCE($9::date, dob),
         updated_at = NOW()
     WHERE id = $1
     RETURNING *
@@ -2953,10 +2956,17 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
     canonicalCategoryName(req.body.category),
     String(req.body.service || '').trim(),
     description,
+    gender,
+    dob,
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
   await ensureProviderProfileService(result.rows[0]);
   res.json({ user: await providerView(result.rows[0]) });
+}));
+
+app.patch('/api/provider/:id/change-password', asyncRoute(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await changeProviderPassword(db, req));
 }));
 
 app.post('/api/provider/:id/reassessment', asyncRoute(async (req, res) => {

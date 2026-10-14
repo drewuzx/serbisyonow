@@ -23,6 +23,7 @@ async function main() {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`${f.base}/pages/provider/profile/profile.html`);
+    await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
     const description = page.getByLabel('Description', { exact: true });
     await description.waitFor();
     const descriptionText = 'Reliable cleaning services.\n' + 'A detailed provider description. '.repeat(20) + '<img src=x onerror=alert(1)>';
@@ -30,6 +31,7 @@ async function main() {
     await page.getByRole('button', { name: 'Save Profile', exact: true }).click();
     await page.locator('#sn-provider-profile-status').filter({ hasText: 'Profile saved successfully' }).waitFor();
     await page.reload();
+    await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
     await description.waitFor();
     assert.equal(await description.inputValue(), descriptionText);
 
@@ -93,6 +95,7 @@ async function main() {
       await page.screenshot({ path: path.join(os.tmpdir(), `provider-profile-${width}.png`), fullPage: true });
     }
     await page.reload();
+    await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
     await description.waitFor();
     assert.equal(await description.inputValue(), descriptionText);
     await workLink.waitFor();
