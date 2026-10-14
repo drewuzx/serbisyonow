@@ -27,7 +27,6 @@ async function main() {
   );
 
   console.log('Database initialized.');
-  console.log(`Database: ${process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/serbisyonow_db'}`);
   console.log(`Admin username: ${username}`);
 }
 
