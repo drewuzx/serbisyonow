@@ -176,6 +176,57 @@ function selectedBookingService() {
  };
 }
 
+function providerPriceSelection() {
+ const host = document.getElementById('sn-provider-price-options');
+ return { addons: [...(host?.querySelectorAll('[data-provider-addon]:checked') || [])].map(input => ({
+  id: input.dataset.providerAddon,
+  quantity: Number(input.closest('.sn-booking-addon').querySelector('input[type="number"]').value),
+ })) };
+}
+
+function applyProviderEstimate(estimate) {
+ return window.SNProviderPricing.apply(estimate, selectedBookingService().service, providerPriceSelection());
+}
+
+function renderProviderPriceOptions() {
+ const host = document.getElementById('sn-provider-price-options');
+ if (!host) return;
+ const service = selectedBookingService().service, config = service?.pricing_config;
+ host.hidden = !config;
+ host.innerHTML = '';
+ if (!config) return;
+ setManualAmountVisible(false);
+ const addons = config.addons.filter(addon => addon.enabled);
+ host.innerHTML = `<h4>Provider Pricing</h4>
+  ${config.service_area ? `<p><strong>Service area:</strong> ${bookingEsc(config.service_area)}</p>` : ''}
+  <p><strong>${config.mode === 'house_matrix' ? 'Duration' : 'Typical duration'}:</strong> ${bookingEsc(config.duration)}</p>
+  ${config.notes ? `<p><strong>Special instructions:</strong> ${bookingEsc(config.notes)}</p>` : ''}
+  ${addons.length ? `<fieldset><legend>Optional add-ons</legend>${addons.map((addon, i) => `<div class="sn-booking-addon">
+   <label><input type="checkbox" data-provider-addon="${bookingEsc(addon.id)}"><span>${bookingEsc(addon.name)}<small>${bookingMoney(addon.min)}${addon.max !== addon.min ? ` - ${bookingMoney(addon.max)}` : ''} / ${bookingEsc(addon.unit.replace('Per ', '').toLowerCase())}</small></span></label>
+   <label class="sn-booking-addon-quantity">Quantity<input type="number" aria-label="${bookingEsc(addon.name)} quantity" min="1" max="${addon.unit === 'Per service' ? '1' : '100'}" step="1" value="1" disabled data-addon-quantity="${i}"></label>
+  </div>`).join('')}</fieldset>` : ''}<div id="sn-provider-generic-estimate" role="status"></div>`;
+ host.querySelectorAll('[data-provider-addon]').forEach(input => input.addEventListener('change', () => {
+  const quantity = input.closest('.sn-booking-addon').querySelector('input[type="number"]');
+  quantity.disabled = !input.checked;
+  updateProviderPriceOptions();
+ }));
+ host.querySelectorAll('[data-addon-quantity]').forEach(input => input.addEventListener('input', updateProviderPriceOptions));
+ updateProviderPriceOptions();
+}
+
+function updateProviderPriceOptions() {
+ const category = calculatedBookingCategories().find(item => !document.getElementById(`sn-${item.id}-assessment`)?.hidden);
+ if (category) return updateCalculatedEstimateDisplay(category);
+ const repair = document.getElementById('sn-repair-assessment');
+ if (repair && !repair.hidden) return updateRepairEstimateDisplay();
+ const summary = document.getElementById('sn-provider-generic-estimate');
+ if (!summary) return;
+ try {
+  const estimate = applyProviderEstimate(null);
+  summary.textContent = estimate?.details.estimate_label || '';
+ } catch (error) { summary.textContent = error.message; }
+}
+
 function isRepairSelection(selection) {
  const values = [selection?.title, selection?.category]
   .map(normalizeBookingText);
@@ -290,7 +341,13 @@ function updateRepairEstimateDisplay() {
  const key = panel.dataset.serviceKey;
  const config = REPAIR_SERVICE_CONFIGS[key];
  if (!config) return null;
- const estimate = calculateRepairEstimate({ ...config, key });
+ let estimate = calculateRepairEstimate({ ...config, key });
+ if (selectedBookingService().service?.pricing_config) {
+  try {
+   const priced = applyProviderEstimate({ ...estimate, details: { service_type: config.title, category: 'Repair Services' } });
+   estimate = { ...priced, min: priced.estimatedMin, max: priced.estimatedMax };
+  } catch (error) { document.getElementById('sn-repair-price-summary').textContent = error.message; return null; }
+ }
  const summary = document.getElementById('sn-repair-price-summary');
  const amountInput = document.getElementById('sn-booking-custom-amount');
  if (amountInput) amountInput.value = estimate.amount;
@@ -300,7 +357,7 @@ function updateRepairEstimateDisplay() {
    : `Estimated service range: ${bookingMoney(estimate.min)} - ${bookingMoney(estimate.max)}`;
   summary.innerHTML = `
    <strong>${bookingEsc(priceText)}</strong>
-   <span>${bookingEsc(config.note)}</span>
+   <span>${bookingEsc(estimate.details?.note || config.note)}</span>
   `;
  }
  return estimate;
@@ -329,7 +386,12 @@ function calculatedBookingCategories() {
 }
 
 function calculatedFields(category, key, inputs = {}) {
- return category.pricing.fields?.(key, category.context, inputs) || category.pricing.configs[key].fields;
+ const fields = category.pricing.fields?.(key, category.context, inputs) || category.pricing.configs[key].fields;
+ const config = selectedBookingService().service?.pricing_config;
+ if (key === 'general house cleaning' && config?.mode === 'house_matrix' && config.duration !== 'Flexible') {
+  return fields.map(field => field.key === 'duration' ? { ...field, options: [config.duration] } : field);
+ }
+ return fields;
 }
 
 function calculatedInputs(category) {
@@ -385,10 +447,10 @@ function updateCalculatedEstimateDisplay(category) {
  });
  const summary = panel.querySelector('.sn-calculated-price-summary');
  try {
-  const estimate = pricing.assessment(key, inputs, context);
+  const estimate = applyProviderEstimate(pricing.assessment(key, inputs, context));
   const mode = panel.querySelector('.sn-calculated-head > span');
-  if (mode) mode.textContent = estimate.pricingType === 'provider_quote' ? 'Assessment / Quote' : 'Sample estimate';
-  summary.innerHTML = `<h5>Price breakdown <span>Sample rates</span></h5><dl>${estimate.details.breakdown.map(item =>
+  if (mode) mode.textContent = estimate.details.provider_pricing ? 'Provider estimate' : estimate.pricingType === 'provider_quote' ? 'Assessment / Quote' : 'Sample estimate';
+  summary.innerHTML = `<h5>Price breakdown <span>${estimate.details.provider_pricing ? 'Provider rates' : 'Sample rates'}</span></h5><dl>${estimate.details.breakdown.map(item =>
    `<div><dt>${bookingEsc(item.label)}</dt><dd>${bookingMoney(item.amount)}${item.max_amount !== undefined ? ` - ${bookingMoney(item.max_amount)}` : ''}</dd></div>`).join('')}</dl>
    <p class="sn-calculated-total sn-${category.id}-total" role="status">${bookingEsc(estimate.details.estimate_label)}</p><p>${bookingEsc(estimate.details.note)}</p>`;
   return estimate;
@@ -411,6 +473,7 @@ function renderBookingAssessment() {
  });
  if (!category) {
   renderRepairAssessment();
+  renderProviderPriceOptions();
   return;
  }
  const repair = document.getElementById('sn-repair-assessment');
@@ -445,6 +508,7 @@ function renderBookingAssessment() {
   input.addEventListener('input', () => updateCalculatedEstimateDisplay(category));
   input.addEventListener('change', () => updateCalculatedEstimateDisplay(category));
  });
+ renderProviderPriceOptions();
  updateCalculatedEstimateDisplay(category);
 }
 
@@ -452,7 +516,7 @@ function collectCalculatedAssessment() {
  const category = calculatedBookingCategories().find(item => !document.getElementById(`sn-${item.id}-assessment`)?.hidden);
  if (!category) return null;
  const panel = document.getElementById(`sn-${category.id}-assessment`);
- const estimate = category.pricing.assessment(panel.dataset.serviceKey, calculatedInputs(category), category.context);
+ const estimate = applyProviderEstimate(category.pricing.assessment(panel.dataset.serviceKey, calculatedInputs(category), category.context));
  estimate.mediaFiles = calculatedAssessmentMedia(panel, category);
  return estimate;
 }
@@ -1177,6 +1241,7 @@ async function renderBookingRequestForm(customer) {
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
   <label><span>Remaining Balance Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">Remaining 70% is paid directly to the provider after service.</small></label>
    <p class="sn-booking-downpayment-terms full">A 30% downpayment is paid directly using the provider's payment QR after the price is confirmed. Submit your payment receipt; your schedule is confirmed only after the provider verifies the transfer. The remaining 70% is due after service.</p>
+   <section class="sn-provider-price-options full" id="sn-provider-price-options" hidden></section>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-personal-care-assessment" hidden></section>
@@ -1357,7 +1422,7 @@ async function submitBookingRequest(event, customer, providerId) {
  const formData = new FormData(form);
  let assessment;
  try {
-  assessment = collectCalculatedAssessment() || collectRepairAssessment(form);
+  assessment = applyProviderEstimate(collectCalculatedAssessment() || collectRepairAssessment(form));
  } catch (error) {
   await bookingAlert(error.message, { title: 'Check Service Details', type: 'warning' });
   return;

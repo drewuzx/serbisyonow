@@ -46,9 +46,13 @@ test('category HTTP bookings validate prices, selections and provider settings',
   async query(sql, params = []) {
    const query = sql.trim();
    let rows = [];
-   if (query.startsWith('SELECT account_role')) rows = [{ account_role: 'customer', account_id: 61 }];
+   if (query.startsWith('SELECT account_role')) rows = params[0] === require('node:crypto').createHash('sha256').update('b'.repeat(64)).digest('hex')
+    ? [{ account_role: 'provider', account_id: 81 }] : [{ account_role: 'customer', account_id: 61 }];
    else if (query.startsWith('UPDATE account_sessions')) rows = [{ account_id: 61 }];
-   else if (query.startsWith('SELECT * FROM provider_services')) rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered, outdoorOffered, lawnOffered];
+   else if (query.startsWith('SELECT * FROM provider_services')) {
+    rows = [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered, outdoorOffered, lawnOffered];
+    if (params[1]) rows = rows.filter(service => service.id === Number(params[1]));
+   }
    else if (query.startsWith('INSERT INTO uploaded_files')) persistedUploads.push(params);
    else if (query.startsWith('SELECT id FROM provider_availability')) {
     assert.match(query, /FOR UPDATE/);
@@ -103,7 +107,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
  const base = `http://127.0.0.1:${server.address().port}`;
  async function request(route, body, method = 'POST') {
   const multipart = body instanceof FormData;
-  const response = await fetch(`${base}${route}`, { method, headers: { ...(!multipart ? { 'Content-Type': 'application/json' } : {}), Authorization: `Bearer ${'a'.repeat(64)}` }, body: multipart ? body : JSON.stringify(body) });
+  const response = await fetch(`${base}${route}`, { method, headers: { ...(!multipart ? { 'Content-Type': 'application/json' } : {}), Authorization: `Bearer ${(route.startsWith('/api/provider/') ? 'b' : 'a').repeat(64)}` }, body: multipart ? body : JSON.stringify(body) });
   return { status: response.status, data: await response.json() };
  }
  const body = {

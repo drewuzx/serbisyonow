@@ -621,7 +621,7 @@ async function loadProviderDatabase({ background = false } = {}) {
     renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews], () => renderProviderMetrics(data));
     if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.availability], () => renderProviderDashboardAnalytics(data));
     const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
-    if (path.includes('/services/') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
+    if (path.includes('/services/') && !document.getElementById('sn-price-editor') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
     if (path.includes('/requests/')) {
       if (!background || !editing) renderChanged('requests', [data.bookings, data.provider?.latitude, data.provider?.longitude], () => renderRequests(data.bookings || [], data.provider || provider));
       refreshProviderGpsForRequests();
@@ -839,10 +839,11 @@ function renderServices(services) {
     <div class="sn-section-head"><h2>Services</h2><button class="btn btn-primary" type="button" data-action="add-service">+ Add Services</button></div>
     ${services.map(service => `
       <article class="sn-provider-service-card" data-service-id="${service.id}">
-        <div class="sn-actions-row"><button class="btn btn-outline" type="button" data-action="edit-service">Edit Service</button><button class="btn btn-danger" type="button" data-action="remove-service">Remove Service</button></div>
+        <div class="sn-actions-row"><button class="btn btn-primary" type="button" data-action="set-price"><img src="/shared/icons/lucide/pencil.svg" alt="" width="16" height="16">Set Price</button><button class="btn btn-outline" type="button" data-action="edit-service">Edit Service</button><button class="btn btn-danger" type="button" data-action="remove-service">Remove Service</button></div>
         <h3>${esc(service.title)} ${service.is_active ? '<span class="sn-status-pill accepted">Active</span>' : '<span class="sn-status-pill pending">Off</span>'}</h3>
         <p>${esc(service.description || service.category)}</p>
-        <strong style="display:block;text-align:right;color:#005cab">Price: ${money(service.starting_price)} - ${money(service.max_price)}</strong>
+        <strong style="display:block;text-align:right;color:#005cab">${service.pricing_config ? 'Base price' : 'Listed range'}: ${money(service.starting_price)} - ${money(service.max_price)}</strong>
+        <p>${service.pricing_config ? `${esc(service.pricing_config.service_area || '')}${service.pricing_config.service_area ? ' | ' : ''}${esc(service.pricing_config.duration)} | ${service.pricing_config.addons.filter(addon => addon.enabled).length} add-ons` : 'Booking rates not configured'}</p>
         ${['laundry', 'laundry services', 'cleaning', 'cleaning services'].includes(String(service.title || '').trim().toLowerCase()) ? `
           <div class="sn-provider-payment-row"><label><input type="checkbox" data-service-field="laundry_pickup_delivery" ${service.laundry_pickup_delivery ? 'checked' : ''}> Offer laundry pickup / delivery</label></div>
         ` : ''}
@@ -861,6 +862,10 @@ function renderServices(services) {
   `;
 
   host.querySelector('[data-action="add-service"]')?.addEventListener('click', () => saveService());
+  host.querySelectorAll('[data-action="set-price"]').forEach(button => button.addEventListener('click', () => {
+    const service = services.find(item => String(item.id) === button.closest('[data-service-id]').dataset.serviceId);
+    openServicePricing(service);
+  }));
   host.querySelectorAll('[data-action="edit-service"]').forEach((button) => {
     button.addEventListener('click', () => {
       const id = button.closest('[data-service-id]')?.dataset.serviceId;
@@ -964,9 +969,10 @@ async function saveService(service) {
     value: service?.description || '',
     placeholder: 'Describe the service',
     multiline: true,
-    confirmText: 'Next',
+    confirmText: service?.pricing_config ? 'Save' : 'Next',
   });
-  const startingPriceInput = await openProviderModal({
+  if (description === null || description === undefined) return;
+  const startingPriceInput = service?.pricing_config ? service.starting_price : await openProviderModal({
     title: modalTitle,
     label: 'Starting price',
     value: service?.starting_price || 500,
@@ -975,7 +981,7 @@ async function saveService(service) {
   });
   if (!startingPriceInput) return;
   const starting_price = Number(startingPriceInput || 0);
-  const maxPriceInput = await openProviderModal({
+  const maxPriceInput = service?.pricing_config ? service.max_price : await openProviderModal({
     title: modalTitle,
     label: 'Maximum price',
     value: service?.max_price || starting_price || 500,
@@ -990,16 +996,19 @@ async function saveService(service) {
     description,
     starting_price,
     max_price,
-    accepts_cash: true,
-    accepts_gcash: true,
-    accepts_other: false,
-    is_active: true,
+    accepts_cash: service?.accepts_cash ?? true,
+    accepts_gcash: service?.accepts_gcash ?? true,
+    accepts_other: service?.accepts_other ?? false,
+    is_active: service?.is_active ?? true,
+    ...(!service?.pricing_config ? { pricing_config: { mode: 'range', min: starting_price, max: max_price, duration: 'Flexible', service_area: '', notes: '', addons: [] } } : {}),
   };
   const path = service?.id
     ? `/api/provider/${provider.id}/services/${service.id}`
     : `/api/provider/${provider.id}/services`;
-  await providerSend(path, service?.id ? 'PATCH' : 'POST', body);
-  loadProviderDatabase();
+  try {
+    await providerSend(path, service?.id ? 'PATCH' : 'POST', body);
+    await loadProviderDatabase();
+  } catch (error) { await openProviderModal({ title: 'Service Not Saved', message: error.message, confirmText: 'OK' }); }
 }
 
 async function removeService(serviceId) {

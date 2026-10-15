@@ -1,0 +1,87 @@
+.sn-sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+#sn-price-editor { color:#17315c; min-width:0; }
+#sn-price-editor * { box-sizing:border-box; letter-spacing:0; }
+.sn-price-heading { display:flex; align-items:center; gap:12px; border-bottom:1px solid #dce4ee; padding-bottom:20px; }
+.sn-price-heading h2 { margin:0; font-size:23px; }
+.sn-price-heading p { margin:4px 0 0; color:#61738b; font-size:13px; overflow-wrap:anywhere; }
+.sn-price-heading .sn-price-back { min-width:40px; width:40px; height:40px; padding:0; font-size:22px; }
+.sn-price-state { margin-left:auto; color:#117558; background:#eaf6ef; font-size:11px; padding:6px 9px; border-radius:4px; }
+.sn-price-layout { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(240px,1fr); gap:26px; }
+.sn-price-main,.sn-price-side { min-width:0; }
+.sn-price-side { border-left:1px solid #dce4ee; padding-left:24px; }
+.sn-price-section { padding:24px 0; border-bottom:1px solid #dce4ee; min-width:0; }
+.sn-price-section h3 { margin:0 0 18px; font-size:16px; }
+.sn-price-section h3 { scroll-margin-top:110px; }
+body:has(#sn-price-editor) .sn-float-launch, body:has(#sn-price-editor) .sn-feedback-launch { display:none !important; }
+.sn-price-section h4 { font-size:13px; margin:20px 0 12px; }
+.sn-price-section .sn-section-head h3 { margin:0; }
+.sn-price-section .sn-section-head > span,.sn-price-addon > div > span,.sn-price-range > div > span,.sn-price-scope > div > span { font-size:11px; color:#61738b; display:block; margin-bottom:6px; }
+.sn-price-field { display:flex; flex-direction:column; gap:7px; font-size:12px; font-weight:600; margin-bottom:16px; min-width:0; }
+#sn-price-editor input:not([type=checkbox]),#sn-price-editor select,#sn-price-editor textarea { width:100%; min-width:0; border:1px solid #cddbeb; border-radius:5px; color:#17315c; background:#fff; padding:10px; font:inherit; font-size:13px; }
+#sn-price-editor input:focus,#sn-price-editor select:focus,#sn-price-editor textarea:focus { outline:2px solid #168367; outline-offset:1px; }
+.sn-price-input { display:flex; align-items:center; position:relative; min-width:0; }
+.sn-price-input > span:not(.sn-sr-only) { position:absolute; left:8px; font-size:10px; color:#6d7e95; pointer-events:none; }
+#sn-price-editor .sn-price-input input { padding:10px 5px 10px 34px; font-variant-numeric:tabular-nums; appearance:textfield; }
+.sn-price-input input::-webkit-inner-spin-button { appearance:none; }
+.sn-price-range { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.sn-price-matrix { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+.sn-price-room-picker { display:none; }
+.sn-price-matrix caption { text-align:left; font-size:11px; color:#61738b; padding:0 0 12px; }
+.sn-price-matrix th,.sn-price-matrix td { border:1px solid #dfE7f0; padding:9px 6px; text-align:left; }
+.sn-price-matrix thead th { background:#f1f6fc; font-size:11px; }
+.sn-price-matrix tbody th { width:20%; font-size:11px; }
+.sn-price-matrix tbody tr:nth-child(even) { background:#f1f9f5; }
+.sn-price-scope { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.sn-price-addons { margin:14px 0; }
+.sn-price-addon { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)) minmax(95px,1fr) 36px; gap:10px; padding:16px 0; border-top:1px solid #e0e7f0; align-items:end; }
+.sn-price-addon-name { grid-column:span 3; }
+.sn-price-enabled { grid-column:1/-1; font-size:11px; display:flex; align-items:center; gap:7px; }
+.sn-price-addon .sn-price-field { margin:0; }
+.sn-price-addon .sn-price-addon-name { grid-column:1/-1; }
+.sn-price-remove { width:36px; min-height:38px; padding:8px !important; }
+.sn-price-empty { font-size:12px; color:#61738b; }
+#sn-price-notes-count { display:block; text-align:right; font-size:11px; color:#61738b; }
+.sn-price-summary strong { display:block; font-size:23px; color:#147457; overflow-wrap:anywhere; }
+.sn-price-summary > span,.sn-price-summary p { font-size:12px; color:#61738b; }
+.sn-price-footer { display:flex; align-items:center; justify-content:flex-end; gap:12px; padding:20px 0 4px; }
+#sn-price-editor .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; border-radius:5px; }
+#sn-price-editor .btn-primary { background:#167457; border-color:#167457; color:white; }
+#sn-price-editor .btn-primary img { filter:brightness(0) invert(1); }
+#sn-price-editor .btn:disabled { opacity:.6; cursor:wait; }
+#sn-price-prev,#sn-price-next,.sn-price-steps { display:none !important; }
+#sn-price-error { color:#ac2635; font-size:13px; overflow-wrap:anywhere; }
+.sn-price-success { color:#147457; background:#edf8f1; padding:12px; }
+#sn-price-editor [hidden] { display:none !important; }
+.sn-provider-service-card .sn-actions-row { display:flex; flex-wrap:wrap; gap:8px; }
+.sn-provider-service-card [data-action=set-price] { display:inline-flex; align-items:center; gap:7px; }
+.sn-provider-service-card [data-action=set-price] img { filter:brightness(0) invert(1); }
+@media (max-width:1150px) { .sn-price-layout { grid-template-columns:1fr; gap:0; } .sn-price-side { border:0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:20px; } .sn-price-summary { grid-column:1/-1; } }
+@media (max-width:700px) {
+ .sn-price-heading { align-items:flex-start; flex-wrap:wrap; }
+ .sn-price-heading h2 { font-size:20px; }
+ .sn-price-state { margin-left:52px; }
+ .sn-price-steps { display:flex !important; gap:6px; padding-top:18px; }
+ .sn-price-steps button { display:flex; flex:1; align-items:center; gap:5px; font-size:10px; padding:9px 3px; color:#61738b; border:0; border-bottom:2px solid #dce4ee; background:none; }
+ .sn-price-steps button[aria-current=step] { color:#127355; border-color:#127355; font-weight:700; }
+ .sn-price-steps span { font-weight:700; }
+ #sn-price-editor .sn-price-inactive { display:none; }
+ .sn-price-side { display:block; }
+ .sn-price-matrix,.sn-price-matrix tbody,.sn-price-matrix tr { display:block; }
+ .sn-price-matrix thead { display:none; }
+ .sn-price-room-picker { display:flex; }
+ .sn-price-matrix caption { display:block; width:100%; }
+ .sn-price-matrix tr:not(.is-selected) { display:none; }
+ .sn-price-matrix tr { display:grid; grid-template-columns:1fr 1fr; padding:12px 0; border-bottom:1px solid #dce4ee; }
+ .sn-price-matrix tbody th { display:block; grid-column:1/-1; width:auto; font-size:13px; padding:0 8px 10px; border:0; }
+ .sn-price-matrix td { border:0; padding:6px; }
+ .sn-price-matrix td::before { content:attr(data-duration); display:block; margin-bottom:5px; font-size:11px; color:#61738b; }
+ .sn-price-scope { grid-template-columns:1fr 1fr; }
+ .sn-price-addon { grid-template-columns:1fr 1fr; }
+ .sn-price-remove { justify-self:end; }
+ .sn-price-footer { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+ #sn-price-prev,#sn-price-next { display:inline-flex !important; }
+ #sn-price-editor .sn-price-hide-mobile { display:none !important; }
+ .sn-price-footer [data-price-cancel] { margin:0; }
+ .sn-price-footer #sn-price-save { grid-column:1/-1; }
+ .sn-price-footer .btn { font-size:12px; padding:9px 12px; }
+}

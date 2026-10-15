@@ -11,6 +11,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./db');
 const cleaningPricing = require('../shared/js/cleaningPricing');
+const providerPricing = require('../shared/js/providerPricing');
 const personalCarePricing = require('../shared/js/personalCarePricing');
 const appliancePricing = require('../shared/js/appliancePricing');
 const installationPricing = require('../shared/js/installationPricing');
@@ -1293,6 +1294,7 @@ async function ensureAdminSupportTables() {
     );
 
     ALTER TABLE provider_services
+      ADD COLUMN IF NOT EXISTS pricing_config JSONB,
       ADD COLUMN IF NOT EXISTS laundry_pickup_delivery BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS massage_types TEXT[] NOT NULL DEFAULT '{}'::text[];
 
@@ -1673,6 +1675,8 @@ function providerServiceRow(row) {
     category: row.category,
     starting_price: Number(row.starting_price || 0),
     max_price: Number(row.max_price || 0),
+    pricing_config: row.pricing_config || null,
+    updated_at: row.updated_at,
     accepts_cash: row.accepts_cash,
     accepts_gcash: row.accepts_gcash,
     accepts_other: row.accepts_other,
@@ -3240,24 +3244,38 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
 
   const calculatedPricing = [cleaningPricing, personalCarePricing, appliancePricing, installationPricing, outdoorPricing].find(pricing =>
     pricing.serviceKey(req.body.service) || pricing.isCategory(req.body.service) || pricing.serviceKeys?.(req.body.service)?.length || pricing.isCategory(serviceDetails.category));
+  const offeredServices = await db.query('SELECT * FROM provider_services WHERE provider_id = $1 AND is_active = TRUE', [req.body.provider_id]);
+  const selectedService = req.body.provider_service_id
+    ? offeredServices.rows.find(service => String(service.id) === String(req.body.provider_service_id))
+    : offeredServices.rows.find(service => service.title.toLowerCase() === String(req.body.service).trim().toLowerCase())
+      || (calculatedPricing && offeredServices.rows.find(service => calculatedPricing.serviceKey(service.title) === calculatedPricing.serviceKey(req.body.service) && calculatedPricing.serviceKey(service.title)))
+      || (calculatedPricing && offeredServices.rows.find(service => calculatedPricing.serviceKeys?.(service.title)?.includes(calculatedPricing.serviceKey(req.body.service)) || calculatedPricing.isCategory(service.title)));
+  if (req.body.provider_service_id && !selectedService) return res.status(400).json({ message: 'This service is no longer available. Reopen the booking.' });
+  const pricingSelection = serviceDetails.provider_pricing;
   if (calculatedPricing) {
-    const offered = await db.query(`
-      SELECT * FROM provider_services
-      WHERE provider_id = $1 AND is_active = TRUE
-    `, [req.body.provider_id]);
-    const key = calculatedPricing.serviceKey(req.body.service);
-    const selected = req.body.provider_service_id
-      ? offered.rows.find(service => String(service.id) === String(req.body.provider_service_id))
-      : offered.rows.find(service => calculatedPricing.serviceKey(service.title) === key || calculatedPricing.serviceKeys?.(service.title)?.includes(key))
-        || offered.rows.find(service => calculatedPricing.isCategory(service.title));
     // Ignore submitted totals and rebuild the saved price from validated selections.
-    const estimate = calculatedPricing.forBooking(req.body.service, serviceDetails, selected);
+    const estimate = calculatedPricing.forBooking(req.body.service, serviceDetails, selectedService);
     serviceDetails = { ...estimate.details, media_files: mediaFiles };
     pricingType = estimate.pricingType;
     estimatedMin = estimate.estimatedMin;
     estimatedMax = estimate.estimatedMax;
     bookingAmount = estimate.amount;
     req.body.service = estimate.details.service_type;
+  }
+  if (selectedService?.pricing_config) {
+    if (String(pricingSelection?.revision || '') !== new Date(selectedService.updated_at).toISOString()) {
+      return res.status(409).json({ message: 'Provider pricing has changed. Reopen the booking to review the current rates.' });
+    }
+    if (!calculatedPricing && !providerPricing.matchesQuoteService(selectedService, req.body.service)) {
+      return res.status(400).json({ message: 'Select the matching provider service.' });
+    }
+    const estimate = providerPricing.apply({ amount: bookingAmount, estimatedMin, estimatedMax, pricingType, details: serviceDetails },
+      { ...selectedService, updated_at: new Date(selectedService.updated_at).toISOString() }, pricingSelection);
+    serviceDetails = { ...estimate.details, media_files: mediaFiles };
+    pricingType = estimate.pricingType;
+    estimatedMin = estimate.estimatedMin;
+    estimatedMax = estimate.estimatedMax;
+    bookingAmount = estimate.amount;
   }
 
   const result = await transaction(db, async client => {
@@ -3450,7 +3468,13 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
 }));
 
 app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
   requireFields(req.body, ['title', 'category']);
+  const pricingConfig = providerPricing.validate(req.body.pricing_config || {
+    mode: 'range', min: req.body.starting_price, max: req.body.max_price ?? req.body.starting_price,
+    service_area: '', duration: 'Flexible', notes: '', addons: [],
+  }, req.body.title);
+  const priceRange = providerPricing.bounds(pricingConfig);
   if (req.body.laundry_pickup_delivery !== undefined && typeof req.body.laundry_pickup_delivery !== 'boolean') {
     return res.status(400).json({ message: 'Laundry pickup / delivery must be enabled or disabled.' });
   }
@@ -3458,28 +3482,41 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
   const massageTypes = personalCarePricing.massageTypes(req.body.massage_types ?? []);
   const result = await db.query(`
     INSERT INTO provider_services
-      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active, laundry_pickup_delivery, massage_types)
-    VALUES ($1, $2, $3, $4, COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, TRUE), COALESCE($8, FALSE), COALESCE($9, FALSE), COALESCE($10, TRUE), COALESCE($11, FALSE), $12::text[])
+      (provider_id, title, description, category, starting_price, max_price, accepts_cash, accepts_gcash, accepts_other, is_active, laundry_pickup_delivery, massage_types, pricing_config)
+    VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, TRUE), COALESCE($8, FALSE), COALESCE($9, FALSE), COALESCE($10, TRUE), COALESCE($11, FALSE), $12::text[], $13::jsonb)
     RETURNING *
   `, [
     req.params.id,
     req.body.title.trim(),
     String(req.body.description || '').trim(),
     category,
-    req.body.starting_price || 0,
-    req.body.max_price || req.body.starting_price || 0,
+    priceRange.min,
+    priceRange.max,
     req.body.accepts_cash !== false,
     Boolean(req.body.accepts_gcash),
     Boolean(req.body.accepts_other),
     req.body.is_active !== false,
     req.body.laundry_pickup_delivery === true,
     massageTypes,
+    JSON.stringify(pricingConfig),
   ]);
   await upsertServiceCategory(category, req.body.title);
   res.status(201).json({ service: providerServiceRow(result.rows[0]) });
 }));
 
 app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.providerId);
+  const existing = await db.query('SELECT * FROM provider_services WHERE provider_id = $1 AND id = $2', [req.params.providerId, req.params.serviceId]);
+  if (!existing.rowCount) return res.status(404).json({ message: 'Service not found.' });
+  const currentService = existing.rows[0];
+  const pricingConfig = req.body.pricing_config === undefined ? currentService.pricing_config
+    : providerPricing.validate(req.body.pricing_config, req.body.title ?? currentService.title);
+  if (pricingConfig) {
+    providerPricing.validate(pricingConfig, req.body.title ?? currentService.title);
+    const priceRange = providerPricing.bounds(pricingConfig);
+    req.body.starting_price = req.body.pricing_config === undefined ? null : priceRange.min;
+    req.body.max_price = req.body.pricing_config === undefined ? null : priceRange.max;
+  }
   if (req.body.laundry_pickup_delivery !== undefined && typeof req.body.laundry_pickup_delivery !== 'boolean') {
     return res.status(400).json({ message: 'Laundry pickup / delivery must be enabled or disabled.' });
   }
@@ -3498,6 +3535,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
         is_active = COALESCE($11, is_active),
         laundry_pickup_delivery = COALESCE($12, laundry_pickup_delivery),
         massage_types = COALESCE($13::text[], massage_types),
+        pricing_config = COALESCE($14::jsonb, pricing_config),
         updated_at = NOW()
     WHERE provider_id = $1 AND id = $2
     RETURNING *
@@ -3515,6 +3553,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     req.body.is_active ?? null,
     req.body.laundry_pickup_delivery ?? null,
     massageTypes,
+    req.body.pricing_config === undefined ? null : JSON.stringify(pricingConfig),
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Service not found.' });
   await upsertServiceCategory(result.rows[0].category, result.rows[0].title);
@@ -3522,6 +3561,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
 }));
 
 app.delete('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.providerId);
   const result = await db.query('DELETE FROM provider_services WHERE provider_id = $1 AND id = $2 RETURNING id', [
     req.params.providerId,
     req.params.serviceId,

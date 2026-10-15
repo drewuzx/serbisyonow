@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v61';
+const SW_VERSION = 'serbisyonow-pwa-v62';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
@@ -25,6 +25,7 @@ const APP_SHELL_URLS = [
   '/shared/js/forgotPassword.js',
   '/shared/js/providerAssessmentBank.js',
   '/shared/js/cleaningPricing.js',
+  '/shared/js/providerPricing.js',
   '/shared/js/personalCarePricing.js',
   '/shared/js/appliancePricing.js',
   '/shared/js/installationPricing.js',
@@ -84,6 +85,8 @@ const APP_SHELL_URLS = [
   '/pages/provider/reviews/reviews.html',
   '/pages/provider/schedule/schedule.html',
   '/pages/provider/services/services.html',
+  '/pages/provider/services/pricing-editor.js',
+  '/pages/provider/services/pricing-editor.css',
   '/pages/landing/index.html',
   '/pages/landing/landing.css',
   '/pages/landing/js/landing.js',

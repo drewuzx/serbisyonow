@@ -126,7 +126,7 @@
   } catch { /* The manual form remains available; automatic prompts wait for a successful check. */ }
  }
  function syncVisibility() {
-  const blocked = !sameAccount() || [...document.querySelectorAll('.sn-float-panel.is-open, .sn-modal-backdrop, [aria-modal="true"]')]
+  const blocked = !sameAccount() || [...document.querySelectorAll('.sn-float-panel.is-open, .sn-modal-backdrop, #sn-price-editor, [aria-modal="true"]')]
    .some(node => node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden');
   if (root.hidden !== blocked) root.hidden = blocked;
  }

@@ -1,0 +1,60 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { startQrFixture } = require('./provider-qr-test-fixture');
+const pricing = require('../shared/js/providerPricing');
+const cleaning = require('../shared/js/cleaningPricing');
+
+test('provider pricing persists, protects ownership and controls booking totals', async () => {
+ const f = await startQrFixture();
+ try {
+  const create = await f.request('/api/provider/81/services','POST',{title:'General House Cleaning',category:'Cleaning Services',starting_price:500,max_price:900},f.providerToken);
+  assert.equal(create.status,201,JSON.stringify(create.data));
+  const id=create.data.service.id, path=`/api/provider/81/services/${id}`;
+  const config={...pricing.defaults(create.data.service),...pricing.defaults({title:'General House Cleaning'}),mode:'house_matrix',addons:[{id:'fridge',name:'Inside Fridge Cleaning',enabled:true,min:200,max:400,unit:'Per service'}]};
+  assert.equal((await f.request(path,'PATCH',{pricing_config:config},null)).status,401);
+  assert.equal((await f.request(path,'PATCH',{pricing_config:config},f.otherProviderToken)).status,403);
+  assert.equal((await f.request(path,'PATCH',{pricing_config:{...config,matrix:[]}},f.providerToken)).status,400);
+  const saved=await f.request(path,'PATCH',{pricing_config:config},f.providerToken);
+  assert.equal(saved.status,200,JSON.stringify(saved.data));
+  assert.equal(saved.data.service.starting_price,400);
+  assert.equal(saved.data.service.max_price,1700);
+  const service=saved.data.service;
+  const persisted=(await f.db.query('SELECT pricing_config FROM provider_services WHERE id=$1',[id])).rows[0].pricing_config;
+  assert.equal(persisted.matrix[0][0],400);
+  const base=cleaning.assessment('general house cleaning',cleaning.defaults('general house cleaning'));
+  const estimate=pricing.apply(base,service,{addons:[{id:'fridge',quantity:1}]});
+  await f.db.query("INSERT INTO provider_availability (provider_id,available_date,start_time,end_time) VALUES (81,'2099-10-10','10:00 AM','12:00 PM')");
+  const body={provider_id:81,provider_service_id:id,service:service.title,scheduled_date:'2099-10-10',scheduled_time:'10:00 AM',address:'Test',amount:1,estimated_min:1,estimated_max:1,service_details:estimate.details};
+  const stale=await f.request('/api/customer/61/bookings','POST',{...body,service_details:{...estimate.details,provider_pricing:{...estimate.details.provider_pricing,revision:'old'}}});
+  assert.equal(stale.status,409);
+  const wrong=await f.request('/api/customer/61/bookings','POST',{...body,provider_service_id:999999});
+  assert.equal(wrong.status,400);
+  const booked=await f.request('/api/customer/61/bookings','POST',body);
+  assert.equal(booked.status,201,JSON.stringify(booked.data));
+  const row=(await f.db.query("SELECT * FROM customer_bookings WHERE provider_id=81 ORDER BY id DESC LIMIT 1")).rows[0];
+  assert.equal(Number(row.estimated_min),600);
+  assert.equal(Number(row.estimated_max),800);
+  assert.equal(row.service_details.sample_rates,false);
+  assert.equal(row.service_details.provider_pricing.config.addons[0].min,200);
+  assert.equal(row.deposit_status,'awaiting_price');
+  // Later rate changes must not rewrite the customer's recorded estimate.
+  await f.request(path,'PATCH',{pricing_config:{...config,matrix:config.matrix.map(r=>r.map(v=>v+100))}},f.providerToken);
+  assert.equal(Number((await f.db.query('SELECT estimated_min FROM customer_bookings WHERE id=$1',[row.id])).rows[0].estimated_min),600);
+  const nail=await f.request('/api/provider/81/services','POST',{title:'Nail Care',category:'Personal Care',starting_price:450,max_price:1500},f.providerToken);
+  assert.equal(nail.status,201);
+  assert.deepEqual([nail.data.service.pricing_config.min,nail.data.service.pricing_config.max],[450,1500]);
+  const nailEstimate=require('../shared/js/personalCarePricing').assessment('nail care',require('../shared/js/personalCarePricing').defaults('nail care'));
+  const nailPrices=pricing.apply(nailEstimate,nail.data.service);
+  await f.db.query("INSERT INTO provider_availability (provider_id,available_date,start_time,end_time) VALUES (81,'2099-10-11','10:00 AM','12:00 PM')");
+  const nailBooking=await f.request('/api/customer/61/bookings','POST',{...body,scheduled_date:'2099-10-11',provider_service_id:nail.data.service.id,service:'Nail Care',service_details:nailPrices.details});
+  assert.equal(nailBooking.status,201,JSON.stringify(nailBooking.data));
+  assert.equal(nailBooking.data.booking.estimated_min,450);
+  assert.equal(nailBooking.data.booking.estimated_max,1500);
+  const toggled=await f.request(`/api/provider/81/services/${nail.data.service.id}`,'PATCH',{accepts_cash:false},f.providerToken);
+  assert.equal(toggled.data.service.pricing_config.min,450);
+  assert.equal(toggled.data.service.starting_price,450);
+  const forbidden=await f.request(`/api/provider/81/services/${nail.data.service.id}`,'DELETE',undefined,f.otherProviderToken);
+  assert.equal(forbidden.status,403);
+ } finally { await f.close(); }
+});
