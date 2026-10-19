@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const { chromium } = require('playwright');
 const { startQrFixture } = require('./provider-qr-test-fixture');
@@ -98,9 +99,19 @@ async function main() {
 
   await f.db.query('INSERT INTO admins (username,password_hash) VALUES ($1,$2)', ['feedback-browser-admin', await bcrypt.hash('fixture-password',4)]);
   const adminUser = (await f.request('/api/auth/admin/login','POST',{username:'feedback-browser-admin',password:'fixture-password'},'')).data.user;
+  await f.db.query("INSERT INTO admin_feedback(type,subject,message,submitted_by) VALUES('feedback','Legacy general feedback','General feedback retained.','Test user')");
+  await f.db.query("INSERT INTO customer_reviews(customer_id,provider_id,rating,comment) VALUES(61,81,1,'Provider review, not a system rating.')");
   const admin = await accountPage('admin', adminUser);
   await admin.goto(`${f.base}/pages/admin/feedback/feedback.html`);
-  await admin.waitForFunction(() => document.querySelector('#feedback-count').textContent === '1 of 1 records');
+  await admin.waitForFunction(() => document.querySelector('#feedback-count').textContent === '1 record');
+  assert.equal(await admin.getByLabel('Feedback type',{exact:true}).inputValue(),'system');
+  assert.match(await admin.locator('#feedback-overview').innerText(),/100%/);
+  assert.match(await admin.locator('#feedback-summary').innerText(),/4.0\/5/);
+  assert.equal(await admin.getByText('Legacy general feedback',{exact:true}).count(),0);
+  assert.equal(await admin.getByText('Provider review, not a system rating.',{exact:true}).count(),0);
+  await admin.getByLabel('Feedback type',{exact:true}).selectOption('all');
+  await admin.getByText('Legacy general feedback',{exact:true}).waitFor();
+  await admin.getByLabel('Feedback type',{exact:true}).selectOption('system');
   assert.equal(await admin.locator('.sn-feedback-root').count(), 0);
   assert.equal(await admin.locator('#feedback-list img').count(), 0, 'Comments are escaped');
   assert.equal(await admin.evaluate(() => window.feedbackXss), undefined);
@@ -116,7 +127,7 @@ async function main() {
   await customer.locator('.sn-feedback-thanks').waitFor();
   await admin.bringToFront();
   await admin.clock.runFor(3500);
-  await admin.waitForFunction(() => document.querySelector('#feedback-count').textContent === '2 of 2 records');
+  await admin.waitForFunction(() => document.querySelector('#feedback-count').textContent === '2 records');
   await admin.getByLabel('Account type', {exact:true}).selectOption('provider');
   await admin.getByLabel('Rating', {exact:true}).selectOption('1');
   assert((await admin.locator('#feedback-list').innerText()).includes('No feedback matches'));
@@ -127,6 +138,11 @@ async function main() {
   assert.equal(await admin.getByLabel('Rating', {exact:true}).inputValue(), '4');
   await admin.getByLabel('Account type', {exact:true}).selectOption('all');
   await admin.getByLabel('Rating', {exact:true}).selectOption('all');
+  assert.equal((await f.request('/api/system-feedback','POST',{role:'provider',rating:2,comment:'System navigation could improve.',submission_id:randomUUID()},f.otherProviderToken)).status,201);
+  await admin.getByRole('button',{name:'Refresh',exact:true}).click();
+  await admin.getByText('2/5 - Poor',{exact:true}).waitFor();
+  assert.match(await admin.locator('#feedback-overview').innerText(),/67%/);
+  assert.match(await admin.locator('#feedback-summary').innerText(),/3.7\/5/);
   for (const width of [1440,390,320]) {
    await admin.setViewportSize({width,height:1000});
    assert(await admin.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Admin overflow at ${width}`);

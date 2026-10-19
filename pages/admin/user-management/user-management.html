@@ -36,6 +36,7 @@
       <a href="../categories/categories.html">Categories</a>
       <a href="../reports/reports.html">Reports</a>
       <a href="../feedback/feedback.html">Feedback</a>
+      <a href="../revenue/revenue.html">Revenue &amp; Promotions</a>
     </nav>
 
     <section class="metrics-grid">
@@ -65,13 +66,13 @@
 
       <div class="admin-controls">
         <input id="search-input" type="search" class="form-control" placeholder="Search by name, email, contact..." />
-        <select id="status-filter" class="form-control">
+        <select id="status-filter" class="form-control" aria-label="Account status">
           <option value="pending">Pending</option>
           <option value="verified">Verified</option>
           <option value="rejected">Declined</option>
           <option value="all">All</option>
         </select>
-        <select id="role-filter" class="form-control">
+        <select id="role-filter" class="form-control" aria-label="Account type">
           <option value="all">All</option>
           <option value="customer">Customers</option>
           <option value="provider">Providers</option>
@@ -109,7 +110,7 @@
       <p class="sn-modal-body">Are you sure you want to decline this account registration? The user may resubmit their documents after updating their details.</p>
       <div class="sn-modal-actions">
         <button type="button" id="decline-cancel-btn" class="btn btn-outline">Cancel</button>
-        <button type="button" id="decline-confirm-btn" class="btn btn-danger">Decline</button>
+        <button type="button" id="decline-confirm-btn" class="btn btn-neutral">Decline</button>
       </div>
     </div>
   </div>

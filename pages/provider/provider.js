@@ -498,6 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const providerNav = [
     { key: 'dashboard', label: 'Dashboard', href: '../dashboard/dashboard.html', icon: '&#127968;' },
     { key: 'services', label: 'Service', href: '../services/services.html', icon: '&#128736;' },
+    { key: 'promotions', label: 'Promotions', href: '../promotions/promotions.html', icon: '<img src="/shared/icons/lucide/star.svg" alt="" width="20" height="20">' },
     { key: 'requests', label: 'Bookings', href: '../requests/requests.html', icon: '&#128197;' },
     { key: 'schedule', label: 'Schedules', href: '../schedule/schedule.html', icon: '&#128198;' },
     { key: 'reviews', label: 'Reviews', href: '../reviews/reviews.html', icon: '&#11088;' },
@@ -620,7 +621,7 @@ async function loadProviderDatabase({ background = false } = {}) {
     };
     renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews], () => renderProviderMetrics(data));
     if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.availability], () => renderProviderDashboardAnalytics(data));
-    const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
+    const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card[aria-busy="true"], .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
     if (path.includes('/services/') && !document.getElementById('sn-price-editor') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
     if (path.includes('/requests/')) {
       if (!background || !editing) renderChanged('requests', [data.bookings, data.provider?.latitude, data.provider?.longitude], () => renderRequests(data.bookings || [], data.provider || provider));
@@ -635,6 +636,13 @@ async function loadProviderDatabase({ background = false } = {}) {
     return true;
   } catch (error) {
     console.warn(error.message || error);
+    if (!background && window.location.pathname.includes('/services/') && !document.querySelector('[data-action="add-service"], #sn-price-editor')) {
+      const panel = document.querySelector('.sn-panel');
+      if (panel) {
+        panel.innerHTML = '<h2>Services</h2><p role="status">Unable to load your services.</p><button class="btn btn-outline" type="button">Retry</button>';
+        panel.querySelector('button').addEventListener('click', () => loadProviderDatabase());
+      }
+    }
     if (!background && window.location.pathname.includes('/profile/') && !document.getElementById('sn-provider-profile-form')) {
       const panel = document.querySelector('.sn-panel');
       if (panel) {
@@ -853,10 +861,10 @@ function renderServices(services) {
         <div class="sn-provider-payment-row">
           <span>Payment Options</span>
           <label><input type="checkbox" data-service-field="accepts_cash" ${service.accepts_cash ? 'checked' : ''}> Cash</label>
-          <label><input type="checkbox" data-service-field="accepts_gcash" ${service.accepts_gcash ? 'checked' : ''}> GCash / QR</label>
-          <label><input type="checkbox" data-service-field="accepts_other" ${service.accepts_other ? 'checked' : ''}> Other</label>
-          <span style="margin-left:auto">On / Off Service:</span><label class="sn-provider-switch"><input type="checkbox" data-service-field="is_active" ${service.is_active ? 'checked' : ''}><span class="sn-provider-toggle"></span></label>
+          <label><input type="checkbox" data-service-field="accepts_gcash" ${service.accepts_gcash ? 'checked' : ''}> QR</label>
+          <label class="sn-provider-availability-toggle"><span>On / Off Service</span><span class="sn-provider-switch"><input type="checkbox" role="switch" aria-label="${esc(service.title)} availability" data-service-field="is_active" ${service.is_active ? 'checked' : ''}><span class="sn-provider-toggle"></span></span></label>
         </div>
+        <p class="sn-service-save-status" role="status" aria-live="polite"></p>
       </article>
     `).join('') || '<article class="sn-provider-service-card"><p>No services listed yet.</p></article>'}
   `;
@@ -888,6 +896,7 @@ function renderServices(services) {
       input.dataset.serviceField,
       input.checked,
       input,
+      services,
     ));
   });
 }
@@ -910,22 +919,37 @@ async function editMassageTypes(service) {
   }
 }
 
-async function updateServiceField(serviceId, field, value, input) {
+async function updateServiceField(serviceId, field, value, input, services) {
   const provider = getProviderUser();
   if (!provider?.id || !serviceId || !field) return;
-  input.disabled = true;
+  const card = input.closest('[data-service-id]');
+  const controls = [...card.querySelectorAll('input, button')];
+  const notice = card.querySelector('.sn-service-save-status');
+  card.setAttribute('aria-busy', 'true');
+  controls.forEach(control => { control.disabled = true; });
+  notice.textContent = 'Saving...';
+  ++providerDatabaseVersion;
   try {
-    await providerSend(`/api/provider/${provider.id}/services/${serviceId}`, 'PATCH', { [field]: value });
-    loadProviderDatabase();
+    const result = await providerSend(`/api/provider/${provider.id}/services/${serviceId}`, 'PATCH', { [field]: value });
+    ++providerDatabaseVersion;
+    const rendered = services.find(service => String(service.id) === String(serviceId));
+    if (rendered) Object.assign(rendered, result.service);
+    card.querySelector('h3 .sn-status-pill').textContent = result.service.is_active ? 'Active' : 'Off';
+    card.querySelector('h3 .sn-status-pill').className = `sn-status-pill ${result.service.is_active ? 'accepted' : 'pending'}`;
+    const cached = window.snProviderLiveData?.services?.find(service => String(service.id) === String(serviceId));
+    if (cached) Object.assign(cached, result.service);
+    notice.textContent = field === 'is_active' ? (value ? 'Service is on.' : 'Service is off. Existing bookings are unchanged.') : field === 'laundry_pickup_delivery' ? 'Pickup / delivery option saved.' : 'Payment options saved.';
   } catch (error) {
     input.checked = !value;
+    notice.textContent = 'Changes were not saved.';
     await openProviderModal({
       title: 'Service not updated',
       message: error.message || 'Unable to update this service option.',
       confirmText: 'OK',
     });
   } finally {
-    input.disabled = false;
+    card.removeAttribute('aria-busy');
+    controls.forEach(control => { control.disabled = false; });
   }
 }
 
@@ -998,7 +1022,7 @@ async function saveService(service) {
     max_price,
     accepts_cash: service?.accepts_cash ?? true,
     accepts_gcash: service?.accepts_gcash ?? true,
-    accepts_other: service?.accepts_other ?? false,
+    accepts_other: false,
     is_active: service?.is_active ?? true,
     ...(!service?.pricing_config ? { pricing_config: { mode: 'range', min: starting_price, max: max_price, duration: 'Flexible', service_area: '', notes: '', addons: [] } } : {}),
   };
@@ -1177,8 +1201,8 @@ function renderRequests(bookings, provider) {
               ${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? `<button class="btn btn-primary btn-sm" data-review-payment>${booking.deposit_status === 'awaiting_verification' ? 'Review Payment' : 'Payment Details'}</button>` : ''}
               ${booking.status === 'pending' ? `<div class="sn-actions-row">${booking.deposit_required
                 ? (!booking.customer_agreed_at && ['awaiting_price', 'awaiting_payment'].includes(booking.deposit_status) ? `<button class="btn btn-success btn-sm" data-confirm-price>${booking.confirmed_price == null ? 'Confirm Price' : 'Edit Price'}</button>` : '')
-                : '<button class="btn btn-success btn-sm" data-status="upcoming">Accept</button>'}<button class="btn btn-danger btn-sm" data-status="cancelled">Decline</button></div>` : ''}
-              ${booking.status === 'upcoming' ? '<button class="btn btn-success btn-sm" data-status="ongoing">Start Service</button><button class="btn btn-outline btn-sm" data-status="cancelled">Cancel Booking</button>' : ''}
+                : '<button class="btn btn-success btn-sm" data-status="upcoming">Accept</button>'}<button class="btn btn-neutral btn-sm" data-status="cancelled">Decline</button></div>` : ''}
+              ${booking.status === 'upcoming' ? '<button class="btn btn-success btn-sm" data-status="ongoing">Start Service</button><button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button>' : ''}
               ${booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark Completed</button>' : ''}
               ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
             </div>
@@ -2329,7 +2353,7 @@ function renderProviderHistoryDetail(booking) {
           <div class="sn-dr"><span class="sn-dr-label">Service</span><span class="sn-dr-value">${esc(booking.service || '-')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Address</span><span class="sn-dr-value">${esc(booking.address || '-')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Amount</span><span class="sn-dr-value sn-dr-amount">${money(booking.amount)}</span></div>
-          <div class="sn-dr"><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value">${esc(booking.payment_method || 'cash')}</span></div>
+          <div class="sn-dr"><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value">${esc(({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[booking.payment_method || 'cash'] || booking.payment_method)}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Status</span><span class="sn-dr-value">${providerHistoryStatusPill(booking.status)}</span></div>
         </div>
         ${renderProviderBookingPayment(booking)}

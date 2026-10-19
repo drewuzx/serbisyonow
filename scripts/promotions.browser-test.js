@@ -1,0 +1,110 @@
+'use strict';
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const os = require('node:os');
+const { chromium } = require('playwright');
+const { startQrFixture } = require('./provider-qr-test-fixture');
+const { issueSession } = require('./account-sessions');
+
+async function main() {
+ const f = await startQrFixture(); let browser;
+ try {
+  const admin = (await f.db.query("INSERT INTO admins(username,password_hash) VALUES('test-admin','fixture') RETURNING id,username")).rows[0];
+  admin.auth_token = await issueSession(f.db,'admin',admin.id);
+  const provider = (await f.request('/api/auth/provider/session','GET',undefined,f.providerToken)).data.user;
+  browser = await chromium.launch({headless:true,channel:'msedge'});
+  const context = await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});
+  await context.route('**/*',route=>new URL(route.request().url()).origin===f.base?route.continue():route.fulfill({body:'',contentType:route.request().url().includes('fonts.googleapis.com')?'text/css':'application/javascript'}));
+  await context.addInitScript(({admin,provider})=>{ localStorage.setItem('sn_admin_user',JSON.stringify(admin)); localStorage.setItem('sn_provider_user',JSON.stringify(provider)); },{admin,provider});
+  const page = await context.newPage(), errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  const adminUrl = f.base+'/pages/admin/revenue/revenue.html', providerUrl=f.base+'/pages/provider/promotions/promotions.html';
+  await page.goto(adminUrl);
+  await page.getByRole('button',{name:'Edit 14-day Profile Boost',exact:true}).click();
+  await page.getByLabel('Price (PHP)',{exact:true}).fill('199');
+  await page.getByLabel('Available for purchase',{exact:true}).check();
+  await page.getByRole('button',{name:'Save Plan',exact:true}).click();
+  await page.locator('dialog').waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Edit Receiving QR',exact:true}).click();
+  await page.getByLabel('Account name',{exact:true}).fill('SerbisyoNow Test Platform');
+  await page.getByLabel('Account number',{exact:true}).fill('09123456789');
+  await page.getByLabel('Receiving QR',{exact:false}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button',{name:'Save Receiving Account',exact:true}).click();
+  await page.locator('dialog').waitFor({state:'detached'});
+  await page.getByText(/SerbisyoNow Test Platform/).waitFor();
+  const subscription = await f.request('/api/admin/promotions/plans','POST',{name:'Monthly Profile Boost',description:'Profile boost for 30 days.',kind:'subscription',duration_days:30,price:'299',enabled:true},admin.auth_token);
+  assert.equal(subscription.status,201);
+  await page.goto(providerUrl);
+  await page.getByRole('tab',{name:'Subscriptions',exact:true}).click();
+  await page.getByRole('heading',{name:'Basic',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Monthly Profile Boost',exact:true}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:'14-day Profile Boost',exact:true}).count(),0);
+  await page.getByRole('tab',{name:'Subscriptions',exact:true}).press('ArrowRight');
+  assert.equal(await page.getByRole('tab',{name:'Promotions',exact:true}).getAttribute('aria-selected'),'true');
+  await page.getByRole('button',{name:'Choose Plan',exact:true}).click();
+  await page.getByText('Admin QR',{exact:true}).waitFor();
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button',{name:'Continue to Admin QR',exact:true}).click();
+  await page.getByLabel('Transaction reference',{exact:true}).waitFor();
+  await page.waitForFunction(()=>document.querySelector('[data-order-qr]')?.naturalWidth>0);
+  await page.setViewportSize({width:390,height:1000});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+  await page.screenshot({path:path.join(os.tmpdir(),'promotion-payment-mobile.png'),fullPage:true});
+  await page.getByLabel('Transaction reference',{exact:true}).fill('PROMOTION-BROWSER-ONE');
+  await page.getByLabel('Payment receipt',{exact:true}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
+  await page.getByRole('button',{name:'Submit Receipt',exact:true}).click();
+  await page.getByRole('heading',{name:'Awaiting verification',exact:true}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:'Payment verified',exact:true}).count(),0);
+  await page.screenshot({path:path.join(os.tmpdir(),'promotion-pending-mobile.png'),fullPage:true});
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('dialog').waitFor({state:'detached'});
+  await page.locator('#promotion-orders .promotion-status.awaiting_verification').waitFor();
+  await page.goto(adminUrl);
+  await page.getByRole('button',{name:'Review Payment',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-order-receipt]')?.naturalWidth>0);
+  await page.getByRole('button',{name:'Verify & Activate',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Confirm actual receipt'}).waitFor();
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button',{name:'Verify & Activate',exact:true}).click();
+  await page.locator('dialog').waitFor({state:'detached'});
+  await page.locator('.promotion-metric').filter({hasText:'Verified platform revenue'}).getByText(/199/).waitFor();
+  for(const width of [1440,390,320]) {
+   await page.setViewportSize({width,height:1000});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`Admin overflow at ${width}`);
+   await page.screenshot({path:path.join(os.tmpdir(),`promotion-admin-${width}.png`),fullPage:true});
+  }
+  await page.getByRole('button',{name:'Edit Receiving QR',exact:true}).click();
+  await page.getByLabel('Account name',{exact:true}).fill('Unsaved platform name');
+  await page.getByRole('checkbox').check();
+  await page.route('**/api/admin/promotions/payment-qr',route=>route.fulfill({status:503,json:{message:'Test connection interrupted.'}}));
+  await page.getByRole('button',{name:'Save Receiving Account',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Test connection interrupted.'}).waitFor();
+  assert.equal(await page.getByLabel('Account name',{exact:true}).inputValue(),'Unsaved platform name');
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.unroute('**/api/admin/promotions/payment-qr');
+  await page.goto(providerUrl);
+  await page.locator('.promotion-status.active').waitFor();
+  await page.getByRole('button',{name:'View Details',exact:true}).click();
+  await page.getByRole('heading',{name:'Payment verified',exact:true}).waitFor();
+  await page.getByText('Your profile boost is active.',{exact:true}).waitFor();
+  await page.screenshot({path:path.join(os.tmpdir(),'promotion-verified-mobile.png'),fullPage:true});
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  for(const width of [1440,390,320]) {
+   await page.setViewportSize({width,height:1000});
+   if(width<768 && await page.locator('.sn-shell').evaluate(n=>n.classList.contains('sidebar-open'))) await page.locator('#sn-hamburger').click();
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`Provider overflow at ${width}`);
+   await page.screenshot({path:path.join(os.tmpdir(),`promotion-provider-${width}.png`),fullPage:true});
+   for(const tab of ['Subscriptions','My Purchases','Promotions']) {
+    await page.getByRole('tab',{name:tab,exact:true}).click();
+    await page.waitForFunction(()=>[...document.querySelectorAll('#promotion-workspace img')].every(img=>img.complete && img.naturalWidth>0));
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`${tab} overflow at ${width}`);
+    await page.screenshot({path:path.join(os.tmpdir(),`promotion-${tab.toLowerCase().replaceAll(' ','-')}-${width}.png`),fullPage:true});
+   }
+   await page.waitForFunction(()=>[...document.querySelectorAll('#promotion-workspace img')].every(img=>img.complete && img.naturalWidth>0));
+  }
+  assert.deepEqual(errors,[]);
+  console.log('Promotion browser flow passed: admin pricing and QR, provider purchase and receipt, admin verification, active boost, save error recovery, private images, and desktop/mobile layouts.');
+ } finally { if(browser) await browser.close(); await f.close(); }
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});

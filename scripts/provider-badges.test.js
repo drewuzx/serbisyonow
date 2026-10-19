@@ -90,7 +90,7 @@ test('live API badges are consistent, review-backed and recalculate after review
       ['/api/customer/61/recommendations', body => body.providers.find(p => p.id === 81)],
       ['/api/customer/61/location-map', body => body.providers.find(p => p.id === 81)],
     ]) {
-      const response = await f.request(url, 'GET', undefined, f.providerToken);
+      const response = await f.request(url, 'GET', undefined, url.startsWith('/api/admin/') ? adminToken : f.providerToken);
       assert.equal(response.status, 200, url + ': ' + JSON.stringify(response.data));
       assert.equal(select(response.data)?.badge_status, 'Top-Rated', url);
       assert.equal(select(response.data)?.badge_details.total_points, 99.2, url);

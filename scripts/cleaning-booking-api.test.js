@@ -25,6 +25,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
  const assemblyOffered = { id: 76, provider_id: 81, title: 'Furniture assembly', category: 'Installation Services', is_active: true };
  const outdoorOffered = { id: 77, provider_id: 81, title: 'Outdoor and Property Maintenance', category: 'Outdoor and Property Maintenance', is_active: true };
  const lawnOffered = { id: 78, provider_id: 81, title: 'Lawn mowing', category: 'Outdoor and Property Maintenance', is_active: true };
+ [offered, personalOffered, applianceOffered, combinedOffered, installationOffered, assemblyOffered, outdoorOffered, lawnOffered].forEach(service => { service.accepts_cash = true; service.accepts_gcash = true; });
  let lastInsert;
  let insertCount = 0;
  const uploads = new Map();

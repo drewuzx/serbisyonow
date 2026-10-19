@@ -24,13 +24,14 @@
         <h2>Add Category</h2>
         <span class="pill">Manual entry</span>
       </div>
-      <form class="admin-inline-form" id="category-form" novalidate>
-        <input class="form-control" id="category-name" name="name" type="text" placeholder="Category name" required />
-        <input class="form-control" id="category-description" name="description" type="text" placeholder="Description" />
-        <input class="form-control" id="category-services" name="services" type="text" placeholder="Services, comma separated" />
+      <form class="admin-inline-form" id="category-form">
+        <label for="category-name">Category name<input class="form-control" id="category-name" name="name" type="text" maxlength="100" required /></label>
+        <label for="category-description">Description<input class="form-control" id="category-description" name="description" type="text" maxlength="1000" /></label>
+        <label for="category-services">Services (comma separated)<input class="form-control" id="category-services" name="services" type="text" maxlength="5000" /></label>
         <button class="btn btn-primary" id="save-category-btn" type="submit">Save Category</button>
       </form>
-      <p class="admin-form-message" id="category-message" hidden></p>
+      <button class="btn btn-outline" id="cancel-category-btn" type="button">Cancel</button>
+      <p class="admin-form-message" id="category-message" role="status" hidden></p>
     </section>
     <section class="admin-grid" id="category-list"></section>
   </main>
@@ -41,6 +42,11 @@
     const form = document.getElementById('category-form');
     const message = document.getElementById('category-message');
     const saveButton = document.getElementById('save-category-btn');
+    const toggleButton = document.getElementById('add-category-toggle');
+    const cancelButton = document.getElementById('cancel-category-btn');
+    let saving = false;
+    toggleButton.setAttribute('aria-controls', 'category-form-panel');
+    toggleButton.setAttribute('aria-expanded', 'false');
 
     function setCategoryMessage(text, type = 'info') {
       message.textContent = text;
@@ -53,7 +59,7 @@
         const isActive = category.is_active && Number(category.provider_count || 0) > 0;
         const services = Array.isArray(category.services) && category.services.length ? category.services.join(', ') : 'No services listed yet';
         return `
-          <article class="admin-card">
+          <article class="admin-card" data-category-id="${Number(category.id)}">
             <h3>${adminEscape(category.name)}</h3>
             <p>${adminEscape(category.description || 'No description yet.')}</p>
             <p>${adminEscape(services)}</p>
@@ -67,22 +73,32 @@
     }
 
     async function loadCategories(options = {}) {
+      if (options.background && saving) return;
       try {
         const { categories } = await adminGet('/api/admin/categories');
         if (!adminDataChanged('categories', categories, options)) return;
         renderCategories(categories);
       } catch (error) {
-        if (!options.background) categoryList.innerHTML = `<article class="admin-card"><h3>${adminEscape(error.message)}</h3></article>`;
+        if (!options.background) categoryList.innerHTML = `<article class="admin-card"><p role="alert">${adminEscape(error.message)}</p><button class="btn btn-outline" type="button" id="retry-categories">Retry</button></article>`;
       }
     }
 
-    document.getElementById('add-category-toggle').addEventListener('click', () => {
+    toggleButton.addEventListener('click', () => {
+      if (saving) return;
       formPanel.hidden = !formPanel.hidden;
+      toggleButton.setAttribute('aria-expanded', String(!formPanel.hidden));
       if (!formPanel.hidden) document.getElementById('category-name').focus();
     });
+    cancelButton.addEventListener('click', () => {
+      if (saving) return;
+      form.reset(); setCategoryMessage(''); formPanel.hidden = true;
+      toggleButton.setAttribute('aria-expanded', 'false'); toggleButton.focus();
+    });
+    categoryList.addEventListener('click', event => { if (event.target.closest('#retry-categories')) loadCategories(); });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (saving) return;
       setCategoryMessage('');
       const payload = {
         name: document.getElementById('category-name').value.trim(),
@@ -94,7 +110,8 @@
         return;
       }
 
-      saveButton.disabled = true;
+      saving = true;
+      saveButton.disabled = toggleButton.disabled = cancelButton.disabled = true;
       saveButton.textContent = 'Saving...';
       try {
         await adminSend('/api/admin/categories', { method: 'POST', body: payload });
@@ -104,7 +121,8 @@
       } catch (error) {
         setCategoryMessage(error.message, 'error');
       } finally {
-        saveButton.disabled = false;
+        saving = false;
+        saveButton.disabled = toggleButton.disabled = cancelButton.disabled = false;
         saveButton.textContent = 'Save Category';
       }
     });

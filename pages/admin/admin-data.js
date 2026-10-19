@@ -1,8 +1,18 @@
 const ADMIN_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
 const adminLiveSignatures = new Map();
 
+document.addEventListener('DOMContentLoaded', () => {
+ const nav = document.querySelector('.admin-module-nav');
+ if (nav && !nav.querySelector('[href*="/revenue/"]')) {
+  const link = document.createElement('a');
+  link.href = '../revenue/revenue.html';
+  link.textContent = 'Revenue & Promotions';
+  nav.appendChild(link);
+ }
+});
+
 function adminCanRefresh() {
-  return window.snLiveRefresh?.isIdle() && !document.querySelector('.admin-modal:not([hidden]), .sn-modal:not([hidden]), .admin-actions button:disabled, [data-feedback-status]:disabled, [data-feedback-status]:focus');
+  return window.snLiveRefresh?.isIdle() && !document.querySelector('.admin-modal:not([hidden]), .admin-confirm-modal:not([hidden]), .admin-provider-detail[open], .sn-modal:not([hidden]), .admin-actions button:disabled, [data-feedback-status]:disabled, [data-feedback-status]:focus');
 }
 
 function adminDataChanged(key, data, { background = false } = {}) {

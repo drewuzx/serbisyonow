@@ -23,6 +23,9 @@ const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheck
 const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
+const { registerPromotionRoutes } = require('./promotions');
+const { registerAdminProviderDetails } = require('./admin-provider-details');
+const { registerAdminReports } = require('./admin-reports');
 const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
@@ -127,15 +130,16 @@ const FIELD_LABELS = {
   message: 'Message',
 };
 
-function canonicalCategoryName(value) {
-  const name = String(value || '').trim();
-  const aliases = {
+const categoryAliases = {
     'home repair': 'Repair Services',
     'home repairs': 'Repair Services',
     'home installation': 'Installation Services',
     'home installations': 'Installation Services',
-  };
-  return aliases[name.toLowerCase()] || name;
+};
+const adminCategoryAliases = { ...categoryAliases, 'cleaning services':'Cleaning', 'personal care services':'Personal Care' };
+function canonicalCategoryName(value) {
+  const name = String(value || '').trim().replace(/\s+/g, ' ');
+  return categoryAliases[name.toLowerCase()] || name;
 }
 
 app.use(cors());
@@ -144,6 +148,9 @@ app.post('/api/payments/paymongo/webhook', express.raw({ type: 'application/json
   res.json(await settleBookingPayment(db, event));
 }));
 app.use(express.json());
+registerPromotionRoutes(app, db, paymentImageUpload);
+registerAdminProviderDetails(app, db, providerView, uploadDir);
+registerAdminReports(app, db, adminCategoryAliases);
 
 app.get('/api/payment-receipts/:receiptId/image', asyncRoute(async (req, res) => {
   const role = req.query.role;
@@ -1112,6 +1119,7 @@ function providerRow(row) {
     review_count: details.review_count,
     completed_jobs: details.completed_jobs,
     assessed_at: row.assessed_at || null,
+    promoted: Boolean(row.promoted),
     is_verified: row.is_verified,
     verification_status: row.verification_status,
     created_at: row.created_at,
@@ -1427,24 +1435,24 @@ function categoryRow(row) {
 }
 
 async function upsertServiceCategory(name, service = '') {
-  const categoryName = canonicalCategoryName(name);
+  const categoryName = canonicalCategoryName(name).replace(/\s+/g, ' ');
   const serviceName = String(service || '').trim();
   if (!categoryName) return;
-  const description = `${categoryName} services offered by registered providers.`;
-  await db.query(`
-    INSERT INTO service_categories (name, description, services)
-    VALUES ($1, $2, CASE WHEN $3 = '' THEN ARRAY[]::TEXT[] ELSE ARRAY[$3]::TEXT[] END)
-    ON CONFLICT (name) DO UPDATE
-    SET services = (
-          SELECT ARRAY(
-            SELECT DISTINCT item
-            FROM unnest(service_categories.services || EXCLUDED.services) AS item
-            WHERE item <> ''
-            ORDER BY item
-          )
-        ),
-        updated_at = NOW()
-  `, [categoryName, description, serviceName]);
+  await saveServiceCategory(categoryName, `${categoryName} services offered by registered providers.`, serviceName ? [serviceName] : []);
+}
+
+async function saveServiceCategory(name, description, services, manual = false) {
+  return transaction(db, async client => {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`category:${name.toLowerCase()}`]);
+    const existing = (await client.query('SELECT id FROM service_categories WHERE lower(trim(name))=lower($1) ORDER BY id LIMIT 1', [name])).rows[0];
+    if (existing && manual) paymentFail(409, 'This category already exists. Choose a different name.');
+    if (existing) {
+      return (await client.query(`UPDATE service_categories SET services=ARRAY(
+        SELECT DISTINCT ON (lower(item)) item FROM unnest(services || $2::text[]) AS item
+        WHERE trim(item)<>'' ORDER BY lower(item),item),updated_at=NOW() WHERE id=$1 RETURNING *`, [existing.id,services])).rows[0];
+    }
+    return (await client.query('INSERT INTO service_categories(name,description,services,is_active) VALUES($1,$2,$3,TRUE) RETURNING *', [name,description,services])).rows[0];
+  });
 }
 
 async function ensureProviderProfileService(provider) {
@@ -1469,6 +1477,26 @@ async function ensureProviderProfileService(provider) {
     category,
   ]);
   await upsertServiceCategory(category, title);
+}
+
+function validateServiceOptions(body, current = { is_active: true, accepts_cash: true, accepts_gcash: false }) {
+  for (const key of ['is_active', 'accepts_cash', 'accepts_gcash', 'accepts_other']) {
+    if (body[key] !== undefined && typeof body[key] !== 'boolean') {
+      const error = new Error('Service availability and payment options must be enabled or disabled.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+  const next = { ...current, ...body };
+  if (body.accepts_other === true || (next.is_active && !next.accepts_cash && !next.accepts_gcash)) {
+    const error = new Error(body.accepts_other === true ? 'Only Cash and QR payments are supported.' : 'Select Cash or QR before enabling this service.');
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function serviceAcceptsPayment(service, method) {
+  return method === 'cash' ? service.accepts_cash === true : method === 'gcash' && service.accepts_gcash === true;
 }
 
 function feedbackRow(row) {
@@ -2398,13 +2426,12 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
   const category = String(req.query.category || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'recommended').trim().toLowerCase();
   const params = [];
-  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`];
+  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
   if (q) {
     params.push(`%${q}%`);
     where.push(`(
       lower(p.full_name) LIKE $${params.length}
       OR lower(p.category) LIKE $${params.length}
-      OR lower(p.service) LIKE $${params.length}
       OR lower(p.address) LIKE $${params.length}
       OR lower(COALESCE(s.title, '')) LIKE $${params.length}
       OR lower(COALESCE(s.description, '')) LIKE $${params.length}
@@ -2413,9 +2440,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
   if (category) {
     params.push(`%${category}%`);
     where.push(`(
-      lower(p.category) LIKE $${params.length}
-      OR lower(p.service) LIKE $${params.length}
-      OR lower(COALESCE(s.category, '')) LIKE $${params.length}
+      lower(COALESCE(s.category, '')) LIKE $${params.length}
       OR lower(COALESCE(s.title, '')) LIKE $${params.length}
     )`);
   }
@@ -3047,13 +3072,12 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
   const location = String(req.query.location || customer?.address || '').trim();
 
   const params = [];
-  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`];
+  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
   if (q) {
     params.push(`%${q.toLowerCase()}%`);
     where.push(`(
       lower(p.full_name) LIKE $${params.length}
       OR lower(p.category) LIKE $${params.length}
-      OR lower(p.service) LIKE $${params.length}
       OR lower(p.address) LIKE $${params.length}
       OR lower(COALESCE(s.title, '')) LIKE $${params.length}
       OR lower(COALESCE(s.description, '')) LIKE $${params.length}
@@ -3063,9 +3087,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
   if (category) {
     params.push(`%${category.toLowerCase()}%`);
     where.push(`(
-      lower(p.category) LIKE $${params.length}
-      OR lower(p.service) LIKE $${params.length}
-      OR lower(COALESCE(s.category, '')) LIKE $${params.length}
+      lower(COALESCE(s.category, '')) LIKE $${params.length}
       OR lower(COALESCE(s.title, '')) LIKE $${params.length}
     )`);
   }
@@ -3086,11 +3108,12 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
     : sort === 'rating' ? 'rating DESC, completed_jobs DESC, proximity_score DESC, p.created_at DESC'
     : sort === 'nearest' ? 'proximity_score DESC, p.is_verified DESC, rating DESC, p.created_at DESC'
     : sort === 'available' ? 'available_slots DESC, recommendation_score DESC, rating DESC, p.created_at DESC'
-    : 'recommendation_score DESC, p.is_verified DESC, rating DESC, completed_jobs DESC, p.created_at DESC';
+    : 'promoted DESC, recommendation_score DESC, p.is_verified DESC, rating DESC, completed_jobs DESC, p.created_at DESC';
 
   const result = await db.query(`
     SELECT
       p.*,
+      EXISTS(SELECT 1 FROM promotion_orders po WHERE po.provider_id=p.id AND po.status='paid' AND po.starts_at<=NOW() AND po.expires_at>NOW()) AS promoted,
       COALESCE(AVG(r.rating), 4.8) AS rating,
       COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END)::int AS completed_jobs,
       COUNT(DISTINCT f.id)::int AS favorite_count,
@@ -3249,8 +3272,12 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     ? offeredServices.rows.find(service => String(service.id) === String(req.body.provider_service_id))
     : offeredServices.rows.find(service => service.title.toLowerCase() === String(req.body.service).trim().toLowerCase())
       || (calculatedPricing && offeredServices.rows.find(service => calculatedPricing.serviceKey(service.title) === calculatedPricing.serviceKey(req.body.service) && calculatedPricing.serviceKey(service.title)))
-      || (calculatedPricing && offeredServices.rows.find(service => calculatedPricing.serviceKeys?.(service.title)?.includes(calculatedPricing.serviceKey(req.body.service)) || calculatedPricing.isCategory(service.title)));
-  if (req.body.provider_service_id && !selectedService) return res.status(400).json({ message: 'This service is no longer available. Reopen the booking.' });
+      || (calculatedPricing && offeredServices.rows.find(service => calculatedPricing.serviceKeys?.(service.title)?.includes(calculatedPricing.serviceKey(req.body.service)) || calculatedPricing.isCategory(service.title)))
+      || (!calculatedPricing && offeredServices.rows.find(service => providerPricing.matchesQuoteService(service, req.body.service)));
+  if (!selectedService) return res.status(400).json({ message: 'This service is no longer available. Reopen the booking.' });
+  // Keep the existing stored value for compatibility with older QR bookings.
+  const paymentMethod = req.body.payment_method === 'qr' ? 'gcash' : (req.body.payment_method || 'cash');
+  if (!serviceAcceptsPayment(selectedService, paymentMethod)) return res.status(400).json({ message: 'This payment option is not available for the selected service. Reopen the booking.' });
   const pricingSelection = serviceDetails.provider_pricing;
   if (calculatedPricing) {
     // Ignore submitted totals and rebuild the saved price from validated selections.
@@ -3279,6 +3306,14 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
   }
 
   const result = await transaction(db, async client => {
+  // Lock the selected service so a concurrent switch-off cannot admit a new booking.
+  const latest = await client.query('SELECT * FROM provider_services WHERE provider_id = $1 AND id = $2 FOR SHARE', [req.body.provider_id, selectedService.id]);
+  if (!latest.rows[0]?.is_active || !serviceAcceptsPayment(latest.rows[0], paymentMethod)
+      || String(latest.rows[0].updated_at) !== String(selectedService.updated_at)) {
+    const error = new Error('Service settings have changed. Reopen the booking to review availability and payment options.');
+    error.statusCode = 409;
+    throw error;
+  }
   const availability = await client.query(`
     SELECT id FROM provider_availability AS a
     WHERE provider_id = $1
@@ -3343,7 +3378,7 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     hasBookingGps ? longitude : null,
     Number.isFinite(accuracy) ? accuracy : null,
     bookingAmount,
-    req.body.payment_method || 'cash',
+    paymentMethod,
     JSON.stringify(serviceDetails),
     pricingType,
     estimatedMin,
@@ -3469,6 +3504,7 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
 
 app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'provider', req.params.id);
+  validateServiceOptions(req.body);
   requireFields(req.body, ['title', 'category']);
   const pricingConfig = providerPricing.validate(req.body.pricing_config || {
     mode: 'range', min: req.body.starting_price, max: req.body.max_price ?? req.body.starting_price,
@@ -3494,7 +3530,7 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
     priceRange.max,
     req.body.accepts_cash !== false,
     Boolean(req.body.accepts_gcash),
-    Boolean(req.body.accepts_other),
+    false,
     req.body.is_active !== false,
     req.body.laundry_pickup_delivery === true,
     massageTypes,
@@ -3509,6 +3545,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
   const existing = await db.query('SELECT * FROM provider_services WHERE provider_id = $1 AND id = $2', [req.params.providerId, req.params.serviceId]);
   if (!existing.rowCount) return res.status(404).json({ message: 'Service not found.' });
   const currentService = existing.rows[0];
+  validateServiceOptions(req.body, currentService);
   const pricingConfig = req.body.pricing_config === undefined ? currentService.pricing_config
     : providerPricing.validate(req.body.pricing_config, req.body.title ?? currentService.title);
   if (pricingConfig) {
@@ -3538,6 +3575,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
         pricing_config = COALESCE($14::jsonb, pricing_config),
         updated_at = NOW()
     WHERE provider_id = $1 AND id = $2
+      AND (COALESCE($11, is_active) = FALSE OR COALESCE($8, accepts_cash) OR COALESCE($9, accepts_gcash))
     RETURNING *
   `, [
     req.params.providerId,
@@ -3549,13 +3587,13 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     req.body.max_price ?? null,
     req.body.accepts_cash ?? null,
     req.body.accepts_gcash ?? null,
-    req.body.accepts_other ?? null,
+    false,
     req.body.is_active ?? null,
     req.body.laundry_pickup_delivery ?? null,
     massageTypes,
     req.body.pricing_config === undefined ? null : JSON.stringify(pricingConfig),
   ]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Service not found.' });
+  if (!result.rowCount) return res.status(409).json({ message: 'Select Cash or QR for an active service. Refresh and try again.' });
   await upsertServiceCategory(result.rows[0].category, result.rows[0].title);
   res.json({ service: providerServiceRow(result.rows[0]) });
 }));
@@ -3803,6 +3841,8 @@ app.get('/api/admin/dashboard', asyncRoute(async (_req, res) => {
 }));
 
 app.get('/api/admin/providers', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
+  res.set('Cache-Control', 'private, no-store');
   const status = String(req.query.status || 'all');
   const params = [];
   let where = '';
@@ -3837,84 +3877,53 @@ app.get('/api/categories', asyncRoute(async (_req, res) => {
   res.json({ categories: result.rows.map((row) => row.name).filter(Boolean) });
 }));
 
-app.get('/api/admin/categories', asyncRoute(async (_req, res) => {
+app.get('/api/admin/categories', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
+  res.set('Cache-Control', 'private, no-store');
   const result = await db.query(`
+    WITH raw_memberships AS (
+      SELECT id AS provider_id, lower(trim(category)) AS category FROM providers
+      UNION
+      SELECT provider_id, lower(trim(category)) AS category FROM provider_services
+    ), memberships AS (
+      SELECT DISTINCT provider_id, COALESCE($1::jsonb->>category,category) AS category FROM raw_memberships
+    )
     SELECT
       c.*,
-      COUNT(DISTINCT p.id)::int AS provider_count,
-      (c.is_active AND COUNT(DISTINCT p.id) > 0) AS is_display_active,
+      COUNT(DISTINCT p.provider_id)::int AS provider_count,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT p.provider_id),NULL) AS provider_ids,
+      (c.is_active AND COUNT(DISTINCT p.provider_id) > 0) AS is_display_active,
       ARRAY_REMOVE(ARRAY_AGG(DISTINCT ps.title) FILTER (WHERE ps.title IS NOT NULL AND ps.title <> ''), NULL) AS provider_services
     FROM service_categories c
-    LEFT JOIN providers p ON lower(p.category) = lower(c.name)
-    LEFT JOIN provider_services ps ON lower(ps.category) = lower(c.name) AND ps.is_active = TRUE
+    LEFT JOIN memberships p ON p.category = COALESCE($1::jsonb->>lower(trim(c.name)),lower(trim(c.name)))
+    LEFT JOIN provider_services ps ON COALESCE($1::jsonb->>lower(trim(ps.category)),lower(trim(ps.category))) = COALESCE($1::jsonb->>lower(trim(c.name)),lower(trim(c.name)))
     GROUP BY c.id
     ORDER BY c.name ASC
-  `);
-  res.json({ categories: result.rows.map(categoryRow) });
+  `, [JSON.stringify(Object.fromEntries(Object.entries(adminCategoryAliases).map(([key,value]) => [key,value.toLowerCase()]))) ]);
+  const categories = new Map();
+  for (const row of result.rows) {
+    const category = categoryRow({ ...row, name:adminCategoryAliases[row.name.toLowerCase()] || row.name }), key = category.name.toLowerCase();
+    const previous = categories.get(key);
+    if (previous) {
+      previous.services = [...new Set([...previous.services,...category.services])];
+      previous.is_active ||= category.is_active;
+      row.provider_ids.forEach(id => previous.providerIds.add(id));
+    } else categories.set(key, { ...category, providerIds:new Set(row.provider_ids) });
+  }
+  res.json({ categories: [...categories.values()].map(({providerIds,...category}) => ({...category,provider_count:providerIds.size})) });
 }));
 
 app.post('/api/admin/categories', asyncRoute(async (req, res) => {
-  requireFields(req.body, ['name']);
-  const services = String(req.body.services || '')
-    .split(',')
-    .map((service) => service.trim())
-    .filter(Boolean);
-  const categoryName = String(req.body.name).trim();
-  const canonicalName = canonicalCategoryName(categoryName);
-  const result = await db.query(`
-    INSERT INTO service_categories (name, description, services, is_active)
-    VALUES ($1, $2, $3, TRUE)
-    ON CONFLICT (name) DO UPDATE
-    SET description = EXCLUDED.description,
-        services = (
-          SELECT ARRAY(
-            SELECT DISTINCT item
-            FROM unnest(service_categories.services || EXCLUDED.services) AS item
-            WHERE item <> ''
-            ORDER BY item
-          )
-        ),
-        updated_at = NOW()
-    RETURNING *, 0::int AS provider_count, ARRAY[]::TEXT[] AS provider_services
-  `, [
-    canonicalName,
-    String(req.body.description || `${canonicalName} services.`).trim(),
-    services,
-  ]);
-  res.status(201).json({ category: categoryRow(result.rows[0]) });
-}));
-
-app.get('/api/admin/reports', asyncRoute(async (_req, res) => {
-  const [userSummary, categorySummary, providerSummary] = await Promise.all([
-    db.query(`
-      SELECT role, status, COUNT(*)::int AS count
-      FROM (
-        SELECT 'customer' AS role, verification_status AS status FROM customers
-        UNION ALL
-        SELECT 'provider' AS role, verification_status AS status FROM providers
-      ) users
-      GROUP BY role, status
-      ORDER BY role, status
-    `),
-    db.query(`
-      SELECT COALESCE(NULLIF(category, ''), 'Uncategorized') AS name, COUNT(*)::int AS count
-      FROM providers
-      GROUP BY COALESCE(NULLIF(category, ''), 'Uncategorized')
-      ORDER BY count DESC, name ASC
-    `),
-    db.query(`
-      SELECT full_name, category, service, verification_status, created_at
-      FROM providers
-      ORDER BY is_verified DESC, created_at DESC
-      LIMIT 6
-    `),
-  ]);
-
-  res.json({
-    userSummary: userSummary.rows,
-    categorySummary: categorySummary.rows,
-    topProviders: await providerViews(providerSummary.rows),
-  });
+  await authenticateAccount(db, req, 'admin');
+  if (typeof req.body.name !== 'string' || !req.body.name.trim() || req.body.name.trim().length > 100) paymentFail(400, 'Enter a category name of 1-100 characters.');
+  if (req.body.description != null && (typeof req.body.description !== 'string' || req.body.description.length > 1000)) paymentFail(400, 'Description must be at most 1,000 characters.');
+  if (req.body.services != null && (typeof req.body.services !== 'string' || req.body.services.length > 5000)) paymentFail(400, 'Enter services separated by commas, up to 5,000 characters.');
+  const services = [...new Map((req.body.services || '').split(',').map(value => value.trim()).filter(Boolean).map(value => [value.toLowerCase(),value])).values()];
+  if (services.length > 50 || services.some(value => value.length > 150)) paymentFail(400, 'Enter up to 50 services, with at most 150 characters each.');
+  const enteredName = canonicalCategoryName(req.body.name.trim().replace(/\s+/g, ' '));
+  const name = adminCategoryAliases[enteredName.toLowerCase()] || enteredName;
+  const category = await saveServiceCategory(name, req.body.description?.trim() || `${name} services.`, services, true);
+  res.status(201).json({ category: categoryRow({ ...category, provider_count:0, is_display_active:false }) });
 }));
 
 app.get('/api/admin/feedback', asyncRoute(async (req, res) => {
@@ -4050,12 +4059,19 @@ app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
 }));
 
 app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
-  const result = await db.query(
-    `DELETE FROM providers
-     WHERE id = $1 AND verification_status = 'rejected'
-     RETURNING id`,
-    [req.params.id]
-  );
+  await authenticateAccount(db, req, 'admin');
+  let result;
+  try {
+    result = await db.query(
+      `DELETE FROM providers
+       WHERE id = $1 AND verification_status = 'rejected'
+       RETURNING id`,
+      [req.params.id]
+    );
+  } catch (error) {
+    if (error.code === '23503') return res.status(409).json({ message: 'This provider has payment records that must be retained. The account cannot be deleted.' });
+    throw error;
+  }
   if (!result.rowCount) {
     return res.status(400).json({ message: 'Only declined provider submissions can be deleted.' });
   }
@@ -4063,6 +4079,9 @@ app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
 }));
 
 app.use((error, _req, res, _next) => {
+  if (error instanceof multer.MulterError && /\/promotions\//.test(_req.path)) {
+    return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Payment images must be 5 MB or smaller.' : 'Upload one PNG, JPG or WebP payment image.' });
+  }
   if (error instanceof multer.MulterError && /^\/api\/provider\/[^/]+\/credentials$/.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each credential file must be 10 MB or smaller.' : 'Upload up to 10 credentials and one file per ID side.' });
   }
@@ -4083,6 +4102,7 @@ app.use((error, _req, res, _next) => {
 ensureAdminSupportTables()
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'payment-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'feedback-schema.sql'), 'utf8')))
+  .then(() => db.query(fs.readFileSync(path.join(__dirname, 'promotion-schema.sql'), 'utf8')))
   .then(() => {
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);

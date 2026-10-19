@@ -33,6 +33,7 @@
     </section>
   </div>
   <script src="../admin-data.js"></script>
+  <script src="./provider-details.js"></script>
   <script>
     const providerMessage = document.getElementById('provider-message');
     const deleteModal = document.getElementById('delete-provider-modal');
@@ -40,15 +41,16 @@
     const deleteConfirm = document.getElementById('delete-provider-confirm');
     const deleteCancel = document.getElementById('delete-provider-cancel');
     let pendingDeleteProvider = null;
+    let providerMutationPending = false;
 
     function providerActions(provider) {
       if (!provider.id) return '';
       const status = String(provider.verification_status || 'pending').toLowerCase();
       if (status === 'rejected') {
-        return `<button class="btn btn-primary" type="button" data-verify-provider="${provider.id}">Verify</button><button class="btn btn-danger" type="button" data-delete-provider="${provider.id}" data-provider-name="${adminEscape(provider.full_name || 'this provider')}">Delete</button>`;
+        return `<button class="btn btn-success" type="button" data-verify-provider="${provider.id}">Verify</button><button class="btn btn-danger" type="button" data-delete-provider="${provider.id}" data-provider-name="${adminEscape(provider.full_name || 'this provider')}">Delete</button>`;
       }
       if (status === 'verified') return '';
-      return `<button class="btn btn-primary" type="button" data-verify-provider="${provider.id}">Verify</button><button class="btn btn-outline" type="button" data-reject-provider="${provider.id}">Decline</button>`;
+      return `<button class="btn btn-success" type="button" data-verify-provider="${provider.id}">Verify</button><button class="btn btn-neutral" type="button" data-reject-provider="${provider.id}">Decline</button>`;
     }
 
     function providerUploadUrl(folder, filename) {
@@ -102,6 +104,7 @@
     }
 
     function closeDeleteModal() {
+      if (providerMutationPending) return;
       deleteModal.hidden = true;
       pendingDeleteProvider = null;
     }
@@ -114,7 +117,7 @@
         ${(() => { const status = adminVerificationStatus(provider.verification_status); return `
         <div class="admin-list-item">
           <div class="admin-provider-main">
-            <strong>${adminEscape(provider.full_name)}</strong>
+            ${provider.id ? `<button class="admin-provider-profile-link" type="button" data-provider-details="${provider.id}" aria-label="View profile of ${adminEscape(provider.full_name)}">${adminEscape(provider.full_name)}</button>` : `<strong>${adminEscape(provider.full_name)}</strong>`}
             <span>${adminEscape(adminCategoryLabel(provider.category) || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
             <span>Assessment: ${provider.assessment_score ?? 0}% - Experience: ${adminEscape(provider.experience_years || '-')} - Badge: ${adminEscape(provider.badge_status || 'Needs Reassessment')}</span>
             ${provider.badge_details ? `<span>Badge score: ${provider.badge_details.total_points}/100 (Assessment ${provider.badge_details.assessment_points} + Credentials ${provider.badge_details.credential_points} + Ratings ${provider.badge_details.rating_points})</span>` : ''}
@@ -134,6 +137,7 @@
     }
 
     document.getElementById('provider-list').addEventListener('click', async (event) => {
+      if (providerMutationPending) return;
       const verifyBtn = event.target.closest('[data-verify-provider]');
       const rejectBtn = event.target.closest('[data-reject-provider]');
       const deleteBtn = event.target.closest('[data-delete-provider]');
@@ -148,7 +152,9 @@
       if (!id) return;
       setProviderMessage('');
       const button = verifyBtn || rejectBtn;
-      button.disabled = true;
+      providerMutationPending = true;
+      const actions = [...button.closest('.admin-actions').querySelectorAll('button')];
+      actions.forEach(action => { action.disabled = true; });
       try {
         const endpoint = verifyBtn ? 'verify' : 'reject';
         await adminSend(`/api/admin/providers/${id}/${endpoint}`, { method: 'PATCH' });
@@ -156,7 +162,9 @@
       } catch (error) {
         setProviderMessage(error.message, 'error');
       } finally {
-        await loadProviders();
+        providerMutationPending = false;
+        actions.forEach(action => { action.disabled = false; });
+        await loadProviders().catch(error => setProviderMessage(error.message, 'error'));
       }
     });
 
@@ -169,24 +177,31 @@
     });
 
     deleteConfirm.addEventListener('click', async () => {
-      if (!pendingDeleteProvider?.id) return;
+      if (!pendingDeleteProvider?.id || providerMutationPending) return;
       setProviderMessage('');
+      providerMutationPending = true;
       deleteConfirm.disabled = true;
+      deleteCancel.disabled = true;
       deleteConfirm.textContent = 'Deleting...';
       try {
         await adminSend(`/api/admin/providers/${pendingDeleteProvider.id}`, { method: 'DELETE' });
+        providerMutationPending = false;
         closeDeleteModal();
         setProviderMessage('Declined provider submission deleted.', 'success');
         await loadProviders();
       } catch (error) {
+        providerMutationPending = false;
         closeDeleteModal();
         setProviderMessage(error.message, 'error');
-        await loadProviders();
+      } finally {
+        providerMutationPending = false;
+        deleteConfirm.disabled = false;
+        deleteCancel.disabled = false;
       }
     });
 
     loadProviders().catch(error => {
-      document.getElementById('provider-list').innerHTML = `<div class="admin-list-item"><strong>${error.message}</strong></div>`;
+      document.getElementById('provider-list').innerHTML = `<div class="admin-list-item"><strong>${adminEscape(error.message)}</strong></div>`;
     });
     adminLive('providers', loadProviders);
   </script>

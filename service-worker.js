@@ -1,10 +1,18 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v62';
+const SW_VERSION = 'serbisyonow-pwa-v70';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
+  '/pages/admin/reports/reports.css',
+  '/pages/admin/reports/reports.js',
+  '/pages/admin/provider-verification/provider-details.js',
+  '/shared/css/button-colors.css',
+  '/shared/css/promotions.css',
+  '/shared/js/promotions.js',
+  '/pages/provider/promotions/promotions.html',
+  '/pages/admin/revenue/revenue.html',
   '/',
   '/offline.html',
   '/manifest.webmanifest',

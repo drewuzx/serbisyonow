@@ -610,13 +610,8 @@ function collectRepairAssessment(form) {
 }
 
 function bookingServiceOptions(provider) {
- const services = bookingProviderServices.length
-  ? bookingProviderServices
-  : [{
-   title: provider?.service || provider?.category || 'Service',
-   starting_price: 0,
-   max_price: 0,
-  }];
+ const services = bookingProviderServices;
+ if (!services.length) return '<option value="">No services available</option>';
  return services.map((service, index) => {
   const calculated = [window.SNCleaningPricing, window.SNPersonalCarePricing, window.SNAppliancePricing, window.SNInstallationPricing, window.SNOutdoorPricing]
    .some(pricing => pricing.serviceKey(service.title) || pricing.isCategory(service.title) || pricing.serviceKeys?.(service.title)?.length);
@@ -637,14 +632,26 @@ function updateBookingPaymentChoices() {
 
  const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
  const service = bookingProviderServices[Number(selectedOption?.dataset.index || 0)] || null;
+ const payment = document.getElementById('sn-booking-payment');
+ const previousPayment = payment.value;
+ const methods = [];
+ if (service?.accepts_cash) methods.push(['cash', 'Cash']);
+ if (service?.accepts_gcash) methods.push(['gcash', 'QR']);
+ payment.innerHTML = methods.length ? methods.map(([value, label]) => `<option value="${value}">${label}</option>`).join('') : '<option value="">No payment options available</option>';
+ if (methods.some(([value]) => value === previousPayment)) payment.value = previousPayment;
+ payment.disabled = !methods.length;
+ serviceSelect.disabled = !service;
+ const submit = document.querySelector('#sn-create-booking-form [type="submit"]');
+ if (submit) submit.disabled = !service || !methods.length;
+ updateBookingPaymentNote();
  const min = Number(service?.starting_price || 0);
  const max = Number(service?.max_price || min || 0);
  const midpoint = min && max && max !== min ? Math.round((min + max) / 2) : 0;
  const amounts = [...new Set([min, midpoint, max].filter(value => value > 0))];
 
  amountSelect.innerHTML = amounts.length
-  ? amounts.map((amount, index) => `<option value="${amount}">${index === 0 ? 'Starting price' : index === amounts.length - 1 ? 'Maximum price' : 'Mid price'} - ${bookingMoney(amount)}</option>`).join('') + '<option value="custom">Custom cash amount</option>'
-  : '<option value="custom">Custom cash amount</option>';
+  ? amounts.map((amount, index) => `<option value="${amount}">${index === 0 ? 'Starting price' : index === amounts.length - 1 ? 'Maximum price' : 'Mid price'} - ${bookingMoney(amount)}</option>`).join('') + '<option value="custom">Custom amount</option>'
+  : '<option value="custom">Custom amount</option>';
  customAmount.value = amounts[0] || '';
  customAmount.min = min || 0;
  customAmount.max = max || '';
@@ -655,6 +662,15 @@ function updateBookingPaymentChoices() {
    ? `Allowed amount: ${bookingMoney(min)}${max && max !== min ? ` to ${bookingMoney(max)}` : ''}`
    : 'Provider has no listed price yet. Enter the agreed amount.';
  }
+}
+
+function updateBookingPaymentNote() {
+ const value = document.getElementById('sn-booking-payment')?.value;
+ const note = document.getElementById('sn-booking-payment-note');
+ if (note) note.textContent = value === 'gcash'
+  ? "Remaining 70% is paid using the provider's QR after service."
+  : value === 'cash' ? 'Remaining 70% is paid directly to the provider in cash after service.'
+   : 'This service cannot accept new bookings right now.';
 }
 
 function bookingAlert(message, options = {}) {
@@ -887,7 +903,7 @@ async function showBookingDetails(booking) {
     ${bookingDetailRow('Date', bookingDisplayDate(item.scheduled_date))}
     ${bookingDetailRow('Time', item.scheduled_time)}
     ${bookingDetailRow('Amount / estimate', bookingEstimateLabel(item))}
-    ${bookingDetailRow(item.deposit_required ? 'Remaining balance method' : 'Payment', item.payment_method || 'cash')}
+    ${bookingDetailRow(item.deposit_required ? 'Remaining balance method' : 'Payment', ({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[item.payment_method || 'cash'] || item.payment_method)}
     ${item.deposit_required ? bookingDetailRow('Downpayment', item.deposit_status.replace(/_/g, ' ')) : ''}
     ${item.deposit_amount != null ? bookingDetailRow('30% downpayment', bookingMoney(item.deposit_amount)) + bookingDetailRow('70% remaining balance', bookingMoney(item.balance_due)) : ''}
     ${item.price_notes ? bookingDetailRow('Confirmed price notes', item.price_notes) : ''}
@@ -964,12 +980,14 @@ async function showBookingPayment(bookingId, returnState = '') {
    const direct = booking.deposit_channel === 'provider_qr';
    const awaiting = booking.status === 'pending' && booking.deposit_status === 'awaiting_payment';
    const paid = booking.deposit_status === 'paid';
+   const balanceQr = paid && ['upcoming', 'ongoing', 'completed'].includes(booking.status) && ['gcash', 'qr'].includes(booking.payment_method);
    const qrUrl = direct && data.recipient && window.snDirectPayments?.qrUrl(BOOKING_API_BASE, data.recipient.qr_url);
    releaseReceiptImage();
    modal.querySelector('.sn-downpayment-content').innerHTML = `<p><strong>${bookingEsc(booking.service)}</strong></p>
     ${booking.confirmed_price != null ? `<dl class="sn-downpayment-breakdown"><div><dt>Confirmed service total</dt><dd>${bookingMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment due now</dt><dd>${bookingMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${bookingMoney(booking.balance_due)}</dd></div></dl>` : '<p>Waiting for the provider to confirm the service price.</p>'}
     ${booking.price_notes ? `<p>${bookingEsc(booking.price_notes)}</p>` : ''}
     ${direct && qrUrl ? `<section class="sn-direct-recipient"><h4>Pay ${bookingEsc(data.recipient.wallet)} directly</h4><p><strong>${bookingEsc(data.recipient.account_name)}</strong><br>${bookingEsc(data.recipient.account_number)}</p>${awaiting ? `<img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider payment QR" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">Open QR</a><p>Send exactly <strong>${bookingMoney(booking.deposit_amount)}</strong>. Check the recipient name in your payment app before confirming.</p>` : ''}</section>` : ''}
+    ${balanceQr && qrUrl ? `<section class="sn-direct-balance"><h4>Remaining Balance - QR</h4><img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider QR for remaining balance" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">Open QR</a><p>${bookingMoney(booking.balance_due)} is due after service. Confirm the recipient with your provider before paying. Pay only once; the provider must verify the transfer. Balance payment is not automatically tracked here.</p></section>` : ''}
     ${direct && data.receipt ? `<section class="sn-direct-receipt"><h4>Submitted payment</h4><p>Reference: <strong>${bookingEsc(data.receipt.reference_number)}</strong></p><p>${bookingEsc(data.receipt.status.replace(/_/g, ' '))}${data.receipt.review_note ? ': ' + bookingEsc(data.receipt.review_note) : ''}</p><img class="sn-payment-receipt-image" data-payment-receipt-image alt="Your submitted receipt" hidden /><p data-receipt-error role="alert" hidden></p></section>` : ''}
     ${awaiting && (!direct || !booking.customer_agreed_at) ? '<label class="sn-payment-consent"><input type="checkbox" data-payment-consent /> <span>I agree to this service price and the 30% downpayment. The remaining balance is due after service. Canceled payments require refund review.</span></label>' : ''}
     ${direct && awaiting && qrUrl ? `<form class="sn-direct-receipt-form"><label>Transaction reference<input name="reference_number" minlength="4" maxlength="120" required autocomplete="off" /></label><label>Payment receipt<input name="receipt" type="file" accept="image/png,image/jpeg,image/webp" required /></label><button class="btn btn-primary" type="submit">Submit Payment Receipt</button></form>` : ''}`;
@@ -1239,7 +1257,7 @@ async function renderBookingRequestForm(customer) {
    <label><span>Service</span><select id="sn-booking-service" name="service" required>${bookingServiceOptions(provider)}</select></label>
    <label><span>Date</span><input id="sn-booking-date" name="scheduled_date" type="date" value="${todayInputValue()}" required /></label>
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
-  <label><span>Remaining Balance Method</span><select id="sn-booking-payment" name="payment_method"><option value="cash">Cash</option><option value="gcash">GCash</option></select><small id="sn-booking-payment-note" class="sn-booking-payment-note">Remaining 70% is paid directly to the provider after service.</small></label>
+  <label><span>Remaining Balance Method</span><select id="sn-booking-payment" name="payment_method" required></select><small id="sn-booking-payment-note" class="sn-booking-payment-note"></small></label>
    <p class="sn-booking-downpayment-terms full">A 30% downpayment is paid directly using the provider's payment QR after the price is confirmed. Submit your payment receipt; your schedule is confirmed only after the provider verifies the transfer. The remaining 70% is due after service.</p>
    <section class="sn-provider-price-options full" id="sn-provider-price-options" hidden></section>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
@@ -1248,7 +1266,7 @@ async function renderBookingRequestForm(customer) {
    <section class="sn-calculated-assessment full" id="sn-appliance-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-installation-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-outdoor-assessment" hidden></section>
-   <label><span>Cash Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
+   <label><span>Service Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
    <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>
    <div class="sn-booking-schedule-note full" id="sn-booking-schedule-note">Checking provider schedule...</div>
@@ -1268,12 +1286,7 @@ async function renderBookingRequestForm(customer) {
   updateBookingPaymentChoices();
   renderBookingAssessment();
  });
- document.getElementById('sn-booking-payment')?.addEventListener('change', (event) => {
-  const note = document.getElementById('sn-booking-payment-note');
-  if (note) note.textContent = event.target.value === 'gcash'
-   ? 'Remaining 70% is paid to the provider via GCash after service.'
-   : 'Remaining 70% is paid directly to the provider in cash after service.';
- });
+ document.getElementById('sn-booking-payment')?.addEventListener('change', updateBookingPaymentNote);
  document.getElementById('sn-booking-amount-choice')?.addEventListener('change', () => {
   const choice = document.getElementById('sn-booking-amount-choice');
   const custom = document.getElementById('sn-booking-custom-amount');
@@ -1420,6 +1433,10 @@ async function submitBookingRequest(event, customer, providerId) {
  const form = event.currentTarget;
  const submit = form.querySelector('[type="submit"]');
  const formData = new FormData(form);
+ if (!selectedBookingService().service || !formData.get('payment_method')) {
+  await bookingAlert('Select an available service and payment option.', { title: 'Booking Unavailable' });
+  return;
+ }
  let assessment;
  try {
   assessment = applyProviderEstimate(collectCalculatedAssessment() || collectRepairAssessment(form));

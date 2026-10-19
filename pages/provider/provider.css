@@ -1735,12 +1735,28 @@ body {
   display: inline-flex;
   align-items: center;
   cursor: pointer;
+  position: relative;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 26px;
 }
 
 .sn-provider-switch input {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.sn-provider-switch input:focus-visible + .sn-provider-toggle { outline: 2px solid var(--blue-main); outline-offset: 3px; }
+.sn-provider-payment-row .sn-provider-availability-toggle { margin-left: auto; gap: 12px; cursor: pointer; }
+.sn-service-save-status { min-height: 1.45em; margin: 6px 0 0; font-size: 0.8rem; }
+@media (max-width: 540px) {
+  .sn-provider-payment-row .sn-provider-availability-toggle { width: 100%; margin-left: 0; justify-content: space-between; }
 }
 
 .sn-provider-switch input:checked + .sn-provider-toggle {

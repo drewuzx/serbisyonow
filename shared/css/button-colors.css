@@ -1,0 +1,103 @@
+/* Semantic action colors shared by the legacy and current button components.
+   Layered important paint rules keep page-specific styles from changing meaning. */
+@layer sn-action-colors {
+  :root {
+    --action-primary: #2b55cc;
+    --action-primary-hover: #1a3a8f;
+    --action-approve: #15803d;
+    --action-approve-hover: #166534;
+    --action-danger: #b91c1c;
+    --action-danger-hover: #991b1b;
+    --action-neutral: #e5e7eb;
+    --action-neutral-hover: #d1d5db;
+    --action-neutral-text: #374151;
+    --action-disabled: #e5e7eb;
+    --action-disabled-text: #596273;
+  }
+
+  :is(.btn, .sn-btn, .promotion-button, .verify-btn, .decline-btn,
+      .sn-filter-action, .sn-provider-action, .sn-edit-toggle-btn,
+      .sn-feedback-submit, .sn-feedback-later, .sn-float-send, .hero-search-btn) {
+    --control-bg: #fff;
+    --control-hover: #eaf0fb;
+    --control-text: var(--action-primary);
+    --control-border: var(--action-primary);
+    background: var(--control-bg) !important;
+    color: var(--control-text) !important;
+    border-color: var(--control-border) !important;
+    box-shadow: none !important;
+    filter: none !important;
+  }
+
+  :is(.btn-primary, .btn-orange, .sn-btn-primary, .promotion-button.primary,
+      .sn-filter-action--primary, .sn-feedback-submit, .sn-float-send, .hero-search-btn) {
+    --control-bg: var(--action-primary);
+    --control-hover: var(--action-primary-hover);
+    --control-text: #fff;
+    --control-border: var(--action-primary);
+  }
+
+  :is(.btn-success, .sn-btn-success, .promotion-button.success, .verify-btn,
+      [data-review-form] button[type=submit]) {
+    --control-bg: var(--action-approve);
+    --control-hover: var(--action-approve-hover);
+    --control-text: #fff;
+    --control-border: var(--action-approve);
+  }
+
+  :is(.btn-danger, .sn-btn-danger, .promotion-button.danger, .sn-price-remove) {
+    --control-bg: var(--action-danger);
+    --control-hover: var(--action-danger-hover);
+    --control-text: #fff;
+    --control-border: var(--action-danger);
+  }
+
+  :is(.btn-neutral, .sn-btn-ghost, .btn-ghost, .decline-btn,
+      .sn-filter-action--ghost, .sn-feedback-later) {
+    --control-bg: var(--action-neutral);
+    --control-hover: var(--action-neutral-hover);
+    --control-text: var(--action-neutral-text);
+    --control-border: #9ca3af;
+  }
+
+  :is(.btn, .sn-btn, .promotion-button, .verify-btn, .decline-btn,
+      .sn-filter-action, .sn-provider-action, .sn-edit-toggle-btn,
+      .sn-feedback-submit, .sn-feedback-later, .sn-float-send, .hero-search-btn):hover {
+    background: var(--control-hover) !important;
+  }
+
+  :is(button, a, input[type=submit], input[type=button]):is(:disabled, [aria-disabled=true]) {
+    --control-bg: var(--action-disabled);
+    --control-hover: var(--action-disabled);
+    --control-text: var(--action-disabled-text);
+    --control-border: #cbd0d8;
+    background: var(--action-disabled) !important;
+    color: var(--action-disabled-text) !important;
+    border-color: #cbd0d8 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+  }
+
+  :is(button, a, input[type=submit], input[type=button]):focus-visible {
+    outline: 3px solid var(--action-primary) !important;
+    outline-offset: 3px !important;
+  }
+
+  :is(.btn-primary, .btn-orange, .btn-success, .btn-danger, .sn-btn-primary,
+      .sn-btn-success, .sn-btn-danger, .promotion-button.primary,
+      .promotion-button.success, .promotion-button.danger) > img {
+    filter: brightness(0) invert(1) !important;
+  }
+  :is(button, a):is(:disabled, [aria-disabled=true]) > img {
+    filter: grayscale(1) brightness(.5) !important;
+  }
+
+  :is(.status-badge.rejected, .status-badge.declined, .sn-rejected-badge) {
+    background: var(--action-neutral) !important;
+    color: var(--action-neutral-text) !important;
+    border-color: #9ca3af !important;
+  }
+}

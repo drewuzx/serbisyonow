@@ -83,6 +83,7 @@
             <div>
               <div class="form-group"><label>Choose Service Category</label><select class="form-control" id="category" required><option value="" disabled selected>Choose a category</option><option>Repair Services</option><option>Cleaning</option><option>Personal Care</option><option>Appliance Maintenance</option><option>Installation Services</option><option>Outdoor and Property Maintenance</option><option>Others</option></select></div>
               <div class="form-group"><label>Select Services</label><select class="form-control" id="service" required disabled><option value="" disabled selected>Select a category first</option></select></div>
+              <div class="form-group" id="custom-service-group" hidden><label for="custom-service">Service name</label><input class="form-control" id="custom-service" type="text" maxlength="150" placeholder="Enter the service you offer" disabled /></div>
               <div class="form-group"><label>Years of Experience</label><select id="experience-years" class="form-control" required><option value="" disabled selected>Enter your years of experience</option><option>1 year below</option><option>2-3 years</option><option>3 years and higher</option></select></div>
               <div class="form-group"><label>Skill Verification</label><p class="field-note">(Certificates, Recognition, Portfolio, Feedbacks, Photos, etc.)</p><label class="upload-pill" id="docs-box"><span id="docs-label">Upload Supporting Documents</span><strong>+</strong><input id="docs" type="file" multiple accept="image/*,.pdf" required onchange="handleUpload(this,'docs-label','docs-box')"/></label></div>
             </div>
@@ -231,6 +232,10 @@
       const category = document.getElementById('category')?.value || '';
       const serviceField = document.getElementById('service');
       if (!serviceField) return;
+      const custom = category === 'Others';
+      document.getElementById('custom-service-group').hidden = !custom;
+      document.getElementById('custom-service').disabled = !custom;
+      document.getElementById('custom-service').required = custom;
       activeAssessmentQuestions = [];
       latestAssessmentScore = 0;
       const services = servicesByCategory[category] || [];
@@ -238,6 +243,7 @@
         ? '<option value="" disabled selected>Choose a service</option>' + services.map(service => `<option>${service}</option>`).join('')
         : '<option value="" disabled selected>Select a category first</option>';
       serviceField.disabled = !services.length;
+      if (custom) serviceField.value = 'Others';
     }
 
     function showFieldError(field, message) {
@@ -331,6 +337,7 @@
       const valid = validateForm(document.getElementById('form-s2'), {
         category: 'Select a category.',
         service: 'Select a service.',
+        'custom-service': 'Enter the service you offer.',
         'experience-years': 'Select your years of experience.',
         docs: 'Upload supporting documents.',
         resume: 'Upload your resume.',
@@ -517,7 +524,7 @@
         payload.append('googleSub', profile?.googleSub || '');
       }
       payload.append('category', document.getElementById('category').value);
-      payload.append('service', document.getElementById('service').value);
+      payload.append('service', document.getElementById('category').value === 'Others' ? document.getElementById('custom-service').value.trim() : document.getElementById('service').value);
       payload.append('experience', `Assessment score: ${latestAssessmentScore}%. Answers: ${JSON.stringify(answers)}`);
       payload.append('experienceYears', document.getElementById('experience-years').value);
       payload.append('experienceCertification', 'Assessment completed');

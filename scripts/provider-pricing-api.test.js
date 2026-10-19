@@ -51,7 +51,7 @@ test('provider pricing persists, protects ownership and controls booking totals'
   assert.equal(nailBooking.status,201,JSON.stringify(nailBooking.data));
   assert.equal(nailBooking.data.booking.estimated_min,450);
   assert.equal(nailBooking.data.booking.estimated_max,1500);
-  const toggled=await f.request(`/api/provider/81/services/${nail.data.service.id}`,'PATCH',{accepts_cash:false},f.providerToken);
+  const toggled=await f.request(`/api/provider/81/services/${nail.data.service.id}`,'PATCH',{accepts_cash:false,accepts_gcash:true},f.providerToken);
   assert.equal(toggled.data.service.pricing_config.min,450);
   assert.equal(toggled.data.service.starting_price,450);
   const forbidden=await f.request(`/api/provider/81/services/${nail.data.service.id}`,'DELETE',undefined,f.otherProviderToken);

@@ -16,9 +16,12 @@ function fixture() {
     bookings: [{ ...booking }, { ...booking, id: 2, status: 'completed', deposit_status: 'paid' }, { ...booking, id: 3, status: 'cancelled', deposit_status: 'cancelled' }],
     favorites: [{ ...provider }], reviews: [], messages: [], conversations: [], categories: [],
     availability: [{ id: 1, available_date: '2027-01-15', start_time: '09:00', end_time: '10:00', is_available: true }],
-    services: [{ id: 1, title: 'General House Cleaning', category: 'Cleaning', starting_price: 500, is_active: true }],
+    services: [{ id: 1, title: 'General House Cleaning', category: 'Cleaning', starting_price: 500, is_active: true, accepts_cash:true, accepts_gcash:true }],
     metrics: { users: 2, providers: 1, pending: 1, open_feedback: 0 }, categoryTrends: [], recentActivity: [],
-    userSummary: [], categorySummary: [], topProviders: [], feedback: [],
+    feedback: [],
+    report: { days:30,sort:'bookings',period:{start:'2026-10-01T00:00:00+08:00',finish:'2026-10-31T00:00:00+08:00'},
+      bookings:{total:0,previous_total:0,completed:0,cancelled:0,active:0},revenue:{total_centavos:0,previous_centavos:0,payments:0},
+      reviews:{count:0,average:null},trend:[{date:'2026-10-01',bookings:0,completed:0,revenue_centavos:0}],categories:[],providers:[],plans:[] },
     users: [{ ...provider, role: 'provider' }], assessment: { score: 60, badge: 'Basic Verified' },
     payment_qr: { wallet: 'GCash', account_name: provider.full_name, account_number: '09123456789', qr_url: '/uploads/provider-payment-qrs/test.png' },
   };
@@ -52,6 +55,7 @@ function fixture() {
       if (url.pathname.startsWith('/api/auth/')) response = { user: url.pathname.includes('/provider/') ? data.provider : data.customer };
       if (url.pathname.endsWith('/payment')) response = { booking: data.bookings[0], recipient: data.payment_qr, checkout_configured: true };
       if (url.pathname.endsWith('/location-map')) response = { providers: [], customer_location: null };
+      if (url.pathname === '/api/admin/reports') response = data.report;
       await route.fulfill({ json: response });
     });
     const page = await context.newPage();
@@ -226,12 +230,17 @@ function fixture() {
       assert.match(await page.locator('#provider-list').textContent(), /New Registration/);
     });
     await scenario('admin/feedback/feedback.html', '#feedback-list', async (page, data, tick) => {
-      data.feedback.push({ id: 1, subject: 'New support request', submitted_by: customer.full_name, message: 'Example', status: 'open' }); await tick();
+      data.feedback.push({ id: 1, source:'system',rating:4,user_role:'customer',subject: 'New support request', submitted_by: customer.full_name, message: 'Example', status: 'open' }); await tick();
       assert.match(await page.locator('#feedback-list').textContent(), /New support request/);
     });
     await scenario('admin/reports/reports.html', '#top-providers', async (page, data, tick) => {
-      data.topProviders.push({ ...provider, full_name: 'Fresh report provider' }); await tick();
+      data.report.providers.push({ id:81,full_name: 'Fresh report provider',bookings:1,completed:0,rating:4,reviews:1 }); await tick();
       assert.match(await page.locator('#top-providers').textContent(), /Fresh report provider/);
+      await page.locator('#booking-chart button').first().focus();
+      data.report.providers[0].full_name='Updated report provider'; await tick();
+      assert.match(await page.locator('#top-providers').textContent(), /Fresh report provider/);
+      await page.evaluate(()=>document.activeElement.blur()); await tick();
+      assert.match(await page.locator('#top-providers').textContent(), /Updated report provider/);
     });
     await scenario('admin/user-management/user-management.html', '#pending-table-body', async (page, data, tick) => {
       data.users.push({ ...customer, role: 'customer', verification_status: 'pending' }); await tick();
