@@ -254,6 +254,12 @@ body {
 .sn-shell--provider .sn-nav-item[href*="schedule"] .sn-ico { --sn-nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='4' y='5' width='16' height='15' rx='2' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M8 3v4M16 3v4M8 14h3M13 14h3' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
 .sn-shell--provider .sn-nav-item[href*="reviews"] .sn-ico { --sn-nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 16.9l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 .sn-shell--provider .sn-nav-item[href*="history"] .sn-ico { --sn-nav-icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6M12 8v5l3 2' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.sn-shell--provider .sn-nav-item[href*="promotions"] .sn-ico {
+  --sn-nav-icon: url("/shared/icons/lucide/star.svg");
+}
+.sn-shell--provider .sn-nav-item[href*="promotions"] .sn-ico img {
+  display: none;
+}
 .sn-shell--provider .sn-nav-item[href*="inbox"] {
   display: none !important;
 }
