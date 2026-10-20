@@ -1,10 +1,13 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v79';
+const SW_VERSION = 'serbisyonow-pwa-v80';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
+  '/shared/js/profile-photos.js',
+  '/shared/css/profile-photos.css',
+  '/pages/admin/provider-verification/photo-reviews.js',
   '/shared/icons/lucide/map-pin.svg',
   '/shared/js/time-format.js',
   '/pages/provider/services/service-editor.js',

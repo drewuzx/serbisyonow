@@ -137,7 +137,7 @@ function renderLiveReviews(bookings, reviews) {
 
  toRatePanel.innerHTML = toRate.length ? toRate.map((booking, index) => `
   <div class="sn-review-card">
-   <div class="sn-review-img sn-review-img--${(index % 5) + 1}"></div>
+   <div class="sn-review-img sn-review-img--${(index % 5) + 1}" data-photo-target="provider/${Number(booking.provider_id)}"></div>
    <div class="sn-review-info">
 	<div class="sn-review-name-row"><span class="sn-review-name">${esc(booking.provider_name || 'Provider')}</span></div>
 	<div class="sn-review-meta-row"><span class="sn-review-meta">${reviewDate(booking.scheduled_date)} - ${esc(booking.service || 'Service')}</span></div>
@@ -159,7 +159,7 @@ function renderLiveReviews(bookings, reviews) {
 
  myReviewsPanel.innerHTML = reviews.length ? reviews.map((review, index) => `
   <div class="sn-review-card">
-   <div class="sn-review-img sn-review-img--${(index % 5) + 1}"></div>
+   <div class="sn-review-img sn-review-img--${(index % 5) + 1}" data-photo-target="provider/${Number(review.provider_id)}"></div>
    <div class="sn-review-info">
 	<div class="sn-review-name-row"><span class="sn-review-name">${esc(review.provider_name || 'Provider')}</span></div>
 	<div class="sn-review-meta-row"><span class="sn-review-meta">${reviewDate(review.created_at)} - ${esc(review.service || 'Service')}</span></div>

@@ -68,7 +68,7 @@ function ppRenderProvider(provider) {
     <div class="sn-detail-panel">
       <div class="sn-detail-header">
         <div class="sn-profile-summary">
-          <div class="sn-profile-photo"></div>
+          <div class="sn-profile-photo" data-photo-target="provider/${Number(provider.id)}"></div>
           <div class="sn-profile-meta">
             <h2>${ppEsc(provider.full_name || 'Service Provider')}</h2>
             ${ppBadge(provider)}

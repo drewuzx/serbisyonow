@@ -189,7 +189,7 @@
         const active = peerKey(convo) === String(state.selectedId);
         return `
           <button class="sn-float-convo ${active ? 'is-active' : ''}" type="button" data-peer-id="${esc(convo.peer_id)}">
-            <span class="sn-float-avatar" style="background:linear-gradient(135deg, ${index % 2 ? '#f97316' : '#4f8ef7'}, ${index % 2 ? '#dc2626' : '#2563eb'})"></span>
+            <span class="sn-float-avatar" data-photo-target="${currentContext()?.role === 'provider' ? 'customer' : 'provider'}/${Number(convo.peer_id)}" style="background:linear-gradient(135deg, ${index % 2 ? '#f97316' : '#4f8ef7'}, ${index % 2 ? '#dc2626' : '#2563eb'})"></span>
             <span class="sn-float-convo-copy">
               <strong>${esc(convo.name)}</strong>
               <span>${esc(last?.message || convo.meta || 'Start a conversation')}</span>
@@ -202,6 +202,8 @@
 
     const convo = selectedConvo();
     const name = root.querySelector('[data-chat-name]');
+    const photo = root.querySelector('.sn-float-head .sn-float-avatar');
+    if (photo) photo.dataset.photoTarget = convo ? `${currentContext()?.role === 'provider' ? 'customer' : 'provider'}/${Number(convo.peer_id)}` : '';
     const meta = root.querySelector('[data-chat-meta]');
     const body = root.querySelector('.sn-float-chat-body');
     if (name) name.textContent = convo?.name || 'Messages';

@@ -117,6 +117,9 @@
         <div class="submitted-card">
           <div class="submitted-check"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
           <h1>Application Submitted!</h1>
+          <p>Your profile selfie needs a separate admin review.</p>
+          <p id="sn-photo-status" role="status"></p>
+          <button class="btn btn-primary btn-full" type="button" onclick="window.SNProfilePhotos.openProvider()">Submit ID &amp; Selfie</button>
           <p>Thank you for signing up! Your service provider application has been submitted and is now under admin review.</p>
           <strong id="provider-score-text">Score: 0%</strong>
           <span>Status: Under Review</span>
@@ -181,6 +184,7 @@
 
   <script src="../../shared/js/app.js?v=20260915-google-role"></script>
   <script src="../../shared/js/providerAssessmentBank.js?v=20260917-reassessment"></script>
+  <script src="/shared/js/profile-photos.js"></script>
   <script>
     const AUTH_API_BASE = SN.utils.apiBase();
     let activeAssessmentQuestions = [];
@@ -542,6 +546,7 @@
           saveProviderApplication(data);
           localStorage.removeItem('sn_google_prefill_provider');
           showSuccess();
+          window.SNProfilePhotos.openProvider({ front: idFront?.files?.[0], back: idBack?.files?.[0] });
         })
         .catch(error => {
           const message = error.message || 'Failed to submit provider application.';

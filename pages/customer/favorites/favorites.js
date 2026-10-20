@@ -31,7 +31,7 @@ async function favFetch(path, options = {}) {
 function renderFavoriteCard(provider, index) {
  return `
   <div class="sn-fav-card" data-provider-id="${favEsc(provider.id)}">
-   <div class="sn-fav-img sn-fav-img--${(index % 5) + 1}"></div>
+   <div class="sn-fav-img sn-fav-img--${(index % 5) + 1}" data-photo-target="provider/${Number(provider.id)}"></div>
    <div class="sn-fav-info">
     <div class="sn-fav-name-row">
      <span class="sn-fav-name">${favEsc(provider.full_name || provider.fullName || 'Service Provider')}</span>

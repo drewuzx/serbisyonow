@@ -471,7 +471,7 @@ function renderProviderCard(provider, favoriteIds = new Set()) {
  const profileUrl = `../provider-profile/provider-profile.html?id=${encodeURIComponent(providerId)}`;
  const bookingUrl = `../bookings/bookings.html?provider_id=${encodeURIComponent(providerId)}`;
  return `
- <div class="sn-provider-card"><button class="sn-fav-btn ${isFavorite ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${snEsc(providerId)}" aria-label="${isFavorite ? 'Saved to favorites' : 'Favorite provider'}">♥</button><div class="sn-provider-img sn-provider-img--1"></div><div class="sn-provider-info"><div class="sn-provider-name-row"><span class="sn-provider-title">${snEsc(provider.full_name)}</span><span class="sn-rating">${provider.rating == null ? 'Not rated' : Number(provider.rating).toFixed(1)}</span></div>
+ <div class="sn-provider-card"><button class="sn-fav-btn ${isFavorite ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${snEsc(providerId)}" aria-label="${isFavorite ? 'Saved to favorites' : 'Favorite provider'}">♥</button><div class="sn-provider-img sn-provider-img--1" data-photo-target="provider/${Number(providerId)}"></div><div class="sn-provider-info"><div class="sn-provider-name-row"><span class="sn-provider-title">${snEsc(provider.full_name)}</span><span class="sn-rating">${provider.rating == null ? 'Not rated' : Number(provider.rating).toFixed(1)}</span></div>
  ${snBadge(provider)}
  ${provider.promoted ? '<span class="sn-provider-tag">Promoted</span>' : ''}
  <div class="sn-provider-loc">${snEsc(provider.address || 'Angeles City')}</div>
@@ -742,7 +742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  const convoList = document.querySelector('.sn-convo-list');
  if (convoList && data.messages) {
  convoList.innerHTML = data.messages.map(message => `
- <button class="sn-convo-item" type="button" data-provider-id="${message.provider_id}"><div class="sn-convo-avatar"></div><div class="sn-convo-body"><div class="sn-convo-top"><span class="sn-convo-name">${snEsc(message.provider_name || 'Provider')}</span><span class="sn-convo-time">${snDate(message.created_at)}</span></div><div class="sn-convo-preview">${snEsc(message.message)}</div></div>
+ <button class="sn-convo-item" type="button" data-provider-id="${message.provider_id}"><div class="sn-convo-avatar" data-photo-target="provider/${Number(message.provider_id)}"></div><div class="sn-convo-body"><div class="sn-convo-top"><span class="sn-convo-name">${snEsc(message.provider_name || 'Provider')}</span><span class="sn-convo-time">${snDate(message.created_at)}</span></div><div class="sn-convo-preview">${snEsc(message.message)}</div></div>
  ${message.is_read? '': '<span class="sn-convo-unread">1</span>'}
  </button>
  `).join('') || '<div class="sn-customer-card"><p>No conversations yet.</p></div>';

@@ -26,6 +26,9 @@
       document.head.appendChild(script);
     });
     window.snAccountSessionReady.then(() => {
+      const photos = document.createElement('script');
+      photos.src = '/shared/js/profile-photos.js';
+      document.head.appendChild(photos);
       const script = document.createElement('script');
       script.src = '/shared/js/system-feedback.js';
       document.head.appendChild(script);

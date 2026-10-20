@@ -14,6 +14,7 @@ async function main() {
   await db.query(schema);
   await db.query(fs.readFileSync(path.join(__dirname, 'payment-schema.sql'), 'utf8'));
   await db.query(fs.readFileSync(path.join(__dirname, 'feedback-schema.sql'), 'utf8'));
+  await db.query(fs.readFileSync(path.join(__dirname, 'profile-photo-schema.sql'), 'utf8'));
 
   const username = process.env.ADMIN_USERNAME || 'admin';
   const password = process.env.ADMIN_PASSWORD || 'admin123';

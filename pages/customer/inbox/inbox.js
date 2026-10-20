@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const active = String(convo.provider_id) === String(selectedProviderId);
       return `
         <button class="sn-convo-item ${active ? 'active' : ''}" type="button" data-provider-id="${convo.provider_id}">
-          <div class="sn-convo-avatar sn-convo-avatar--${(index % 6) + 1}"></div>
+          <div class="sn-convo-avatar sn-convo-avatar--${(index % 6) + 1}" data-photo-target="provider/${Number(convo.provider_id)}"></div>
           <div class="sn-convo-body">
             <div class="sn-convo-top"><span class="sn-convo-name">${esc(convo.provider_name)}</span><span class="sn-convo-time">${timeLabel(last?.created_at)}</span></div>
             <div class="sn-convo-preview">${esc(last?.message || convo.booking_ref || 'Start a conversation')}</div>

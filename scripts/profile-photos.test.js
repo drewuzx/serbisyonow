@@ -1,0 +1,71 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { test } = require('node:test');
+const sharp = require('sharp');
+const { issueSession } = require('./account-sessions');
+const { startQrFixture } = require('./provider-qr-test-fixture');
+
+test('profile photos enforce ownership, private review, revision checks, and preserve verification', async () => {
+ const f = await startQrFixture();
+ try {
+  const admin = await issueSession(f.db, 'admin', 1);
+  const form = (provider = false, consent = 'true', content = f.image) => {
+   const data = new FormData();
+   for (const field of provider ? ['selfie', 'idFront', 'idBack'] : ['photo']) data.append(field, new Blob([content], { type: 'image/png' }), 'photo.png');
+   if (provider) data.append('consent', consent);
+   return data;
+  };
+  const customer = (data = form(), token = f.customerToken) => f.request('/api/customer/profile-photo', 'POST', data, token);
+  assert.equal((await customer(form(), null)).status, 401);
+  assert.equal((await customer(form(), f.providerToken)).status, 403);
+  assert.equal((await customer(form(false, '', Buffer.from('not an image')))).status, 400);
+  assert.equal((await customer(form(false, '', Buffer.alloc(5 * 1024 * 1024 + 1)))).status, 400);
+  assert.equal((await customer()).status, 200);
+  const stored = await f.request('/api/profile-photos/customer/61', 'GET', null, null);
+  assert.equal(stored.status, 200); assert.equal(stored.headers.get('content-type'), 'image/jpeg');
+  const metadata = await sharp(stored.data).metadata();
+  assert.equal(metadata.width, 600); assert.equal(metadata.height, 600); assert.equal(metadata.exif, undefined);
+  assert.equal((await f.request('/api/profile-photos/customer/62')).status, 404);
+  await f.request('/api/customer/profile-photo', 'DELETE', null, f.otherCustomerToken);
+  assert.equal((await f.request('/api/profile-photos/customer/61')).status, 200);
+  assert.equal((await f.request('/api/customer/profile-photo', 'DELETE')).status, 200);
+  assert.equal((await f.request('/api/profile-photos/customer/61')).status, 404);
+  const before = (await f.db.query('SELECT is_verified,verification_status FROM providers WHERE id=81')).rows[0];
+  const submit = data => f.request('/api/provider/profile-photo', 'POST', data || form(true), f.providerToken);
+  assert.equal((await submit(form(true, 'false'))).status, 400);
+  assert.equal((await submit(new FormData())).status, 400);
+  const pending = await submit(); assert.equal(pending.status, 201);
+  assert.equal((await submit()).status, 409);
+  assert.equal((await f.request('/api/profile-photos/provider/81')).status, 404);
+  const review = (await f.request('/api/provider/profile-photo', 'GET', null, f.providerToken)).data.review;
+  assert.equal(review.status, 'pending'); assert.equal(review.selfie, undefined);
+  assert.equal((await f.request('/api/provider/profile-photo', 'GET', null, f.otherProviderToken)).data.review, null);
+  assert.equal((await f.request('/api/admin/profile-photo-reviews')).status, 403);
+  const queue = await f.request('/api/admin/profile-photo-reviews', 'GET', null, admin);
+  assert.equal(queue.data.reviews.length, 1); assert.equal(queue.data.reviews[0].selfie, undefined);
+  const privateUrl = `/api/admin/profile-photo-reviews/81/${review.revision}/front`;
+  assert.equal((await f.request(privateUrl, 'GET', null, null)).status, 401);
+  assert.equal((await f.request(privateUrl, 'GET', null, f.providerToken)).status, 403);
+  assert.equal((await f.request(privateUrl, 'GET', null, admin)).status, 200);
+  const decide = (decision, revision = review.revision, reason = '', token = admin) => f.request('/api/admin/profile-photo-reviews/81', 'POST', { decision, revision, reason }, token);
+  assert.equal((await decide('approved', review.revision, '', f.providerToken)).status, 403);
+  assert.equal((await decide('approved', 'stale')).status, 409);
+  assert.equal((await decide('declined')).status, 400);
+  assert.equal((await decide('declined', review.revision, 'Please retake in better lighting.')).status, 200);
+  assert.equal((await f.request(privateUrl, 'GET', null, admin)).status, 404);
+  assert.equal((await f.db.query('SELECT selfie,id_front FROM provider_photo_reviews WHERE provider_id=81')).rows[0].selfie, null);
+  const resubmit = await submit(); assert.equal(resubmit.status, 201); assert.notEqual(resubmit.data.revision, review.revision);
+  assert.equal((await decide('approved')).status, 409);
+  const outcomes = await Promise.all([decide('approved', resubmit.data.revision), decide('declined', resubmit.data.revision, 'Already reviewed.')]);
+  assert.deepEqual(outcomes.map(r => r.status).sort(), [200, 409]);
+  const state = (await f.db.query('SELECT status FROM provider_photo_reviews WHERE provider_id=81')).rows[0].status;
+  if (state === 'declined') { const next = await submit(); await decide('approved', next.data.revision); }
+  assert.equal((await f.request('/api/profile-photos/provider/81', 'GET', null, null)).status, 200);
+  const old = (await f.request('/api/profile-photos/provider/81')).data;
+  const replacement = await submit();
+  assert.deepEqual((await f.request('/api/profile-photos/provider/81')).data, old);
+  await decide('declined', replacement.data.revision, 'Retake');
+  assert.deepEqual((await f.request('/api/profile-photos/provider/81')).data, old);
+  assert.deepEqual((await f.db.query('SELECT is_verified,verification_status FROM providers WHERE id=81')).rows[0], before);
+ } finally { await f.close(); }
+});

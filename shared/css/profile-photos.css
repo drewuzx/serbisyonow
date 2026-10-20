@@ -1,0 +1,43 @@
+.sn-photo-avatar { position: relative; overflow: hidden; }
+.sn-photo-avatar > img.sn-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; border-radius: inherit; }
+.sn-photo-section { margin: 20px 0; padding: 24px 0; border-block: 1px solid #d7e1f2; color: #193b88; }
+.sn-photo-section h2 { margin: 0 0 16px; font-size: 22px; }
+.sn-photo-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
+.sn-photo-portrait { width: 88px; height: 88px; flex: 0 0 88px; border-radius: 50%; background: #dbe7ff url('/shared/icons/lucide/user.svg') center/45% no-repeat; }
+.sn-photo-section p { color: #52647c; font-size: 14px; max-width: 640px; }
+.sn-photo-dialog { box-sizing: border-box; position: fixed; inset: 0; margin: auto; width: min(580px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #cfdaee; border-top: 5px solid #2b50ce; border-radius: 20px; color: #193b88; background: #fff; box-shadow: 0 16px 60px #162c5a33; overflow: auto; font-family: 'Poppins', sans-serif; }
+.sn-photo-dialog::backdrop { background: #152d5c80; backdrop-filter: blur(3px); }
+.sn-photo-dialog *, .sn-photo-section *, .sn-photo-queue * { box-sizing: border-box; letter-spacing: 0; }
+.sn-photo-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.sn-photo-dialog h2 { margin: 0; font-size: 22px; line-height: 1.4; }
+.sn-photo-dialog h3 { font-size: 17px; }
+.sn-photo-dialog p { font-size: 14px; line-height: 1.6; color: #52647c; overflow-wrap: anywhere; }
+.sn-photo-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 44px; padding: 10px 18px; border: 1px solid #2b50ce; border-radius: 8px; background: #2b50ce; color: white; font: 600 15px 'Poppins', sans-serif; cursor: pointer; text-decoration: none; }
+.sn-photo-button.secondary { background: #fff; color: #2b50ce; }
+.sn-photo-button:disabled { opacity: .55; cursor: not-allowed; }
+.sn-photo-button:focus-visible { outline: 3px solid #aac5ff; outline-offset: 3px; }
+.sn-photo-button img { width: 18px; height: 18px; }
+.sn-photo-close { width: 44px; flex: 0 0 44px; padding: 10px; }
+.sn-photo-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.sn-photo-field { display: grid; gap: 8px; margin: 14px 0; font-weight: 600; font-size: 14px; }
+.sn-photo-field input:not([type=range]), .sn-photo-field textarea { width: 100%; min-width: 0; padding: 12px; background: #f2f5fb; border: 1px solid #becfee; border-radius: 8px; color: #193b88; font: inherit; }
+.sn-photo-field input[type=range] { width: 100%; accent-color: #2b50ce; }
+.sn-photo-consent { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.6; }
+.sn-photo-consent input { flex: 0 0 20px; width: 20px; height: 20px; accent-color: #2b50ce; }
+.sn-photo-crop, .sn-photo-video { display: block; width: min(100%, 320px); aspect-ratio: 1; height: auto; margin: 16px auto; border-radius: 8px; background: #edf2fb; object-fit: cover; }
+.sn-photo-video { transform: scaleX(-1); }
+.sn-photo-notice { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.sn-photo-notice[data-error=true] { color: #b42318; }
+.sn-photo-review-images { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sn-photo-review-images figure { margin: 0; min-width: 0; }
+.sn-photo-review-images img { display: block; width: 100%; max-height: 320px; object-fit: contain; background: #f2f5fb; border: 1px solid #cfdaee; }
+.sn-photo-review-images figcaption { margin: 6px 0; font-weight: 600; }
+.sn-photo-queue article { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; border-bottom: 1px solid #d7e1f2; }
+.sn-photo-queue strong { overflow-wrap: anywhere; }
+@media(max-width: 560px) {
+ .sn-photo-dialog { padding: 18px; }
+ .sn-photo-dialog h2 { font-size: 20px; }
+ .sn-photo-actions .sn-photo-button { flex: 1 1 auto; }
+ .sn-photo-review-images { grid-template-columns: 1fr; }
+ .sn-photo-field input:not([type=range]), .sn-photo-field textarea { font-size: 16px; }
+}

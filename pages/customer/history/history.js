@@ -77,7 +77,7 @@ function renderHistoryItem(booking, index, active) {
   const reason = historyStatus(booking.status) === 'cancelled' ? '<div class="sn-hi-reason">Reason: Cancelled booking</div>' : '';
   return `
     <button class="sn-history-item ${active ? 'active' : ''}" type="button" data-id="${historyEsc(booking.id)}" data-status="${historyEsc(booking.status)}">
-      <div class="sn-hi-avatar ${avatarClass}"></div>
+      <div class="sn-hi-avatar ${avatarClass}" data-photo-target="provider/${Number(booking.provider_id)}"></div>
       <div class="sn-hi-info">
         <div class="sn-hi-name">${historyEsc(booking.provider_name || 'Service Provider')}</div>
         <div class="sn-hi-meta">${historyEsc(booking.service || 'Service')} - ${historyEsc(historyDate(booking.scheduled_date))}</div>
@@ -140,6 +140,7 @@ function populateDetail(booking, index = 0) {
   const isCompleted = historyStatus(booking.status) === 'completed';
   const avatarClass = historyAvatarClass(index);
   document.getElementById('detail-avatar').className = `sn-detail-avatar ${avatarClass}`;
+  document.getElementById('detail-avatar').dataset.photoTarget = `provider/${Number(booking.provider_id)}`;
   document.getElementById('detail-provider-name').textContent = booking.provider_name || 'Service Provider';
   document.getElementById('detail-booking-id').textContent = `Booking ID: #SN-${String(booking.id).padStart(5, '0')}`;
   document.getElementById('detail-service-tag').textContent = booking.service || 'Service';
@@ -150,6 +151,7 @@ function populateDetail(booking, index = 0) {
   document.getElementById('detail-payment').textContent = ({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[booking.payment_method || 'cash'] || booking.payment_method;
   document.getElementById('detail-status-badge').innerHTML = historyStatusPill(booking.status);
   document.getElementById('detail-card-avatar').className = `sn-provider-info-avatar ${avatarClass}`;
+  document.getElementById('detail-card-avatar').dataset.photoTarget = `provider/${Number(booking.provider_id)}`;
   document.getElementById('detail-card-name').textContent = booking.provider_name || 'Service Provider';
 
   const verifiedBadge = document.getElementById('detail-verified');

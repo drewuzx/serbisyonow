@@ -26,6 +26,7 @@ const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-
 const { registerPromotionRoutes } = require('./promotions');
 const { registerAdminProviderDetails } = require('./admin-provider-details');
 const { registerAdminReports } = require('./admin-reports');
+const { registerProfilePhotos } = require('./profile-photos');
 const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
@@ -151,6 +152,7 @@ app.use(express.json());
 registerPromotionRoutes(app, db, paymentImageUpload);
 registerAdminProviderDetails(app, db, providerView, uploadDir);
 registerAdminReports(app, db, adminCategoryAliases);
+registerProfilePhotos(app, db);
 
 app.get('/api/payment-receipts/:receiptId/image', asyncRoute(async (req, res) => {
   const role = req.query.role;
@@ -4111,6 +4113,9 @@ app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
 }));
 
 app.use((error, _req, res, _next) => {
+  if (error instanceof multer.MulterError && /\/profile-photo$/.test(_req.path)) {
+    return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each photo must be 5 MB or smaller.' : 'Upload one photo per field using JPG, PNG, or WebP.' });
+  }
   if (error instanceof multer.MulterError && /\/promotions\//.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Payment images must be 5 MB or smaller.' : 'Upload one PNG, JPG or WebP payment image.' });
   }
@@ -4135,6 +4140,7 @@ ensureAdminSupportTables()
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'payment-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'feedback-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'promotion-schema.sql'), 'utf8')))
+  .then(() => db.query(fs.readFileSync(path.join(__dirname, 'profile-photo-schema.sql'), 'utf8')))
   .then(() => {
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);

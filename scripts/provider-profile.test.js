@@ -140,7 +140,8 @@ test('profile and credentials API: ownership, persistence, review, validation an
     const current = (await f.request('/api/provider/81/dashboard', 'GET', undefined, f.providerToken)).data.provider;
     assert.equal(current.id_front_file, first.data.user.id_front_file);
     assert.equal(current.documents_files.length, 2);
-    const adminList = await f.request('/api/admin/providers?status=all');
+    const adminToken = await issueSession(f.db, 'admin', 1);
+    const adminList = await f.request('/api/admin/providers?status=all', 'GET', undefined, adminToken);
     assert.ok(adminList.data.providers.find(provider => provider.id === 81).documents_files.includes(filename));
 
     const count = (await f.db.query('SELECT count(*)::int AS count FROM uploaded_files')).rows[0].count;

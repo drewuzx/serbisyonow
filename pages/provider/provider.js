@@ -2095,7 +2095,7 @@ function renderInbox(messages) {
       const active = String(convo.customer_id) === String(renderInbox.selectedCustomerId);
       return `
         <button class="sn-convo-item ${active ? 'active' : ''}" type="button" data-customer-id="${convo.customer_id}">
-          <div class="sn-convo-avatar sn-convo-avatar--${(index % 6) + 1}"></div>
+          <div class="sn-convo-avatar sn-convo-avatar--${(index % 6) + 1}" data-photo-target="customer/${Number(convo.customer_id)}"></div>
           <div class="sn-convo-body">
             <div class="sn-convo-top"><span class="sn-convo-name">${esc(convo.customer_name)}</span><span class="sn-convo-time">${timeLabel(last?.created_at)}</span></div>
             <div class="sn-convo-preview">${esc(last?.message || 'No messages yet.')}</div>
@@ -2353,7 +2353,7 @@ function providerHistoryStatusPill(status) {
 function renderProviderHistoryItem(booking, active = false) {
   return `
     <button class="sn-history-item ${active ? 'active' : ''}" type="button" data-history-id="${booking.id}" data-status="${esc(booking.status)}">
-      <div class="sn-hi-avatar ${booking.avatarClass}"></div>
+      <div class="sn-hi-avatar ${booking.avatarClass}" data-photo-target="customer/${Number(booking.customer_id)}"></div>
       <div class="sn-hi-info">
         <div class="sn-hi-name">${esc(booking.customer_name || 'Customer')}</div>
         <div class="sn-hi-meta">${esc(booking.service || 'Service')} - ${shortDate(booking.scheduled_date)}</div>
@@ -2382,7 +2382,7 @@ function renderProviderHistoryDetail(booking) {
   return `
     <div class="sn-detail-header">
       <div class="sn-detail-header-left">
-        <div class="sn-detail-avatar ${booking.avatarClass}"></div>
+        <div class="sn-detail-avatar ${booking.avatarClass}" data-photo-target="customer/${Number(booking.customer_id)}"></div>
         <div>
           <div class="sn-detail-name">${esc(booking.customer_name || 'Customer')}</div>
           <div class="sn-detail-sub">Booking ID: #SN-${String(booking.id).padStart(5, '0')} - ${esc(booking.service || 'Service')}</div>
@@ -2411,7 +2411,7 @@ function renderProviderHistoryDetail(booking) {
       <aside class="sn-provider-info-card">
         <div class="sn-provider-info-title">Customer</div>
         <div class="sn-provider-info-body">
-          <div class="sn-provider-info-avatar ${booking.avatarClass}"></div>
+          <div class="sn-provider-info-avatar ${booking.avatarClass}" data-photo-target="customer/${Number(booking.customer_id)}"></div>
           <div>
             <div class="sn-provider-info-name">${esc(booking.customer_name || 'Customer')}</div>
             <div class="sn-provider-info-type">${esc(booking.customer_contact || 'No contact saved')}</div>

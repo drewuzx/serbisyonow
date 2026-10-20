@@ -604,7 +604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     resultList.innerHTML = providers.map((provider, index) => `
       <article class="sn-result-card">
-        <div class="sn-result-img sn-result-img--${(index % 5) + 1}"></div>
+        <div class="sn-result-img sn-result-img--${(index % 5) + 1}" data-photo-target="provider/${provider.id}"></div>
         <div class="sn-result-body">
           <div class="sn-result-top">
             <span class="sn-result-name">${esc(provider.full_name)}</span>
