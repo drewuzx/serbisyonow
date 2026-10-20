@@ -39,6 +39,16 @@ test('malformed pricing is rejected', () => {
  assert.throws(() => pricing.validate(draft(), 'Nail Care'));
  assert.throws(() => pricing.validate({ ...draft(), notes: 'a'.repeat(501) }, service.title));
 });
+test('optional add-on descriptions and half-day duration round-trip with legacy pricing', () => {
+ const addon = { id:'a1',name:'Inspection',min:100,max:100,unit:'Per service',enabled:true };
+ const config = { ...draft(), mode:'range',min:500,max:1000,duration:'Half day',addons:[{...addon,description:'  Includes diagnosis.  '}] };
+ const result = pricing.validate(config,'Appliance repair');
+ assert.equal(result.duration,'Half day');
+ assert.equal(result.addons[0].description,'Includes diagnosis.');
+ assert.deepEqual(pricing.validate({...config,addons:[addon]},'Appliance repair').addons[0],addon);
+ assert.throws(()=>pricing.validate({...config,addons:[{...addon,description:'x'.repeat(301)}]},'Appliance repair'),/description/);
+ assert.throws(()=>pricing.validate({...config,addons:[{...addon,description:{}}]},'Appliance repair'),/description/);
+});
 test('unavailable, duplicate and invalid quantity add-ons are rejected', () => {
  const addon = { id:'a1',name:'Fridge',min:200,max:400,unit:'Per service',enabled:true };
  const configured = { ...service, pricing_config: { ...draft(), mode:'range', min:500,max:1000,addons:[addon] } };

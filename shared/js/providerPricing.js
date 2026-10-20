@@ -7,7 +7,7 @@
  'use strict';
  const rooms = ['Studio', '1 Bedroom', '2 Bedrooms', '3 Bedrooms', '4+ Bedrooms'];
  const durations = ['2 hours', '3 hours', '4 hours', '5+ hours'];
- const typicalDurations = ['Flexible', '30 minutes', '1 hour', '90 minutes', ...durations];
+ const typicalDurations = ['Flexible', '30 minutes', '1 hour', '90 minutes', ...durations, 'Half day'];
  const areas = ['Kitchen', 'Living room', 'Balcony', 'Garage', 'Other'];
  const units = ['Per service', 'Per load', 'Per window', 'Per unit', 'Per hour'];
  const repairServices = ['plumbing services','electrical repair','appliance repair','carpentry','roof repair','furniture repair','painting services','door and window repair'];
@@ -64,7 +64,8 @@
    const min = amount(addon.min, `${name} minimum`), max = amount(addon.max, `${name} maximum`);
    if (max < min) fail(`${name}: maximum price must be at least the minimum.`);
    if (!units.includes(addon.unit) || typeof addon.enabled !== 'boolean') fail('Invalid additional service settings.');
-   return { id, name, min, max, unit: addon.unit, enabled: addon.enabled };
+   const description = text(addon.description ?? '', 'Add-on description', 300);
+   return { id, name, ...(description ? { description } : {}), min, max, unit: addon.unit, enabled: addon.enabled };
   });
   return config;
  }

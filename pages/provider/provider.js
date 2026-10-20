@@ -413,10 +413,11 @@ function startProviderNotificationRealtime(provider) {
   window.snProviderNotificationTimer = window.snStartLiveRefresh('provider-data', () => loadProviderDatabase({ background: true }));
 }
 
-function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', danger = false, options = [] }) {
+function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', danger = false, options = [], validate = null, className = '', maxLength = null }) {
   return new Promise((resolve) => {
+    const previousFocus = document.activeElement;
     const backdrop = document.createElement('div');
-    backdrop.className = 'sn-modal-backdrop';
+    backdrop.className = `sn-modal-backdrop ${className}`;
     const inputMarkup = label ? `
       <label class="sn-modal-field">
         <span>${esc(label)}</span>
@@ -439,6 +440,7 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
         </div>
         ${message ? `<p class="sn-modal-message">${esc(message)}</p>` : ''}
         ${inputMarkup}
+        <p class="sn-modal-validation" role="alert" id="sn-modal-validation" hidden></p>
         <div class="sn-modal-actions">
           <button class="btn btn-outline" type="button" data-modal-cancel>${esc(cancelText)}</button>
           <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" type="button" data-modal-confirm>${esc(confirmText)}</button>
@@ -447,20 +449,45 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
     `;
 
     const field = backdrop.querySelector('.sn-modal-input');
+    if (field && maxLength) field.maxLength = maxLength;
+    field?.addEventListener('input', () => {
+      if (validate && !validate(field.value.trim())) {
+        backdrop.querySelector('.sn-modal-validation').hidden = true;
+        field.removeAttribute('aria-invalid');
+        field.removeAttribute('aria-describedby');
+      }
+    });
     const close = (result) => {
       document.removeEventListener('keydown', onKeydown);
       backdrop.remove();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
       resolve(result);
     };
     const submitModal = () => {
       if (!field) return close(true);
       const nextValue = field.tagName === 'SELECT' ? field.value : field.value.trim();
+      const error = validate?.(nextValue);
+      if (error) {
+        const notice = backdrop.querySelector('.sn-modal-validation');
+        notice.textContent = error;
+        notice.hidden = false;
+        field.setAttribute('aria-invalid', 'true');
+        field.setAttribute('aria-describedby', notice.id);
+        field.focus();
+        return;
+      }
       close(allowEmpty ? nextValue : nextValue || (typeof value === 'string' ? value : ''));
     };
     const onKeydown = (event) => {
       if (event.key === 'Escape') close(null);
-      if (!multiline && event.key === 'Enter' && field) submitModal();
+      if (!multiline && event.key === 'Enter' && event.target === field) { event.preventDefault(); submitModal(); }
       if (multiline && event.key === 'Enter' && event.ctrlKey && field) submitModal();
+      if (event.key === 'Tab') {
+        const controls = [...backdrop.querySelectorAll('button, input, select, textarea')];
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
     };
 
     backdrop.addEventListener('click', (event) => {
@@ -471,7 +498,7 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
     backdrop.querySelector('[data-modal-confirm]')?.addEventListener('click', submitModal);
     document.addEventListener('keydown', onKeydown);
     document.body.appendChild(backdrop);
-    requestAnimationFrame(() => field?.focus());
+    requestAnimationFrame(() => (field || backdrop.querySelector('[data-modal-confirm]'))?.focus());
   });
 }
 
@@ -878,7 +905,7 @@ function renderServices(services) {
     button.addEventListener('click', () => {
       const id = button.closest('[data-service-id]')?.dataset.serviceId;
       const service = services.find((item) => String(item.id) === String(id));
-      saveService(service);
+      openServiceEdit(service);
     });
   });
   host.querySelectorAll('[data-action="remove-service"]').forEach((button) => {

@@ -56,5 +56,21 @@ test('provider pricing persists, protects ownership and controls booking totals'
   assert.equal(toggled.data.service.starting_price,450);
   const forbidden=await f.request(`/api/provider/81/services/${nail.data.service.id}`,'DELETE',undefined,f.otherProviderToken);
   assert.equal(forbidden.status,403);
+  const editPath=`/api/provider/81/services/${nail.data.service.id}`;
+  const beforeCount=Number((await f.db.query('SELECT count(*) FROM provider_services WHERE provider_id=81')).rows[0].count);
+  for (const title of ['', '   ', 123, 'x'.repeat(161)]) {
+   assert.equal((await f.request(editPath,'PATCH',{title},f.providerToken)).status,400);
+  }
+  const renamedConfig={...nail.data.service.pricing_config,min:700,max:1200,duration:'Half day',addons:[{id:'detail',name:'Details',description:'Optional treatment',min:50,max:50,unit:'Per service',enabled:true}]};
+  assert.equal((await f.request(editPath,'PATCH',{title:'Updated Nail Care',pricing_config:{...renamedConfig,max:100}},f.providerToken)).status,400);
+  assert.equal((await f.db.query('SELECT title FROM provider_services WHERE id=$1',[nail.data.service.id])).rows[0].title,'Nail Care');
+  const renamed=await f.request(editPath,'PATCH',{title:' Updated Nail Care ',pricing_config:renamedConfig},f.providerToken);
+  assert.equal(renamed.status,200,JSON.stringify(renamed.data));
+  assert.equal(renamed.data.service.id,nail.data.service.id);
+  assert.equal(renamed.data.service.title,'Updated Nail Care');
+  assert.equal(renamed.data.service.pricing_config.addons[0].description,'Optional treatment');
+  assert.equal(renamed.data.service.pricing_config.duration,'Half day');
+  assert.equal(renamed.data.service.accepts_gcash,true);
+  assert.equal(Number((await f.db.query('SELECT count(*) FROM provider_services WHERE provider_id=81')).rows[0].count),beforeCount);
  } finally { await f.close(); }
 });

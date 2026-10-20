@@ -3545,6 +3545,9 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
   const existing = await db.query('SELECT * FROM provider_services WHERE provider_id = $1 AND id = $2', [req.params.providerId, req.params.serviceId]);
   if (!existing.rowCount) return res.status(404).json({ message: 'Service not found.' });
   const currentService = existing.rows[0];
+  if (req.body.title !== undefined && (typeof req.body.title !== 'string' || !req.body.title.trim() || req.body.title.trim().length > 160)) {
+    return res.status(400).json({ message: 'Service name is required and must be no more than 160 characters.' });
+  }
   validateServiceOptions(req.body, currentService);
   const pricingConfig = req.body.pricing_config === undefined ? currentService.pricing_config
     : providerPricing.validate(req.body.pricing_config, req.body.title ?? currentService.title);
