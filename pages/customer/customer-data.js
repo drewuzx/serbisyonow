@@ -566,7 +566,10 @@ document.addEventListener('DOMContentLoaded', async () => {
  snAttachCustomerSidebarFallback();
  snAttachUniversalCustomerFilter(customer);
  window.snStartLiveRefresh('customer-account', async () => {
+  if (window.snCustomerProfileSaving) return;
+  const snapshot = localStorage.getItem('sn_customer_user');
   const { user } = await snCustomerGet(`/api/auth/customer/status/${customer.id}`);
+  if (window.snCustomerProfileSaving || snapshot !== localStorage.getItem('sn_customer_user')) return;
   if (!window.snLiveRefresh?.isIdle()) return;
   if (!user) return;
   const current = snCurrentCustomer();

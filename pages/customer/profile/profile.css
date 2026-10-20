@@ -300,6 +300,17 @@
   gap: 16px;
 }
 
+.sn-customer-location { border-top:1px solid var(--border); margin-top:20px; padding-top:20px; color:var(--blue-dark); }
+.sn-customer-location h3 { margin:0 0 16px; font-size:18px; }
+.sn-customer-location dl { margin:0 0 10px; }
+.sn-customer-location dt { font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+.sn-customer-location dd { margin:0; font-size:14px; overflow-wrap:anywhere; }
+.sn-customer-location p { font-size:12px; color:var(--text-secondary); overflow-wrap:anywhere; }
+.sn-customer-location .sn-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; max-width:100%; white-space:normal; }
+.sn-customer-location .sn-btn img { flex-shrink:0; filter:brightness(0) invert(1); }
+.sn-customer-location .sn-btn:disabled { opacity:.65; cursor:wait; }
+#sn-customer-location-status.is-error { color:#b42318; }
+
 /* â”€â”€ Account Status Card â”€â”€ */
 .sn-account-rows {
   display: flex;

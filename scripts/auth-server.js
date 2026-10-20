@@ -878,10 +878,13 @@ function inferGeoPoint(address) {
 function geoPointFromRow(row) {
   const lat = Number(row?.latitude);
   const lng = Number(row?.longitude);
-  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+  if (row?.latitude != null && row?.longitude != null
+      && String(row.latitude).trim() && String(row.longitude).trim()
+      && Number.isFinite(lat) && lat >= -90 && lat <= 90
+      && Number.isFinite(lng) && lng >= -180 && lng <= 180) {
     return { lat, lng, source: 'saved-gps' };
   }
-  return inferGeoPoint(row?.address);
+  return { ...inferGeoPoint(row?.address), source: 'estimated' };
 }
 
 function uploadedFileFolder(file) {
@@ -2250,11 +2253,17 @@ app.get('/api/auth/customer/status/:id', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/customer/:id/location', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'customer', req.params.id);
   const latitude = Number(req.body.latitude);
   const longitude = Number(req.body.longitude);
   const accuracy = Number(req.body.accuracy);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+  if (typeof req.body.latitude !== 'number' || typeof req.body.longitude !== 'number'
+      || !Number.isFinite(latitude) || latitude < -90 || latitude > 90
+      || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     return res.status(400).json({ message: 'Valid GPS coordinates are required.' });
+  }
+  if (req.body.accuracy != null && (typeof req.body.accuracy !== 'number' || !Number.isFinite(accuracy) || accuracy < 0)) {
+    return res.status(400).json({ message: 'GPS accuracy must be a non-negative number.' });
   }
   const result = await db.query(`
     UPDATE customers
@@ -2265,17 +2274,25 @@ app.patch('/api/customer/:id/location', asyncRoute(async (req, res) => {
         updated_at = NOW()
     WHERE id = $1
     RETURNING *
-  `, [req.params.id, latitude, longitude, Number.isFinite(accuracy) ? accuracy : null]);
+  `, [req.params.id, latitude, longitude, req.body.accuracy != null ? accuracy : null]);
   if (!result.rowCount) return res.status(404).json({ message: 'Customer not found.' });
   res.json({ user: customerRow(result.rows[0]) });
 }));
 
 app.patch('/api/auth/customer/update', asyncRoute(async (req, res) => {
   requireFields(req.body, ['id', 'full_name', 'contact', 'address', 'gender', 'dob']);
+  await authenticateAccount(db, req, 'customer', req.body.id);
+  if (typeof req.body.address !== 'string' || !req.body.address.trim()) {
+    return res.status(400).json({ message: 'Address is required.' });
+  }
   const contact = normalizeContactNumber(req.body.contact);
   const result = await db.query(
     `UPDATE customers
-     SET full_name = $2, contact = $3, address = $4, gender = $5, dob = $6, updated_at = NOW()
+     SET full_name = $2, contact = $3, address = $4, gender = $5, dob = $6, updated_at = NOW(),
+         latitude = CASE WHEN address IS DISTINCT FROM $4 THEN NULL ELSE latitude END,
+         longitude = CASE WHEN address IS DISTINCT FROM $4 THEN NULL ELSE longitude END,
+         location_accuracy_m = CASE WHEN address IS DISTINCT FROM $4 THEN NULL ELSE location_accuracy_m END,
+         location_updated_at = CASE WHEN address IS DISTINCT FROM $4 THEN NULL ELSE location_updated_at END
      WHERE id = $1
      RETURNING *`,
     [
@@ -2425,8 +2442,14 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
   const q = String(req.query.q || '').trim().toLowerCase();
   const category = String(req.query.category || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'recommended').trim().toLowerCase();
+  const availableOnly = ['true', '1', 'yes', 'available'].includes(String(req.query.available || '').toLowerCase());
   const params = [];
   const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
+  if (availableOnly) {
+    where.push(`EXISTS (SELECT 1 FROM provider_availability availability
+      WHERE availability.provider_id = p.id AND availability.available_date >= CURRENT_DATE
+        AND availability.is_available = TRUE)`);
+  }
   if (q) {
     params.push(`%${q}%`);
     where.push(`(

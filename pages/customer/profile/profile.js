@@ -34,6 +34,7 @@ function showNotice(elId, message, type = 'success') {
 }
 
 function populatePage(user, { preserveDraft = false } = {}) {
+ renderCustomerLocation(user);
  const status = user?.verification_status || (user?.is_verified? 'verified': 'pending');
  const isVerified = status === 'verified';
  const isRejected = status === 'rejected';
@@ -86,6 +87,18 @@ function populatePage(user, { preserveDraft = false } = {}) {
  document.getElementById('edit-dob').value = user?.dob? user.dob.split('T')[0]: '';
 }
 
+function renderCustomerLocation(user) {
+ const label = document.getElementById('sn-customer-gps-value');
+ if (!label) return;
+ const hasLocation = user?.latitude != null && user?.longitude != null
+  && Number.isFinite(Number(user.latitude)) && Number.isFinite(Number(user.longitude));
+ label.textContent = hasLocation ? `${Number(user.latitude).toFixed(6)}, ${Number(user.longitude).toFixed(6)}` : 'GPS location not saved yet';
+ const accuracy = document.getElementById('sn-customer-gps-accuracy');
+ accuracy.textContent = hasLocation && user.location_accuracy_m != null ? `Accuracy: +/- ${Math.round(user.location_accuracy_m)} m` : '';
+ const updated = document.getElementById('sn-customer-gps-updated');
+ updated.textContent = hasLocation && user.location_updated_at ? `Updated ${new Date(user.location_updated_at).toLocaleString('en-PH', { month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true })}` : '';
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
  await window.snAccountSessionReady;
  const currentCustomer = getCurrentCustomer();
@@ -93,6 +106,13 @@ document.addEventListener('DOMContentLoaded', async () => {
  window.location.href = '../../auth/customerLogin.html';
  return;
  }
+ document.getElementById('sn-profile-form').insertAdjacentHTML('afterend', `<section class="sn-customer-location" aria-labelledby="sn-customer-location-title">
+  <h3 id="sn-customer-location-title">My Location</h3>
+  <dl><dt>Saved GPS location</dt><dd id="sn-customer-gps-value"></dd></dl>
+  <p id="sn-customer-gps-accuracy"></p><p id="sn-customer-gps-updated"></p>
+  <button class="sn-btn sn-btn-primary" id="sn-customer-update-location" type="button"><img src="/shared/icons/lucide/map-pin.svg" width="18" height="18" alt="">Update My Location</button>
+  <p id="sn-customer-location-status" role="status" aria-live="polite"></p>
+ </section>`);
 
  // Always re-fetch fresh data from the API so all registered fields appear
  // (localStorage may have been saved before contact/address/gender/dob were included)
@@ -143,6 +163,44 @@ document.addEventListener('DOMContentLoaded', async () => {
  const profileView = document.getElementById('sn-profile-view');
  const profileForm = document.getElementById('sn-profile-form');
  const cancelEditBtn = document.getElementById('sn-cancel-edit');
+ const locationButton = document.getElementById('sn-customer-update-location');
+ const locationStatus = document.getElementById('sn-customer-location-status');
+ let profileBusy = false;
+ function setProfileBusy(value) {
+  profileBusy = value;
+  window.snCustomerProfileSaving = value;
+  [locationButton, editToggleBtn, cancelEditBtn, document.getElementById('sn-save-btn')].forEach(button => { if (button) button.disabled = value; });
+ }
+ locationButton.addEventListener('click', async () => {
+  if (profileBusy) return;
+  locationStatus.classList.remove('is-error');
+  if (!navigator.geolocation) {
+   locationStatus.textContent = 'Location is unavailable in this browser. You can still update your address in Edit Profile.';
+   locationStatus.classList.add('is-error');
+   return;
+  }
+  setProfileBusy(true);
+  locationStatus.textContent = 'Getting your location...';
+  try {
+   const position = await new Promise((resolve,reject) => navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:15000,maximumAge:0}));
+   const user = getCurrentCustomer();
+   if (String(user?.id) !== String(currentCustomer.id)) throw new Error('Your account changed. Reload this page before saving your location.');
+   const response = await fetch(`${AUTH_API_BASE}/api/customer/${user.id}/location`, {
+    method:'PATCH',headers:{'Content-Type':'application/json',...(user.auth_token ? {Authorization:`Bearer ${user.auth_token}`} : {})},
+    body:JSON.stringify({latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy}),
+   });
+   const data = await response.json().catch(()=>({}));
+   if (!response.ok || !data.user) throw new Error(data.message || 'Unable to save your location. Please try again.');
+   if (String(getCurrentCustomer()?.id) !== String(user.id)) return;
+   saveCurrentCustomer(data.user);
+   Object.assign(currentCustomer,data.user);
+   populatePage(data.user,{preserveDraft:profileForm.style.display !== 'none'});
+   locationStatus.textContent = 'Your location has been updated.';
+  } catch (error) {
+   locationStatus.classList.add('is-error');
+   locationStatus.textContent = error.code === 1 ? 'Location permission denied. Allow location in your browser, then try again.' : error.code === 3 ? 'Location request timed out. Please try again.' : error.code === 2 ? 'Your device could not determine its location. Please try again.' : error.message || 'Unable to update your location.';
+  } finally { setProfileBusy(false); }
+ });
  document.addEventListener('sn:customer-account-updated', ({ detail: user }) => {
   Object.assign(currentCustomer, user);
   populatePage(user, { preserveDraft: profileForm.style.display !== 'none' });
@@ -161,6 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  editToggleBtn.textContent = ' Edit Profile';
  editToggleBtn.classList.remove('editing');
  document.getElementById('sn-save-notice').style.display = 'none';
+ populatePage(getCurrentCustomer());
  }
 
  editToggleBtn?.addEventListener('click', () => {
@@ -173,6 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  // Save Profile 
  profileForm?.addEventListener('submit', async (e) => {
  e.preventDefault();
+ if (profileBusy) return;
 
  const fullName = document.getElementById('edit-fullname').value.trim();
  const contact = document.getElementById('edit-contact').value.trim();
@@ -180,51 +240,36 @@ document.addEventListener('DOMContentLoaded', async () => {
  const gender = document.getElementById('edit-gender').value;
  const dob = document.getElementById('edit-dob').value;
 
- if (!fullName) {
- showNotice('sn-save-notice', 'Full name is required.', 'error');
+ if (!fullName || !address) {
+ showNotice('sn-save-notice', !fullName ? 'Full name is required.' : 'Address is required.', 'error');
  return;
  }
 
  const saveBtn = document.getElementById('sn-save-btn');
- saveBtn.disabled = true;
+ setProfileBusy(true);
  saveBtn.textContent = 'Saving...';
 
  try {
- // Update local customer data
- // NOTE: When your API supports PATCH /api/auth/customer/update, call it here.
- // For now we update localStorage directly.
- const updatedCustomer = {...currentCustomer,
- full_name: fullName,
- contact,
- address,
- gender,
- dob,
- };
-
- // Attempt API update if endpoint exists
- try {
+ const user = getCurrentCustomer();
+ if (String(user?.id) !== String(currentCustomer.id)) throw new Error('Your account changed. Reload this page before saving.');
  const res = await fetch(`${AUTH_API_BASE}/api/auth/customer/update`, {
  method: 'PATCH',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...(user.auth_token ? {Authorization:`Bearer ${user.auth_token}`} : {}) },
  body: JSON.stringify({ id: currentCustomer.id, full_name: fullName, contact, address, gender, dob }),
  });
- if (res.ok) {
  const data = await res.json().catch(() => ({}));
- if (data.user) Object.assign(updatedCustomer, data.user);
- }
- } catch (_) {
- // API not yet available continue with local update
- }
-
- saveCurrentCustomer(updatedCustomer);
- populatePage(updatedCustomer);
+ if (!res.ok || !data.user) throw new Error(data.message || 'Failed to save changes. Please try again.');
+ if (String(getCurrentCustomer()?.id) !== String(currentCustomer.id)) return;
+ Object.assign(currentCustomer,data.user);
+ saveCurrentCustomer(data.user);
+ populatePage(data.user);
  showNotice('sn-save-notice', ' Profile updated successfully!', 'success');
 
  setTimeout(exitEditMode, 1500);
  } catch (err) {
  showNotice('sn-save-notice', err.message || 'Failed to save changes.', 'error');
  } finally {
- saveBtn.disabled = false;
+ setProfileBusy(false);
  saveBtn.textContent = ' Save Changes';
  }
  });

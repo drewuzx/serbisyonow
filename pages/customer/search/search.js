@@ -290,6 +290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       category: currentCategory,
       location: currentLocationQuery,
       sort: currentSort,
+      available: String(availableOnly),
     });
     if (deviceCoords) {
       params.set('lat', deviceCoords.lat);
@@ -762,63 +763,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadProviders();
   });
 
-  document.getElementById('sn-use-gps')?.addEventListener('click', () => {
+  let savingLocation = false;
+  async function updateSearchLocation() {
+    if (savingLocation) return;
     if (!navigator.geolocation) {
       if (mapStatus) mapStatus.textContent = 'GPS is not available in this browser.';
       return;
     }
+    savingLocation = true;
+    window.snCustomerProfileSaving = true;
+    const buttons = [document.getElementById('sn-use-gps'), document.getElementById('sn-filter-gps')].filter(Boolean);
+    buttons.forEach(button => { button.disabled = true; });
     if (mapStatus) mapStatus.textContent = 'Requesting GPS permission...';
-    navigator.geolocation.getCurrentPosition((position) => {
+    try {
+      const position = await new Promise((resolve,reject) => navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:15000,maximumAge:0}));
+      const user = getCurrentCustomer();
+      if (String(user?.id) !== String(currentCustomer.id)) throw new Error('Your account changed. Reload the page before saving your location.');
+      const response = await fetch(`${API_BASE}/api/customer/${user.id}/location`, {
+        method:'PATCH',headers:{'Content-Type':'application/json',...(user.auth_token ? {Authorization:`Bearer ${user.auth_token}`} : {})},
+        body:JSON.stringify({latitude:position.coords.latitude,longitude:position.coords.longitude,accuracy:position.coords.accuracy}),
+      });
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok || !data.user) throw new Error(data.message || 'Unable to save your location. Please try again.');
+      if (String(getCurrentCustomer()?.id) !== String(user.id)) return;
+      Object.assign(currentCustomer,data.user);
+      localStorage.setItem('sn_customer_user',JSON.stringify({...user,...data.user}));
       deviceCoords = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         accuracy: position.coords.accuracy,
       };
-      fetch(`${API_BASE}/api/customer/${currentCustomer.id}/location`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: deviceCoords.lat, longitude: deviceCoords.lng, accuracy: deviceCoords.accuracy }),
-      }).then((res) => res.json().catch(() => ({}))).then((data) => {
-        if (data.user) {
-          Object.assign(currentCustomer, data.user);
-          localStorage.setItem('sn_customer_user', JSON.stringify(currentCustomer));
-        }
-      }).catch(() => {
-        // Still use the live GPS point for this page even if saving fails.
-      }).finally(loadLocationMap);
-    }, () => {
-      if (mapStatus) mapStatus.textContent = 'GPS permission was denied. Using registered address instead.';
-      deviceCoords = null;
-      loadLocationMap();
-    }, { enableHighAccuracy: true, timeout: 8000 });
-  });
-
-  document.getElementById('sn-filter-gps')?.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      const locationInput = document.getElementById('sn-filter-location');
-      if (locationInput) locationInput.value = currentCustomer.address || '';
-      return;
+      await loadLocationMap();
+    } catch (error) {
+      if (mapStatus) mapStatus.textContent = error.code === 1 ? 'Location permission denied. Allow location in your browser, then try again.' : error.code === 3 ? 'Location request timed out. Please try again.' : error.message || 'Unable to update your location.';
+    } finally {
+      savingLocation = false;
+      window.snCustomerProfileSaving = false;
+      buttons.forEach(button => { button.disabled = false; });
     }
-    if (mapStatus) mapStatus.textContent = 'Requesting GPS permission for filter accuracy...';
-    navigator.geolocation.getCurrentPosition((position) => {
-      deviceCoords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      };
-      currentLocationQuery = currentCustomer.address || 'Device GPS';
-      const locationInput = document.getElementById('sn-filter-location');
-      if (locationInput) locationInput.value = currentLocationQuery;
-      fetch(`${API_BASE}/api/customer/${currentCustomer.id}/location`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: deviceCoords.lat, longitude: deviceCoords.lng, accuracy: deviceCoords.accuracy }),
-      }).catch(() => {});
-      loadLocationMap();
-    }, () => {
-      if (mapStatus) mapStatus.textContent = 'GPS permission was denied. Location filter still uses typed address.';
-    }, { enableHighAccuracy: true, timeout: 8000 });
-  });
+  }
+  document.getElementById('sn-use-gps')?.addEventListener('click', updateSearchLocation);
+  document.getElementById('sn-filter-gps')?.addEventListener('click', updateSearchLocation);
 
   tabs.forEach((tab) => {
     const label = tab.textContent.trim().toLowerCase();
