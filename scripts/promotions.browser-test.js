@@ -39,9 +39,11 @@ async function main() {
   const promotionNav=page.locator('.sn-nav-item[href*="promotions"]');
   await promotionNav.waitFor();
   const promotionIcon=promotionNav.locator('.sn-ico');
-  assert.match(await promotionIcon.evaluate(icon=>getComputedStyle(icon,'::before').maskImage),/\/shared\/icons\/lucide\/star\.svg/,'Promotions must have an icon mask, not a solid square');
+  const promotionMask=await promotionIcon.evaluate(icon=>getComputedStyle(icon,'::before').maskImage);
+  assert.match(promotionMask,/\/shared\/icons\/lucide\/megaphone-percent\.svg/,'Promotions must have a distinct megaphone and percent icon');
+  assert.notEqual(promotionMask,await page.locator('.sn-nav-item[href*="reviews"] .sn-ico').evaluate(icon=>getComputedStyle(icon,'::before').maskImage));
   assert.equal(await promotionIcon.locator('img').isVisible(),false,'No duplicate image beneath the mask');
-  assert.equal((await page.request.get(f.base+'/shared/icons/lucide/star.svg')).status(),200);
+  assert.equal((await page.request.get(f.base+'/shared/icons/lucide/megaphone-percent.svg')).status(),200);
   await promotionNav.screenshot({path:path.join(os.tmpdir(),'promotion-nav-desktop.png')});
   await page.setViewportSize({width:390,height:900});
   await page.locator('#sn-hamburger-top').click();

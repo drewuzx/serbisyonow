@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const providerNav = [
     { key: 'dashboard', label: 'Dashboard', href: '../dashboard/dashboard.html', icon: '&#127968;' },
     { key: 'services', label: 'Service', href: '../services/services.html', icon: '&#128736;' },
-    { key: 'promotions', label: 'Promotions', href: '../promotions/promotions.html', icon: '<img src="/shared/icons/lucide/star.svg" alt="" width="20" height="20">' },
+    { key: 'promotions', label: 'Promotions', href: '../promotions/promotions.html', icon: '<img src="/shared/icons/lucide/megaphone-percent.svg" alt="" width="28" height="28">' },
     { key: 'requests', label: 'Bookings', href: '../requests/requests.html', icon: '&#128197;' },
     { key: 'schedule', label: 'Schedules', href: '../schedule/schedule.html', icon: '&#128198;' },
     { key: 'reviews', label: 'Reviews', href: '../reviews/reviews.html', icon: '&#11088;' },
