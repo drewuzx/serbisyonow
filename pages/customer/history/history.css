@@ -7,7 +7,7 @@
 /* â”€â”€ Two-Panel Layout â”€â”€ */
 .sn-history-layout {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 20px;
   height: calc(100vh - var(--topbar-height) - 40px);
   min-height: 0;
@@ -251,8 +251,14 @@
 .sn-detail-panel {
   display: flex;
   flex-direction: column;
+  flex: 1;
   height: 100%;
   overflow-y: auto;
+}
+
+/* Layout display rules must not reveal inactive booking details. */
+.sn-detail-panel > [hidden] {
+  display: none !important;
 }
 
 /* â”€â”€ Detail Header â”€â”€ */
@@ -350,11 +356,11 @@
 /* â”€â”€ Detail Body â”€â”€ */
 .sn-detail-body {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 0 20px 20px;
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-width: 0;
 }
 
 /* â”€â”€ Detail Section â”€â”€ */
@@ -372,7 +378,7 @@
 }
 .sn-dr {
   display: grid;
-  grid-template-columns: 24px auto 1fr;
+  grid-template-columns: 24px auto minmax(0, 1fr);
   align-items: flex-start;
   gap: 12px;
   font-size: var(--text-sm);
@@ -386,6 +392,7 @@
 .sn-dr-value {
   color: var(--blue-dark);
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .sn-dr-amount {
   font-family: var(--font-heading);
@@ -426,6 +433,9 @@
   gap: 12px;
   align-items: flex-start;
 }
+.sn-provider-info-body > div { min-width: 0; }
+.sn-detail-header-left > div { min-width: 0; overflow-wrap: anywhere; }
+.sn-hi-meta { overflow-wrap: anywhere; }
 .sn-provider-info-avatar {
   width: 52px;
   height: 52px;
@@ -517,7 +527,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
+  min-height: 240px;
   gap: 10px;
   padding: 40px;
   text-align: center;
@@ -544,4 +555,21 @@
   .sn-history-left { max-height: 50vh; }
   .sn-history-right { min-height: 60vh; }
   .sn-detail-right-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .sn-history-layout .sn-history-left { max-height: none; }
+  .sn-history-layout .sn-history-right { min-height: 0; }
+  .sn-history-list { flex: none; }
+  .sn-history-item { flex-shrink: 0; }
+  .sn-detail-panel { height: auto; overflow: visible; }
+  .sn-detail-body { flex: none; }
+}
+@media (max-width: 560px) {
+  .sn-detail-empty { padding: 24px 16px; }
+  .sn-detail-body { padding: 0 16px 16px; }
+  .sn-dr { grid-template-columns: 16px minmax(0, 1fr); gap: 4px 8px; }
+  .sn-dr-label { white-space: normal; }
+  .sn-dr-value { grid-column: 2; }
+  .sn-cust-actions .sn-btn { white-space: normal; min-height: 44px; }
+  .sn-provider-info-name { white-space: normal; overflow-wrap: anywhere; }
 }
