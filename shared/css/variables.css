@@ -7,6 +7,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap');
 @import url('./button-colors.css');
 
+/* Author layout rules must not expose inactive panels or form sections. */
+[hidden]:not([hidden="until-found"]) { display: none !important; }
+
+@media (max-width: 940px) {
+  /* Keep editable text readable without automatic phone-browser zoom. */
+  body :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not([type="submit"]):not([type="button"]) {
+    font-size: 16px !important;
+  }
+}
+
 /* ── CSS Custom Properties ── */
 :root {
   /* Brand Colors */

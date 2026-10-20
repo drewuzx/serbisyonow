@@ -100,7 +100,7 @@ async function inspectLayout(page) {
  });
 }
 
-(async () => {
+if (require.main === module) (async () => {
  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
  const results = [];
  const errors = [];
@@ -167,7 +167,7 @@ async function inspectLayout(page) {
    }
    for (const [route, control, selector] of [
     ['customer/profile/profile.html', '#sn-edit-toggle', '#sn-profile-form'],
-    ['provider/services/services.html', '[data-action="edit-service"]', '.sn-modal'],
+    ['provider/services/services.html', '[data-action="edit-service"]', '#sn-service-editor'],
    ]) {
     await page.goto(`${base}/pages/${route}`);
     await page.locator(control).first().click();
@@ -185,3 +185,5 @@ async function inspectLayout(page) {
   console.log(`${baseline ? 'Baseline' : 'Verified'} ${results.length} page/viewports, ${results.reduce((sum, result) => sum + result.actions, 0)} controls. Screenshots: ${os.tmpdir()}. JavaScript errors: ${JSON.stringify(errors)}`);
  } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+module.exports = { inspectLayout };

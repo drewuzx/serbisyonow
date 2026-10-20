@@ -43,7 +43,7 @@ async function main() {
      const issues = [];
      if (box.left < 0 || box.right > innerWidth || box.top < 0 || box.bottom > innerHeight) issues.push('Panel outside viewport');
      if (box.bottom > launch.top) issues.push('Panel overlaps its launcher');
-     if (chat && launch.bottom > chat.top) issues.push('Rating launcher overlaps chat');
+     if (chat && Math.min(launch.right,chat.right)>Math.max(launch.left,chat.left) && Math.min(launch.bottom,chat.bottom)>Math.max(launch.top,chat.top)) issues.push('Rating launcher overlaps chat');
      if (panel.scrollWidth > panel.clientWidth + 1) issues.push('Panel content overflows');
      for (const button of panel.querySelectorAll('button')) if (button.getClientRects().length && button.scrollWidth > button.clientWidth + 1) issues.push('Button text clips');
      return issues;

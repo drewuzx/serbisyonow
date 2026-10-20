@@ -1,6 +1,14 @@
 'use strict';
 
 (function registerSerbisyoNowPwa() {
+  const mobileLayout = window.matchMedia('(max-width: 940px)');
+  mobileLayout.addEventListener('change', () => {
+    const shell = document.querySelector('.sn-shell');
+    if (!shell) return;
+    shell.classList.remove('sidebar-open');
+    shell.classList.add('sidebar-collapsed');
+    if (!document.querySelector('dialog[open], [aria-modal="true"]')) document.body.style.overflow = '';
+  });
   window.snLiveRefreshReady = new Promise(resolve => {
     const script = document.createElement('script');
     script.src = '/shared/js/live-refresh.js';

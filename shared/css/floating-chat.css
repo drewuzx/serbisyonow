@@ -354,17 +354,31 @@
 }
 
 @media (max-width: 720px) {
+  body:has(.sn-float-root) .sn-main {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
+  html:has(.sn-float-root) {
+    scroll-padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
   .sn-float-root {
-    right: 10px;
-    bottom: 10px;
-    left: 10px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: calc(72px + env(safe-area-inset-bottom));
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border, #d4ddeb);
+    background: var(--white, #fff);
     justify-content: flex-end;
   }
 
+  .sn-float-root .sn-float-launch { width: 48px; height: 48px; flex: 0 0 48px; }
+
   .sn-float-windows {
     position: absolute;
-    inset: auto 0 70px 0;
-    width: 100%;
+    inset: auto 10px calc(100% + 8px) 10px;
+    width: auto;
   }
 
   .sn-float-panel,
@@ -372,7 +386,13 @@
     width: 100%;
   }
 
+  .sn-float-panel { max-height: calc(100dvh - 100px - env(safe-area-inset-bottom)); }
+
   .sn-float-chat.is-open + .sn-float-list.is-open {
     display: none;
   }
+}
+
+body:has(.sn-modal-backdrop, dialog[open], [aria-modal="true"], #sn-price-editor, #sn-service-editor) .sn-float-root {
+  visibility: hidden;
 }

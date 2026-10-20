@@ -73,6 +73,7 @@
 .sn-feedback-thanks { padding: 12px; margin: 10px 0 0; background: #e6f6ed; color: #166645; font-size: 14px; line-height: 1.6; }
 .sn-feedback-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 720px) {
- .sn-feedback-root { right: 13px; bottom: 80px; }
- .sn-feedback-panel { width: min(340px, calc(100vw - 20px)); max-height: calc(100dvh - 156px); padding: 16px; }
+ .sn-feedback-root { right: 76px; bottom: calc(12px + env(safe-area-inset-bottom)); width: 48px; z-index: 2401; }
+ .sn-feedback-launch { width: 48px; height: 48px; }
+ .sn-feedback-panel { right: -66px; width: min(340px, calc(100vw - 20px)); max-height: calc(100dvh - 100px - env(safe-area-inset-bottom)); padding: 16px; }
 }
