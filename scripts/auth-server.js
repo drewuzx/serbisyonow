@@ -1105,6 +1105,7 @@ function providerRow(row) {
     email: row.email,
     category: canonicalCategoryName(row.category),
     service: row.service,
+    starting_price: row.starting_price == null ? null : Number(row.starting_price),
     description: row.description || '',
     experience: row.experience,
     experience_years: row.experience_years,
@@ -1132,7 +1133,15 @@ function providerRow(row) {
 }
 
 async function providerViews(rows) {
-  return (await loadProviderBadgeData(db, rows)).map(row => ({ ...providerRow(row), ...(row.favorite_id !== undefined ? { favorite_id: row.favorite_id } : {}) }));
+  if (!rows.length) return [];
+  const prices = await db.query(`SELECT provider_id, MIN(starting_price) AS starting_price
+    FROM provider_services WHERE provider_id = ANY($1::int[]) AND is_active = TRUE AND starting_price > 0
+    GROUP BY provider_id`, [rows.map(row => row.id)]);
+  const minimums = new Map(prices.rows.map(row => [Number(row.provider_id), Number(row.starting_price)]));
+  return (await loadProviderBadgeData(db, rows)).map(row => ({
+    ...providerRow({ ...row, starting_price: minimums.get(Number(row.id)) ?? null }),
+    ...(row.favorite_id !== undefined ? { favorite_id: row.favorite_id } : {}),
+  }));
 }
 
 async function providerView(row) {
@@ -1623,7 +1632,7 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
         COALESCE(AVG(r.rating), 4.8) AS rating,
         COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END)::int AS completed_jobs,
         COUNT(DISTINCT f.id)::int AS favorite_count,
-        COALESCE(MIN(s.starting_price), 350) AS starting_price
+        MIN(s.starting_price) FILTER (WHERE s.starting_price > 0) AS starting_price
       FROM providers p
       LEFT JOIN customer_reviews r ON r.provider_id = p.id
       LEFT JOIN customer_bookings b ON b.provider_id = p.id
@@ -1687,7 +1696,7 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
     rating: row.rating,
     completed_jobs: Number(row.completed_jobs || 0),
     favorite_count: Number(row.favorite_count || 0),
-    starting_price: Number(row.starting_price || 350),
+    starting_price: row.starting_price == null ? null : Number(row.starting_price),
     available_slots: Number(row.available_slots || 0),
     is_previous_interaction: Boolean(row.is_previous_interaction),
     verified_tier: row.verified_tier,
@@ -2475,7 +2484,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
       p.*,
       COALESCE(AVG(r.rating), 4.8) AS rating,
       COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END)::int AS completed_jobs,
-      COALESCE(MIN(s.starting_price), 350) AS starting_price,
+      MIN(s.starting_price) FILTER (WHERE s.starting_price > 0) AS starting_price,
       COUNT(DISTINCT av.id)::int AS available_slots,
       COALESCE(psa.score, extract_score.score, 0)::int AS assessment_score,
       p.verification_status AS verification_state
@@ -2509,7 +2518,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
       ...providerRow(row),
       rating: row.rating,
       completed_jobs: Number(row.completed_jobs || 0),
-      starting_price: Number(row.starting_price || 350),
+      starting_price: row.starting_price == null ? null : Number(row.starting_price),
       available_slots: Number(row.available_slots || 0),
       assessment_score: Number(row.assessment_score || 0),
       verified_tier: row.verified_tier,
@@ -3142,7 +3151,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
       COALESCE(AVG(r.rating), 4.8) AS rating,
       COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END)::int AS completed_jobs,
       COUNT(DISTINCT f.id)::int AS favorite_count,
-      COALESCE(MIN(s.starting_price), 350) AS starting_price,
+      MIN(s.starting_price) FILTER (WHERE s.starting_price > 0) AS starting_price,
       (
         SELECT COUNT(*)::int
         FROM provider_availability av
@@ -3220,7 +3229,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
       rating: row.rating,
       completed_jobs: Number(row.completed_jobs || 0),
       favorite_count: Number(row.favorite_count || 0),
-      starting_price: Number(row.starting_price || 350),
+      starting_price: row.starting_price == null ? null : Number(row.starting_price),
       available_slots: Number(row.available_slots || 0),
       verified_tier: row.verified_tier,
       assessment_score: Number(row.assessment_score || 0),

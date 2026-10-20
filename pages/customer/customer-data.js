@@ -476,7 +476,7 @@ function renderProviderCard(provider, favoriteIds = new Set()) {
  ${provider.promoted ? '<span class="sn-provider-tag">Promoted</span>' : ''}
  <div class="sn-provider-loc">${snEsc(provider.address || 'Angeles City')}</div>
  ${provider.recommendation_reason? `<div class="sn-recommend-reason">${snEsc(provider.recommendation_reason)}</div>`: ''}
- <div class="sn-provider-meta"><span class="sn-provider-tag">${snEsc(provider.service || providerCategory || 'Service')}</span><span class="sn-provider-price">Starts at <strong>${snMoney(provider.starting_price || 350)}</strong></span></div>
+ <div class="sn-provider-meta"><span class="sn-provider-tag">${snEsc(provider.service || providerCategory || 'Service')}</span><span class="sn-provider-price">${Number(provider.starting_price) > 0 ? `Starts at <strong>${snMoney(provider.starting_price)}</strong>` : '<strong>Price not set</strong>'}</span></div>
  <div class="sn-provider-actions"><a class="sn-provider-action sn-provider-action--outline" href="${snEsc(profileUrl)}">View Profile</a><a class="sn-provider-action sn-provider-action--primary" href="${snEsc(bookingUrl)}">Book Now</a></div></div></div>
  `;
 }

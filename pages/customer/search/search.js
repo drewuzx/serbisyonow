@@ -609,7 +609,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="sn-result-top">
             <span class="sn-result-name">${esc(provider.full_name)}</span>
             <div class="sn-result-price-wrap">
-              <span class="sn-result-price">Starts at <strong>${money(provider.starting_price)}</strong></span>
+              <span class="sn-result-price">${Number(provider.starting_price) > 0 ? `Starts at <strong>${money(provider.starting_price)}</strong>` : '<strong>Price not set</strong>'}</span>
               <span class="sn-result-price-note">*Price may vary</span>
               <button class="sn-fav-btn" type="button" data-provider-id="${provider.id}" aria-label="Favorite provider">♥</button>
             </div>

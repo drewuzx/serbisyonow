@@ -46,7 +46,7 @@ function ppRenderProvider(provider) {
   const detail = document.querySelector('.sn-provider-detail');
   if (!detail) return;
 
-  const startingRate = Number(provider.starting_price || provider.service_price || 350);
+  const startingRate = Number(provider.starting_price);
   const rating = provider.rating;
   const completedJobs = Number(provider.completed_jobs || 0);
   const reviewCount = Number(provider.review_count || 0);
@@ -77,8 +77,8 @@ function ppRenderProvider(provider) {
         </div>
         <div class="sn-rate-card">
           <span class="sn-rate-label">Starting Rate</span>
-          <strong>${ppMoney(startingRate)}</strong>
-          <small>Ratings may vary</small>
+          <strong>${startingRate > 0 ? ppMoney(startingRate) : 'Price not set'}</strong>
+          <small>Final price depends on service scope</small>
         </div>
       </div>
 

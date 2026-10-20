@@ -38,7 +38,7 @@ function renderFavoriteCard(provider, index) {
      <span class="sn-fav-rating">${provider.rating == null ? 'Not rated' : `* ${Number(provider.rating).toFixed(1)}`}</span>
     </div>
     ${favBadge(provider)}
-    <div class="sn-fav-price">Starts at <strong>${favMoney(provider.starting_price || 350)}</strong></div>
+    <div class="sn-fav-price">${Number(provider.starting_price) > 0 ? `Starts at <strong>${favMoney(provider.starting_price)}</strong>` : '<strong>Price not set</strong>'}</div>
     <div class="sn-fav-loc">${favEsc(provider.address || 'Angeles City')}</div>
    </div>
    <div class="sn-fav-actions">
