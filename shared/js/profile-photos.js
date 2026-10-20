@@ -14,6 +14,18 @@
  }
  let generation = Date.now();
  function hydrate() {
+  if (pageRole) document.querySelectorAll('.sn-topbar .sn-avatar:not(a)').forEach(node => {
+   const link = document.createElement('a');
+   for (const attribute of node.attributes) {
+    if (!['aria-hidden', 'role', 'tabindex'].includes(attribute.name)) link.setAttribute(attribute.name, attribute.value);
+   }
+   link.href = `/pages/${pageRole}/profile/profile.html`;
+   link.classList.add('sn-profile-link');
+   link.setAttribute('aria-label', 'My profile');
+   link.title = 'My profile';
+   link.append(...node.childNodes);
+   node.replaceWith(link);
+  });
   const own = user(pageRole);
   if (own?.id) document.querySelectorAll('.sn-user-greeting .sn-avatar-lg, .sn-topbar .sn-avatar, #sn-profile-avatar').forEach(node => {
    const key = `${pageRole}/${own.id}`;

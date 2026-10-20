@@ -1,4 +1,6 @@
 .sn-photo-avatar { position: relative; overflow: hidden; }
+.sn-topbar .sn-profile-link { display: block; flex-shrink: 0; cursor: pointer; text-decoration: none; }
+.sn-topbar .sn-profile-link:focus-visible { outline: 3px solid #2b50ce; outline-offset: 3px; }
 .sn-photo-avatar > img.sn-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; border-radius: inherit; }
 .sn-photo-section { margin: 20px 0; padding: 24px 0; border-block: 1px solid #d7e1f2; color: #193b88; }
 .sn-photo-section h2 { margin: 0 0 16px; font-size: 22px; }
