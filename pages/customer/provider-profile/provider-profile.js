@@ -78,7 +78,6 @@ function ppRenderProvider(provider) {
         <div class="sn-rate-card">
           <span class="sn-rate-label">Starting Rate</span>
           <strong>${startingRate > 0 ? ppMoney(startingRate) : 'Price not set'}</strong>
-          <small>Final price depends on service scope</small>
         </div>
       </div>
 
