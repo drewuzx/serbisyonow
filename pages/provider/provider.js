@@ -649,7 +649,7 @@ async function loadProviderDatabase({ background = false } = {}) {
     renderChanged('metrics', [data.metrics, data.bookings, data.history_bookings, data.reviews], () => renderProviderMetrics(data));
     if (path.includes('/dashboard/')) renderChanged('dashboard', [data.bookings, data.history_bookings, data.availability], () => renderProviderDashboardAnalytics(data));
     const editing = providerBookingActions.size || document.querySelector('.sn-modal-backdrop, .sn-provider-service-card[aria-busy="true"], .sn-provider-service-card button:disabled, #sn-provider-availability-form button:disabled, [data-schedule-action]:disabled, [data-close-booking]:disabled, #sn-refresh-requests:disabled');
-    if (path.includes('/services/') && !document.getElementById('sn-price-editor') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
+    if (path.includes('/services/') && !document.querySelector('#sn-price-editor, #sn-service-editor') && (!background || !editing)) renderChanged('services', data.services, () => renderServices(data.services || []));
     if (path.includes('/requests/')) {
       if (!background || !editing) renderChanged('requests', [data.bookings, data.provider?.latitude, data.provider?.longitude], () => renderRequests(data.bookings || [], data.provider || provider));
       refreshProviderGpsForRequests();
@@ -663,7 +663,7 @@ async function loadProviderDatabase({ background = false } = {}) {
     return true;
   } catch (error) {
     console.warn(error.message || error);
-    if (!background && window.location.pathname.includes('/services/') && !document.querySelector('[data-action="add-service"], #sn-price-editor')) {
+    if (!background && window.location.pathname.includes('/services/') && !document.querySelector('[data-action="add-service"], #sn-price-editor, #sn-service-editor')) {
       const panel = document.querySelector('.sn-panel');
       if (panel) {
         panel.innerHTML = '<h2>Services</h2><p role="status">Unable to load your services.</p><button class="btn btn-outline" type="button">Retry</button>';

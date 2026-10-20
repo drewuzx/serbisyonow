@@ -71,6 +71,17 @@ test('provider pricing persists, protects ownership and controls booking totals'
   assert.equal(renamed.data.service.pricing_config.addons[0].description,'Optional treatment');
   assert.equal(renamed.data.service.pricing_config.duration,'Half day');
   assert.equal(renamed.data.service.accepts_gcash,true);
+  for (const category of ['', ' ', 123, 'x'.repeat(81)]) {
+   assert.equal((await f.request(editPath,'PATCH',{category},f.providerToken)).status,400);
+  }
+  assert.equal((await f.request(editPath,'PATCH',{description:{}},f.providerToken)).status,400);
+  const detailsOnly=await f.request(editPath,'PATCH',{title:'Detailed Nail Care',description:'New description',category:'Personal Care'},f.providerToken);
+  assert.equal(detailsOnly.status,200);
+  assert.equal(detailsOnly.data.service.description,'New description');
+  assert.deepEqual(detailsOnly.data.service.pricing_config,renamed.data.service.pricing_config);
+  assert.equal(detailsOnly.data.service.starting_price,renamed.data.service.starting_price);
+  assert.equal(detailsOnly.data.service.max_price,renamed.data.service.max_price);
+  assert.equal(detailsOnly.data.service.accepts_gcash,true);
   assert.equal(Number((await f.db.query('SELECT count(*) FROM provider_services WHERE provider_id=81')).rows[0].count),beforeCount);
  } finally { await f.close(); }
 });

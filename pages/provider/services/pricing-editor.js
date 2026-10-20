@@ -1,35 +1,14 @@
 'use strict';
 
-function serviceNameError(value) {
- return !value.trim() ? 'Enter a service name.' : value.length > 160 ? 'Service name must be no more than 160 characters.' : '';
-}
-
-function editServiceName(value) {
- return openProviderModal({
-  title: 'Edit Service', label: 'Service name', value, placeholder: 'Enter service name',
-  confirmText: 'Next', validate: serviceNameError, maxLength: 160, className: 'sn-service-edit-dialog',
- });
-}
-
-async function openServiceEdit(service) {
- if (!service?.id) return;
- const title = await editServiceName(service.title);
- if (title === null || title === undefined) return;
- openServicePricing(service, { title, editing: true });
-}
-
-function openServicePricing(service, { title = service.title, editing = false } = {}) {
+function openServicePricing(service) {
+ const title = service.title;
  const api = window.SNProviderPricing;
  const host = document.querySelector('.sn-section, .sn-panel');
  if (!api || !host) return;
  let draft = api.defaults(service);
  const fallback = api.defaults({ ...service, pricing_config: null });
  draft = { ...fallback, ...draft };
- let step = 0, roomIndex = 0, dirty = title !== service.title, busy = false;
- // Renaming a house service cannot silently submit an unsupported matrix.
- if (!api.isHouse(title) && draft.mode === 'house_matrix') {
-  Object.assign(draft, api.bounds(draft), { mode: 'range', duration: 'Flexible' });
- }
+ let step = 0, roomIndex = 0, dirty = false, busy = false;
  const icon = name => `<img src="/shared/icons/lucide/${name}.svg" alt="" width="18" height="18">`;
  const price = (name, value, label, minimum = 0) => `<label class="sn-price-input"><span class="sn-sr-only">${esc(label)}</span><span aria-hidden="true">PHP</span><input name="${name}" aria-label="${esc(label)}" type="number" inputmode="decimal" min="${minimum}" max="1000000" step="0.01" required value="${esc(value)}"></label>`;
  const options = (values, current) => values.map(value => `<option${value === current ? ' selected' : ''}>${esc(value)}</option>`).join('');
@@ -65,21 +44,6 @@ function openServicePricing(service, { title = service.title, editing = false } 
  }
  function beforeUnload(event) { if (dirty) { event.preventDefault(); event.returnValue = ''; } }
  window.addEventListener('beforeunload', beforeUnload);
- async function back() {
-  if (busy) return;
-  if (!editing) return close();
-  read();
-  const nextTitle = await editServiceName(title);
-  if (nextTitle === null || nextTitle === undefined) return;
-  dirty = dirty || nextTitle !== title;
-  title = nextTitle;
-  if (!api.isHouse(title) && draft.mode === 'house_matrix') {
-   Object.assign(draft, api.bounds(draft), { mode: 'range', duration: 'Flexible' });
-  }
-  render();
-  host.querySelector('.sn-price-back').focus({ preventScroll: true });
-  window.scrollTo({ top: 0, behavior: 'instant' });
- }
  function showRates() {
   const saved = service.pricing_config;
   const range = saved ? api.bounds(saved) : { min: service.starting_price, max: service.max_price };
@@ -93,7 +57,7 @@ function openServicePricing(service, { title = service.title, editing = false } 
  }
  function render() {
   host.innerHTML = `<form id="sn-price-editor" novalidate>
-   <header class="sn-price-heading"><button type="button" class="btn btn-outline sn-price-back" aria-label="${editing ? 'Back to service name' : 'Back to services'}" title="${editing ? 'Back to service name' : 'Back to services'}">&larr;</button><div><h2>Set Price</h2><p>${esc(title)}</p></div><button type="button" class="btn btn-outline sn-provider-rates">Provider rates</button></header>
+   <header class="sn-price-heading"><button type="button" class="btn btn-outline sn-price-back" aria-label="Back to services" title="Back to services">&larr;</button><div><h2>Set Price</h2><p>${esc(title)}</p></div><button type="button" class="btn btn-outline sn-provider-rates">Provider rates</button></header>
    <p class="sn-price-state" role="status"></p>
    <nav class="sn-price-steps" aria-label="Pricing steps">${['Base Prices','Add-ons','Settings'].map((label, i) => `<button type="button" data-step="${i}" aria-current="${i === step ? 'step' : 'false'}"><span>${i + 1}</span>${label}</button>`).join('')}</nav>
    <div class="sn-price-layout">
@@ -130,7 +94,7 @@ function openServicePricing(service, { title = service.title, editing = false } 
    <p id="sn-price-error" role="alert" tabindex="-1"></p>
    <footer class="sn-price-footer"><button type="button" class="btn btn-outline" data-price-cancel>Cancel</button><button type="button" class="btn btn-outline" id="sn-price-prev">Back</button><button type="button" class="btn btn-primary" id="sn-price-next">Next &rarr;</button><button type="submit" class="btn btn-primary" id="sn-price-save">${icon('pencil')} Save Changes</button></footer>
   </form>`;
-  host.querySelector('.sn-price-back').addEventListener('click', back);
+  host.querySelector('.sn-price-back').addEventListener('click', close);
   host.querySelector('.sn-provider-rates').addEventListener('click', showRates);
   host.querySelector('[data-price-cancel]').addEventListener('click', close);
   host.querySelector('form').addEventListener('input', event => { if (event.target.id !== 'sn-price-room') dirty = true; updateSummary(); });
@@ -165,8 +129,6 @@ function openServicePricing(service, { title = service.title, editing = false } 
   const errorHost = host.querySelector('#sn-price-error'); errorHost.textContent = '';
   let config;
   try {
-   const nameError = serviceNameError(title);
-   if (nameError) throw new Error(nameError);
    config = api.validate(draft, title);
   }
   catch (error) { errorHost.textContent = error.message; errorHost.focus(); return; }
@@ -174,12 +136,12 @@ function openServicePricing(service, { title = service.title, editing = false } 
   host.querySelectorAll('input,select,textarea,button').forEach(control => { control.disabled = true; });
   host.querySelector('#sn-price-save').textContent = 'Saving...';
   try {
-   const result = await providerSend(`/api/provider/${getProviderUser().id}/services/${service.id}`, 'PATCH', { ...(editing ? { title } : {}), pricing_config: config });
+   const result = await providerSend(`/api/provider/${getProviderUser().id}/services/${service.id}`, 'PATCH', { pricing_config: config });
    dirty = false; window.removeEventListener('beforeunload', beforeUnload);
    const services = window.snProviderLiveData?.services || [];
    renderServices(services.map(item => item.id === service.id ? result.service : item));
    await loadProviderDatabase();
-   host.insertAdjacentHTML('afterbegin',`<p class="sn-price-success" role="status">${editing ? 'Service changes saved.' : 'Service pricing saved.'}</p>`);
+   host.insertAdjacentHTML('afterbegin','<p class="sn-price-success" role="status">Service pricing saved.</p>');
   } catch (error) {
    errorHost.textContent = error.message || 'Unable to save prices. Please try again.';
    host.querySelectorAll('input,select,textarea,button').forEach(control => { control.disabled = false; });

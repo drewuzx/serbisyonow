@@ -3548,6 +3548,12 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
   if (req.body.title !== undefined && (typeof req.body.title !== 'string' || !req.body.title.trim() || req.body.title.trim().length > 160)) {
     return res.status(400).json({ message: 'Service name is required and must be no more than 160 characters.' });
   }
+  if (req.body.category !== undefined && (typeof req.body.category !== 'string' || !req.body.category.trim() || req.body.category.trim().length > 80)) {
+    return res.status(400).json({ message: 'Category is required and must be no more than 80 characters.' });
+  }
+  if (req.body.description !== undefined && typeof req.body.description !== 'string') {
+    return res.status(400).json({ message: 'Description must be text.' });
+  }
   validateServiceOptions(req.body, currentService);
   const pricingConfig = req.body.pricing_config === undefined ? currentService.pricing_config
     : providerPricing.validate(req.body.pricing_config, req.body.title ?? currentService.title);
