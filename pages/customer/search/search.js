@@ -608,11 +608,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="sn-result-body">
           <div class="sn-result-top">
             <span class="sn-result-name">${esc(provider.full_name)}</span>
-            <div class="sn-result-price-wrap">
-              <span class="sn-result-price">${Number(provider.starting_price) > 0 ? `Starts at <strong>${money(provider.starting_price)}</strong>` : '<strong>Price not set</strong>'}</span>
-              <span class="sn-result-price-note">*Price may vary</span>
-              <button class="sn-fav-btn" type="button" data-provider-id="${provider.id}" aria-label="Favorite provider">♥</button>
-            </div>
           </div>
           ${providerBadge(provider)}
           <div class="sn-result-rating">${provider.rating == null ? 'Not rated' : `Rating ${Number(provider.rating).toFixed(1)}`} - ${Number(provider.completed_jobs || 0)} completed jobs - ${Number(provider.available_slots || 0)} open slots</div>
@@ -626,6 +621,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="sn-result-loc">${esc(provider.address || 'Location unavailable')}</div>
         </div>
         <div class="sn-result-actions">
+          <div class="sn-result-price-wrap">
+            <span class="sn-result-price">${Number(provider.starting_price) > 0 ? `Starts at <strong>${money(provider.starting_price)}</strong>` : '<strong>Price not set</strong>'}</span>
+            <span class="sn-result-price-note">*Price may vary</span>
+            <button class="sn-fav-btn" type="button" data-provider-id="${provider.id}" aria-label="Favorite provider">♥</button>
+          </div>
           <a class="sn-btn sn-btn-outline" href="../provider-profile/provider-profile.html?id=${provider.id}">View Profile</a>
           <a class="sn-btn sn-btn-primary" href="../bookings/bookings.html?provider_id=${provider.id}">Book Now</a>
         </div>
