@@ -1,10 +1,11 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v74';
+const SW_VERSION = 'serbisyonow-pwa-v75';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
+  '/shared/js/time-format.js',
   '/pages/provider/services/service-editor.js',
   '/shared/icons/lucide/megaphone-percent.svg',
   '/pages/admin/reports/reports.css',

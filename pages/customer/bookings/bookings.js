@@ -154,7 +154,7 @@ function bookingSlotLabel(slot) {
  const dateLabel = Number.isNaN(date.getTime())
   ? bookingDateValue(slot.available_date)
   : date.toLocaleDateString('en-PH', { month: 'short', day: '2-digit' });
- return `${dateLabel} - ${slot.start_time}`;
+ return `${dateLabel} - ${SNTime.format(slot.start_time)}`;
 }
 
 function bookingMoney(value) {
@@ -901,7 +901,7 @@ async function showBookingDetails(booking) {
    <div class="sn-booking-detail-grid">
     ${bookingDetailRow('Status', item.status)}
     ${bookingDetailRow('Date', bookingDisplayDate(item.scheduled_date))}
-    ${bookingDetailRow('Time', item.scheduled_time)}
+    ${bookingDetailRow('Time', SNTime.format(item.scheduled_time))}
     ${bookingDetailRow('Amount / estimate', bookingEstimateLabel(item))}
     ${bookingDetailRow(item.deposit_required ? 'Remaining balance method' : 'Payment', ({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[item.payment_method || 'cash'] || item.payment_method)}
     ${item.deposit_required ? bookingDetailRow('Downpayment', item.deposit_status.replace(/_/g, ' ')) : ''}
@@ -1119,7 +1119,7 @@ function renderBookingCalendar() {
     <div class="sn-calendar-events">
      ${dayBookings.map((booking) => `
       <button class="sn-calendar-event sn-calendar-event--${bookingStatusClass(booking.status)}" type="button" data-booking-id="${bookingEsc(booking.id || '')}">
-       ${bookingEsc(booking.scheduled_time || '')} ${bookingEsc(booking.service || 'Service')}
+       ${bookingEsc(SNTime.format(booking.scheduled_time, ''))} ${bookingEsc(booking.service || 'Service')}
       </button>
      `).join('')}
     </div>
@@ -1347,7 +1347,7 @@ async function loadProviderBookingSlots(providerId, preferredTime = '', { backgr
   const previousTime = background ? timeSelect.value : preferredTime;
   timeSelect.innerHTML = slots.map((slot) => {
    const selected = previousTime && previousTime === slot.start_time ? ' selected' : '';
-   return `<option value="${bookingEsc(slot.start_time)}"${selected}>${bookingEsc(slot.start_time)} - ${bookingEsc(slot.end_time)}</option>`;
+   return `<option value="${bookingEsc(slot.start_time)}"${selected}>${bookingEsc(SNTime.format(slot.start_time))} - ${bookingEsc(SNTime.format(slot.end_time))}</option>`;
   }).join('');
   timeSelect.disabled = false;
   if (note) note.textContent = `${slots.length} open slot${slots.length === 1 ? '' : 's'} found. The backend will still re-check before submitting.`;

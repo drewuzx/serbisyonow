@@ -23,7 +23,7 @@
     const date = new Date(value);
     const today = new Date();
     if (date.toDateString() === today.toDateString()) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString('en-PH', { hour: 'numeric', hour12: true, minute: '2-digit' });
     }
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }

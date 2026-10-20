@@ -169,7 +169,9 @@ function fixture() {
       assert.equal(await page.locator('.sn-booking-request-card').count(), 2);
     });
     await scenario('provider/schedule/schedule.html', '#sn-provider-availability-form', async (page, data, tick) => {
-      await page.locator('#sn-availability-start').fill('13:30');
+      await page.getByLabel('Start hour', { exact: true }).selectOption('1');
+      await page.getByLabel('Start minute', { exact: true }).selectOption('30');
+      await page.getByLabel('Start AM/PM', { exact: true }).selectOption('PM');
       data.availability.push({ ...data.availability[0], id: 2, start_time: '11:00' }); await tick();
       assert.equal(await page.locator('#sn-availability-start').inputValue(), '13:30');
       assert.equal(await page.locator('.sn-schedule-slot').count(), 2);

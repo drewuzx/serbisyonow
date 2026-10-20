@@ -38,7 +38,7 @@ function historyDate(value) {
 }
 
 function historyDateTime(booking) {
-  return `${historyDate(booking.scheduled_date)}${booking.scheduled_time ? ` at ${booking.scheduled_time}` : ''}`;
+  return `${historyDate(booking.scheduled_date)}${booking.scheduled_time ? ` at ${SNTime.format(booking.scheduled_time)}` : ''}`;
 }
 
 function historyStatus(value) {

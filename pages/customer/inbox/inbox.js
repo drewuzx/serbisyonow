@@ -21,7 +21,7 @@ function timeLabel(value) {
   const date = new Date(value);
   const today = new Date();
   if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-PH', { hour: 'numeric', hour12: true, minute: '2-digit' });
   }
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
@@ -69,7 +69,7 @@ function bookingContact(booking) {
   return {
     provider_id: booking.provider_id,
     provider_name: booking.provider_name || 'Provider',
-    booking_ref: `${booking.service || 'Service'} - ${timeLabel(booking.scheduled_date)} ${booking.scheduled_time || ''}`.trim(),
+    booking_ref: `${booking.service || 'Service'} - ${timeLabel(booking.scheduled_date)} ${SNTime.format(booking.scheduled_time, '')}`.trim(),
   };
 }
 

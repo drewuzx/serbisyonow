@@ -5,7 +5,7 @@
  const host = document.getElementById('promotion-workspace');
  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
  const money = cents => new Intl.NumberFormat('en-PH', { style:'currency',currency:'PHP' }).format(Number(cents || 0) / 100);
- const date = value => value ? new Date(value).toLocaleString('en-PH', { timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit' }) : '-';
+ const date = value => value ? new Date(value).toLocaleString('en-PH', { timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',hour12:true,minute:'2-digit' }) : '-';
  const label = value => String(value).replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase());
  let state, busy = false, currentDialog = null, filter = 'all', signature = '', orderPage = 1, loadVersion = 0, providerView = 'promotion';
  const user = () => { try { return JSON.parse(localStorage.getItem(`sn_${role}_user`) || 'null'); } catch { return null; } };

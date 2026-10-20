@@ -190,7 +190,7 @@ function shortDateTime(value) {
   return new Date(value).toLocaleString('en-PH', {
     month: 'short',
     day: '2-digit',
-    hour: '2-digit',
+    hour: 'numeric', hour12: true,
     minute: '2-digit',
   });
 }
@@ -200,7 +200,7 @@ function timeLabel(value) {
   const date = new Date(value);
   const today = new Date();
   if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-PH', { hour: 'numeric', hour12: true, minute: '2-digit' });
   }
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
@@ -686,7 +686,7 @@ async function loadProviderDatabase({ background = false } = {}) {
 }
 
 function liveClockLabel() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date().toLocaleTimeString('en-PH', { hour: 'numeric', hour12: true, minute: '2-digit', second: '2-digit' });
 }
 
 function bookingDayStamp(value) {
@@ -828,7 +828,7 @@ function renderProviderDashboardLists(activeBookings, allBookings, availability)
         <tbody>
           ${recent.map((booking) => `
             <tr>
-              <td>${esc(booking.scheduled_time || '-')}</td>
+              <td>${esc(SNTime.format(booking.scheduled_time))}</td>
               <td>${esc(booking.customer_name || 'Customer')}</td>
               <td>${esc(booking.service || 'Service')}</td>
               <td>${statusPill(booking.status)}</td>
@@ -848,13 +848,13 @@ function renderProviderDashboardLists(activeBookings, allBookings, availability)
       <h3>Upcoming Schedule</h3>
       <div class="sn-panel-list">
         ${upcoming.map((booking) => `
-          <div class="sn-module-card"><div><strong>${shortDate(booking.scheduled_date)} ${esc(booking.scheduled_time)}</strong><span>${esc(booking.service)} - ${esc(booking.customer_name || 'Customer')}</span></div>${statusPill(booking.status)}</div>
+          <div class="sn-module-card"><div><strong>${shortDate(booking.scheduled_date)} ${esc(SNTime.format(booking.scheduled_time))}</strong><span>${esc(booking.service)} - ${esc(booking.customer_name || 'Customer')}</span></div>${statusPill(booking.status)}</div>
         `).join('') || '<p>No upcoming bookings.</p>'}
       </div>
       <h3 class="sn-mini-heading">Open Availability</h3>
       <div class="sn-panel-list">
         ${openSlots.map((slot) => `
-          <div class="sn-module-card"><div><strong>${shortDate(slot.available_date)}</strong><span>${esc(slot.start_time)} - ${esc(slot.end_time)}</span></div><span class="sn-status-pill active">Open</span></div>
+          <div class="sn-module-card"><div><strong>${shortDate(slot.available_date)}</strong><span>${esc(SNTime.format(slot.start_time))} - ${esc(SNTime.format(slot.end_time))}</span></div><span class="sn-status-pill active">Open</span></div>
         `).join('') || '<p>No open availability slots.</p>'}
       </div>
     `;
@@ -1218,7 +1218,7 @@ function renderRequests(bookings, provider) {
           <article class="sn-booking-request-card ${selectedBooking?.id === booking.id ? 'active' : ''}" data-booking-card="${booking.id}" tabindex="0" aria-label="${esc(booking.service)} for ${esc(booking.customer_name || 'Customer')}">
             <div>
               <strong>${esc(booking.service)}</strong>
-              <span>${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)} - ${esc(booking.scheduled_time)}</span>
+              <span>${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)} - ${esc(SNTime.format(booking.scheduled_time))}</span>
               <small>${esc(booking.address || 'Customer address unavailable')}</small>
               ${renderProviderBookingAssessment(booking)}
               ${renderProviderBookingPayment(booking)}
@@ -1853,7 +1853,7 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
   const slots = [...(availability || [])].sort((a, b) => {
     const dateSort = String(a.available_date || '').localeCompare(String(b.available_date || ''));
     if (dateSort) return dateSort;
-    return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+    return (SNTime.minutes(a.start_time) ?? -1) - (SNTime.minutes(b.start_time) ?? -1);
   });
 
   const markup = `
@@ -1864,14 +1864,8 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
           <label for="sn-availability-date">Date</label>
           <input id="sn-availability-date" name="available_date" type="date" min="${today}" value="${today}" required />
         </div>
-        <div class="sn-form-field">
-          <label for="sn-availability-start">Start Time</label>
-          <input id="sn-availability-start" name="start_time" type="time" required />
-        </div>
-        <div class="sn-form-field">
-          <label for="sn-availability-end">End Time</label>
-          <input id="sn-availability-end" name="end_time" type="time" required />
-        </div>
+        ${availabilityTimeField('start', 'Start')}
+        ${availabilityTimeField('end', 'End')}
         <label class="sn-schedule-check">
           <input id="sn-availability-open" name="is_available" type="checkbox" checked />
           <span>Open for customer booking</span>
@@ -1887,7 +1881,7 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
       <div class="sn-panel-list">${activeBookings.map(booking => `
         <div class="sn-module-card">
           <div>
-            <strong>${esc(booking.scheduled_time || '-')}</strong>
+            <strong>${esc(SNTime.format(booking.scheduled_time))}</strong>
             <span>${esc(booking.service || 'Service')} - ${esc(booking.customer_name || 'Customer')} - ${shortDate(booking.scheduled_date)}</span>
           </div>
           ${statusPill(booking.status)}
@@ -1900,7 +1894,7 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
         <div class="sn-module-card sn-schedule-slot" data-slot-id="${esc(slot.id)}">
           <div>
             <strong>${shortDate(slot.available_date)}</strong>
-            <span>${esc(slot.start_time || '-')} - ${esc(slot.end_time || '-')}</span>
+            <span>${esc(SNTime.format(slot.start_time))} - ${esc(SNTime.format(slot.end_time))}</span>
           </div>
           <div class="sn-schedule-slot-actions">
             ${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Closed</span>'}
@@ -1920,6 +1914,15 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
     }
   } else {
     grid.innerHTML = markup;
+    grid.querySelectorAll('[data-availability-time]').forEach(field => {
+      field.addEventListener('change', () => {
+        const hour = field.querySelector('[data-time-hour]').value;
+        const minute = field.querySelector('[data-time-minute]').value;
+        const period = field.querySelector('[data-time-period]').value;
+        field.querySelector('input[type="hidden"]').value = SNTime.to24(`${hour}:${minute} ${period}`);
+        document.getElementById('sn-provider-schedule-status').hidden = true;
+      });
+    });
     document.getElementById('sn-provider-availability-form')?.addEventListener('submit', saveAvailabilitySlot);
   }
   grid.querySelectorAll('[data-schedule-action="toggle"]').forEach((button) => {
@@ -1943,6 +1946,20 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
   }
 }
 
+function availabilityTimeField(key, label) {
+  const options = (count, start, pad) => Array.from({ length: count }, (_, index) => {
+    const value = String(index + start).padStart(pad, '0');
+    return `<option value="${value}">${value}</option>`;
+  }).join('');
+  return `<fieldset class="sn-form-field sn-time-field" data-availability-time="${key}">
+    <legend>${label} Time</legend><div class="sn-time-controls">
+      <select data-time-hour aria-label="${label} hour" required><option value="">--</option>${options(12, 1, 1)}</select><span aria-hidden="true">:</span>
+      <select data-time-minute aria-label="${label} minute">${options(60, 0, 2)}</select>
+      <select data-time-period aria-label="${label} AM/PM"><option>AM</option><option>PM</option></select>
+    </div><input id="sn-availability-${key}" name="${key}_time" type="hidden">
+  </fieldset>`;
+}
+
 async function saveAvailabilitySlot(event) {
   event.preventDefault();
   const provider = getProviderUser();
@@ -1952,7 +1969,11 @@ async function saveAvailabilitySlot(event) {
   const formData = new FormData(form);
   const startTime = formData.get('start_time');
   const endTime = formData.get('end_time');
-  if (startTime && endTime && String(endTime) <= String(startTime)) {
+  if (SNTime.minutes(startTime) === null || SNTime.minutes(endTime) === null) {
+    setScheduleStatus('Select a start and end time.', 'error');
+    return;
+  }
+  if (SNTime.minutes(endTime) <= SNTime.minutes(startTime)) {
     setScheduleStatus('End time must be later than start time.', 'error');
     return;
   }
@@ -2376,7 +2397,7 @@ function renderProviderHistoryDetail(booking) {
       <section class="sn-detail-section">
         <h3>Booking Details</h3>
         <div class="sn-detail-rows">
-          <div class="sn-dr"><span class="sn-dr-label">Booking Date</span><span class="sn-dr-value">${shortDate(booking.scheduled_date)} at ${esc(booking.scheduled_time)}</span></div>
+          <div class="sn-dr"><span class="sn-dr-label">Booking Date</span><span class="sn-dr-value">${shortDate(booking.scheduled_date)} at ${esc(SNTime.format(booking.scheduled_time))}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Service</span><span class="sn-dr-value">${esc(booking.service || '-')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Address</span><span class="sn-dr-value">${esc(booking.address || '-')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Amount</span><span class="sn-dr-value sn-dr-amount">${money(booking.amount)}</span></div>

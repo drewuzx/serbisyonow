@@ -63,7 +63,7 @@ function adminFormatDate(value) {
   return new Date(value).toLocaleString('en-PH', {
     month: 'short',
     day: '2-digit',
-    hour: '2-digit',
+    hour: 'numeric', hour12: true,
     minute: '2-digit',
   });
 }

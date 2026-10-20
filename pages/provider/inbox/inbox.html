@@ -9,6 +9,7 @@
     const peer = params.get('customer_id') || '';
     window.location.replace('../dashboard/dashboard.html' + (peer ? '#messages=' + encodeURIComponent(peer) : '#messages'));
   </script>
+<script src="/shared/js/time-format.js"></script>
 </head>
 <body>
   <p>Opening messages...</p>
