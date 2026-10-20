@@ -132,6 +132,14 @@
 }
 .sn-filter-tab:hover { border-color: var(--orange); color: var(--orange); }
 .sn-filter-tab.active { background: var(--orange); border-color: var(--orange); color: var(--white); }
+.sn-history-layout .sn-filter-tabs { display: flex; flex-wrap: wrap; }
+.sn-history-layout .sn-filter-tabs .sn-filter-tab {
+  flex: 1 0 auto;
+  width: auto;
+  padding: 8px 10px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
 
 /* â”€â”€ History List â”€â”€ */
 .sn-history-list {

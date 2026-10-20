@@ -27,6 +27,7 @@ async function main() {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'page must fit viewport');
    assert.equal(await page.locator('#sn-detail-panel').evaluate(el=>el.scrollWidth>el.clientWidth+1),false,'details must fit panel');
    assert.ok(await page.locator('#sn-history-list').evaluate(el=>el.clientHeight>=Math.min(el.scrollHeight,100)),'history list must have usable height');
+   assert.ok(await page.locator('.sn-filter-tab').evaluateAll(tabs=>tabs.every(el=>el.scrollWidth<=el.clientWidth+1&&getComputedStyle(el).whiteSpace==='nowrap')),'filter labels must fit without splitting words');
   }
   for (const width of [320,360,390,768,1440]) {
    await page.setViewportSize({width,height:900});
