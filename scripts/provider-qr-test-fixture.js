@@ -10,7 +10,7 @@ const { Pool } = require('pg');
 const express = require('express');
 const { issueSession } = require('./account-sessions');
 
-async function startQrFixture() {
+async function startQrFixture({ gateway, promotionChannel = 'manual', returnBase = 'http://localhost:3000' } = {}) {
  const url = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/serbisyonow_db';
  if (!['localhost', '127.0.0.1', '::1'].includes(new URL(url).hostname)) throw new Error('QR tests only run against a local PostgreSQL instance.');
  const schema = `sn_qr_test_${crypto.randomBytes(8).toString('hex')}`;
@@ -50,10 +50,10 @@ async function startQrFixture() {
   }, express);
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
    __dirname, __filename: filename, Buffer, URL, URLSearchParams, AbortSignal, setTimeout, clearTimeout, setInterval, clearInterval,
-   process: { env: { PORT: '0' } }, console: { log() {}, error(...args) { if (args[0] === 'Failed to initialize admin database tables.') resolveReady(Promise.reject(args[1])); } },
+   process: { env: { PORT: '0', PROMOTION_PAYMENT_CHANNEL:promotionChannel, FRONTEND_BASE_URL:returnBase } }, console: { log() {}, error(...args) { if (args[0] === 'Failed to initialize admin database tables.') resolveReady(Promise.reject(args[1])); } },
    require(name) {
     if (name === './db') return db;
-    if (name === './paymongo') return { createPayMongo: () => ({ ready: false, livemode: false, verifyWebhook() { throw new Error('No gateway calls in direct QR tests.'); } }) };
+    if (name === './paymongo') return { createPayMongo: () => gateway || ({ ready: false, livemode: false, verifyWebhook() { throw new Error('No gateway calls in direct QR tests.'); } }) };
     if (name === 'express') return expressFactory;
     if (name === 'dotenv') return { config() {} };
     if (name === 'fs') return { ...fs, mkdirSync() {}, readdirSync: () => [], promises: { ...fs.promises, readdir: async () => [] } };

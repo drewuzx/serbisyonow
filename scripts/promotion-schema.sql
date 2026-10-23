@@ -66,3 +66,28 @@ CREATE TABLE IF NOT EXISTS promotion_references (
   reference_number TEXT PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES promotion_orders(id)
 );
+
+ALTER TABLE promotion_orders ADD COLUMN IF NOT EXISTS payment_channel TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE promotion_orders ADD COLUMN IF NOT EXISTS payment_livemode BOOLEAN;
+ALTER TABLE promotion_orders ALTER COLUMN qr_content DROP NOT NULL;
+ALTER TABLE promotion_orders ALTER COLUMN qr_mime DROP NOT NULL;
+ALTER TABLE promotion_orders DROP CONSTRAINT IF EXISTS promotion_orders_status_check;
+ALTER TABLE promotion_orders ADD CONSTRAINT promotion_orders_status_check CHECK
+ (status IN ('awaiting_payment','awaiting_verification','rejected','paid','cancelled','test_paid','payment_review','refund_review'));
+CREATE TABLE IF NOT EXISTS promotion_checkouts (
+ order_id INTEGER PRIMARY KEY REFERENCES promotion_orders(id),
+ reference_number TEXT NOT NULL UNIQUE,
+ checkout_session_id TEXT UNIQUE,
+ checkout_url TEXT,
+ livemode BOOLEAN NOT NULL,
+ status TEXT NOT NULL DEFAULT 'creating' CHECK(status IN ('creating','active','paid','expired','review')),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS promotion_gateway_receipts (
+ payment_id TEXT PRIMARY KEY,
+ order_id INTEGER NOT NULL REFERENCES promotion_orders(id),
+ amount_centavos INTEGER NOT NULL,
+ livemode BOOLEAN NOT NULL,
+ disposition TEXT NOT NULL CHECK(disposition IN ('credited','test','refund_review')),
+ received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

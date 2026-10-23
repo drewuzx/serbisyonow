@@ -2,14 +2,16 @@
 const { fail, transaction } = require('./booking-payments');
 const { imageFile } = require('./provider-qr-payments');
 const { authenticateAccount } = require('./account-sessions');
+const { createPromotionCheckout, refreshPromotionPayment, cancelPromotionCheckout } = require('./promotion-checkout');
 
 const orderColumns = `o.id,o.provider_id,o.plan_id,o.plan_name,o.description,o.duration_days,o.amount_centavos,o.status,
- o.wallet,o.account_name,o.account_number,o.receipt_id,o.paid_at,o.starts_at,o.expires_at,o.created_at,
+ o.wallet,o.account_name,o.account_number,o.receipt_id,o.paid_at,o.starts_at,o.expires_at,o.created_at,o.payment_channel,o.payment_livemode,
+ c.status AS checkout_status,c.reference_number AS gateway_reference,
  p.full_name AS provider_name,r.reference_number,r.review_note,
  CASE WHEN o.status='paid' AND o.expires_at<=NOW() THEN 'expired'
  WHEN o.status='paid' AND o.starts_at>NOW() THEN 'scheduled'
  WHEN o.status='paid' THEN 'active' ELSE o.status END AS display_status`;
-const orderJoin = `FROM promotion_orders o JOIN providers p ON p.id=o.provider_id LEFT JOIN promotion_receipts r ON r.id=o.receipt_id`;
+const orderJoin = `FROM promotion_orders o JOIN providers p ON p.id=o.provider_id LEFT JOIN promotion_receipts r ON r.id=o.receipt_id LEFT JOIN promotion_checkouts c ON c.order_id=o.id`;
 const wrap = fn => (req, res, next) => Promise.resolve().then(() => {
  for (const [key, value] of Object.entries(req.params)) {
   if (['id', 'orderId', 'planId'].includes(key) && (!/^[1-9]\d*$/.test(value) || Number(value) > 2147483647)) fail(400, 'Invalid record identifier.');
@@ -36,6 +38,7 @@ async function orders(db, providerId, query) {
  if (!Number.isInteger(page) || page < 1 || page > 100000) fail(400, 'Invalid history page.');
  const filters = { all:'TRUE',awaiting_payment:"o.status='awaiting_payment'",awaiting_verification:"o.status='awaiting_verification'",rejected:"o.status='rejected'",cancelled:"o.status='cancelled'",
   active:"o.status='paid' AND o.starts_at<=NOW() AND o.expires_at>NOW()",scheduled:"o.status='paid' AND o.starts_at>NOW()",expired:"o.status='paid' AND o.expires_at<=NOW()" };
+ Object.assign(filters, { test_paid:"o.status='test_paid'", refund_review:"o.status='refund_review'" });
  const filter = query.status || 'all';
  if (!Object.hasOwn(filters,filter)) fail(400, 'Invalid payment status.');
  const params = providerId ? [providerId] : [];
@@ -45,7 +48,9 @@ async function orders(db, providerId, query) {
  return { orders:rows,order_count:count,order_page:page,page_size:size };
 }
 
-function registerPromotionRoutes(app, db, upload) {
+function registerPromotionRoutes(app, db, upload, { gateway, returnBase, channel = 'paymongo' } = {}) {
+ const automatic = channel === 'paymongo';
+ const paymentConfig = () => ({ channel: automatic ? 'paymongo' : 'manual', ready: Boolean(gateway?.ready), livemode: Boolean(gateway?.livemode) });
  const admin = async req => {
   const actor = await authenticateAccount(db, req, 'admin');
   if (!(await db.query('SELECT id FROM admins WHERE id=$1', [actor.id])).rowCount) fail(403, 'An admin account is required.');
@@ -72,7 +77,7 @@ function registerPromotionRoutes(app, db, upload) {
    COALESCE(SUM(b.confirmed_price) FILTER(WHERE b.status='completed'),0) AS completed_service_totals
    FROM providers p JOIN customer_bookings b ON b.provider_id=p.id
    GROUP BY p.id ORDER BY p.full_name LIMIT 200`)).rows;
-  res.json({ plans, settings, metrics, ...await orders(db,null,req.query), earnings });
+  res.json({ plans, settings, gateway:paymentConfig(), metrics, ...await orders(db,null,req.query), earnings });
  }));
  app.post('/api/admin/promotions/plans', adminGuard, wrap(async (req, res) => {
   const result = await db.query(`INSERT INTO promotion_plans(name,description,kind,duration_days,price_centavos,enabled) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, planInput(req.body));
@@ -103,7 +108,7 @@ function registerPromotionRoutes(app, db, upload) {
   const pending = (await db.query("SELECT EXISTS(SELECT 1 FROM promotion_orders WHERE provider_id=$1 AND status IN ('awaiting_payment','awaiting_verification','rejected')) AS pending",[req.params.id])).rows[0].pending;
   const currentBoost = (await db.query(`SELECT ${orderColumns} ${orderJoin} WHERE o.provider_id=$1 AND o.status='paid' AND o.starts_at<=NOW() AND o.expires_at>NOW() ORDER BY o.expires_at DESC LIMIT 1`, [req.params.id])).rows[0] || null;
   res.json({ plans: (await db.query('SELECT * FROM promotion_plans WHERE enabled=TRUE ORDER BY price_centavos,id')).rows,
-   payment_ready: Boolean(settings?.configured), verified: Boolean(account?.is_verified), has_pending:pending, current_boost:currentBoost, ...await orders(db, req.params.id,req.query) });
+   payment_ready: automatic ? Boolean(gateway?.ready) : Boolean(settings?.configured), gateway:paymentConfig(), verified: Boolean(account?.is_verified), has_pending:pending, current_boost:currentBoost, ...await orders(db, req.params.id,req.query) });
  }));
  app.post('/api/provider/:id/promotions/orders', providerGuard, wrap(async (req, res) => {
   if (!Number.isInteger(Number(req.body.plan_id)) || Number(req.body.plan_id) < 1 || Number(req.body.plan_id) > 2147483647) fail(400, 'Choose a valid plan.');
@@ -117,6 +122,13 @@ function registerPromotionRoutes(app, db, upload) {
    if (open) fail(409, 'Finish or cancel your existing promotion payment first.');
    const plan = (await client.query('SELECT * FROM promotion_plans WHERE id=$1 AND enabled=TRUE FOR SHARE', [req.body.plan_id])).rows[0];
    if (!plan || new Date(plan.updated_at).toISOString() !== req.body.revision) fail(409, 'The plan has changed. Refresh and review the current price.');
+   if (automatic) {
+    if (!gateway?.ready) fail(503, 'PayMongo QR Ph checkout is not configured yet. Contact the admin.');
+    const created = await client.query(`INSERT INTO promotion_orders(provider_id,plan_id,request_id,plan_name,description,duration_days,amount_centavos,wallet,account_name,account_number,payment_channel,payment_livemode)
+     VALUES($1,$2,$3,$4,$5,$6,$7,'PayMongo QR Ph','','','paymongo',$8) RETURNING id`,
+    [req.params.id,plan.id,req.body.request_id,plan.name,plan.description,plan.duration_days,plan.price_centavos,gateway.livemode]);
+    return created.rows[0].id;
+   }
    const accountQr = (await client.query('SELECT * FROM platform_payment_settings WHERE id=1 FOR SHARE')).rows[0];
    if (!accountQr?.qr_content) fail(409, 'The admin has not configured platform payments yet.');
    const result = await client.query(`INSERT INTO promotion_orders(provider_id,plan_id,request_id,plan_name,description,duration_days,amount_centavos,wallet,account_name,account_number,qr_content,qr_mime)
@@ -125,12 +137,24 @@ function registerPromotionRoutes(app, db, upload) {
   });
   res.status(201).json({ id });
  }));
+ app.post('/api/provider/:id/promotions/orders/:orderId/checkout', providerGuard, wrap(async (req, res) => {
+  res.json(await createPromotionCheckout(db,gateway,req.params.id,req.params.orderId,returnBase));
+ }));
+ app.post('/api/provider/:id/promotions/orders/:orderId/payment-status', providerGuard, wrap(async (req, res) => {
+  res.json(await refreshPromotionPayment(db,gateway,req.params.id,req.params.orderId));
+ }));
+ app.post('/api/admin/promotions/orders/:orderId/payment-status', adminGuard, wrap(async (req, res) => {
+  const order = (await db.query('SELECT provider_id FROM promotion_orders WHERE id=$1', [req.params.orderId])).rows[0];
+  if (!order) fail(404, 'Order not found.');
+  res.json(await refreshPromotionPayment(db,gateway,order.provider_id,req.params.orderId));
+ }));
  app.post('/api/provider/:id/promotions/orders/:orderId/receipt', providerGuard, upload.single('receipt'), wrap(async (req, res) => {
   const image = imageFile(req.file), reference = text(req.body.reference_number, 'transaction reference', 120).toUpperCase();
   if (!/^[A-Z0-9][A-Z0-9 -]{3,119}$/.test(reference)) fail(400, 'Enter a transaction reference of 4-120 letters or digits.');
   await transaction(db, async client => {
-   const order = (await client.query('SELECT status FROM promotion_orders WHERE id=$1 AND provider_id=$2 FOR UPDATE', [req.params.orderId, req.params.id])).rows[0];
+   const order = (await client.query('SELECT status,payment_channel FROM promotion_orders WHERE id=$1 AND provider_id=$2 FOR UPDATE', [req.params.orderId, req.params.id])).rows[0];
    if (!order) fail(404, 'Order not found.');
+   if (order.payment_channel === 'paymongo') fail(409, 'QR Ph payments are confirmed by PayMongo, not receipt uploads.');
    if (!['awaiting_payment', 'rejected'].includes(order.status)) fail(409, 'This order is not waiting for a receipt.');
    await client.query('INSERT INTO promotion_references(reference_number,order_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [reference, req.params.orderId]);
    const previous = (await client.query('SELECT order_id FROM promotion_references WHERE reference_number=$1', [reference])).rows[0];
@@ -141,6 +165,11 @@ function registerPromotionRoutes(app, db, upload) {
   res.status(201).json({ ok: true });
  }));
  app.patch('/api/provider/:id/promotions/orders/:orderId/cancel', providerGuard, wrap(async (req, res) => {
+  const order = (await db.query('SELECT payment_channel FROM promotion_orders WHERE id=$1 AND provider_id=$2', [req.params.orderId,req.params.id])).rows[0];
+  if (order?.payment_channel === 'paymongo') {
+   await cancelPromotionCheckout(db,gateway,req.params.id,req.params.orderId);
+   return res.json({ ok:true });
+  }
   // Receipt-bearing orders cannot disappear while money may already have arrived.
   const result = await db.query("UPDATE promotion_orders SET status='cancelled' WHERE id=$1 AND provider_id=$2 AND status='awaiting_payment' AND receipt_id IS NULL RETURNING id", [req.params.orderId, req.params.id]);
   if (!result.rowCount) fail(409, 'Only unpaid orders without a submitted receipt can be cancelled. Contact the admin if you already transferred money.');
@@ -154,6 +183,7 @@ function registerPromotionRoutes(app, db, upload) {
    if (!ref) fail(404, 'Order not found.');
    const account = (await client.query('SELECT is_verified FROM providers WHERE id=$1 FOR UPDATE', [ref.provider_id])).rows[0];
    const order = (await client.query('SELECT * FROM promotion_orders WHERE id=$1 FOR UPDATE', [req.params.orderId])).rows[0];
+   if (order.payment_channel === 'paymongo') fail(409, 'Only PayMongo can confirm this payment. Use Check Payment Status.');
    if (order.status !== 'awaiting_verification' || Number(order.receipt_id) !== Number(req.body.receipt_id)) fail(409, 'The payment has changed or was already reviewed. Refresh first.');
    if (decision === 'verify' && !account?.is_verified) fail(409, 'Resolve provider verification before activating this purchase.');
    await client.query('UPDATE promotion_receipts SET status=$2,review_note=$3,reviewed_by=$4,reviewed_at=NOW() WHERE id=$1', [order.receipt_id, decision === 'verify' ? 'verified' : 'rejected', note, req.promotionActor.id]);

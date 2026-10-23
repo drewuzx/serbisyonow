@@ -7,6 +7,7 @@
  const money = cents => new Intl.NumberFormat('en-PH', { style:'currency',currency:'PHP' }).format(Number(cents || 0) / 100);
  const date = value => value ? new Date(value).toLocaleString('en-PH', { timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',hour12:true,minute:'2-digit' }) : '-';
  const label = value => String(value).replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase());
+ const automatic = () => state?.gateway?.channel === 'paymongo';
  let state, busy = false, currentDialog = null, filter = 'all', signature = '', orderPage = 1, loadVersion = 0, providerView = 'promotion';
  const user = () => { try { return JSON.parse(localStorage.getItem(`sn_${role}_user`) || 'null'); } catch { return null; } };
  const headers = () => user()?.auth_token ? { Authorization:`Bearer ${user().auth_token}` } : {};
@@ -73,22 +74,23 @@
    ${providerView !== 'purchases' ? `<section class="promotion-section promotion-current"><div class="promotion-symbol">${icon('star')}</div><div class="promotion-current-content"><span class="promotion-eyebrow">Current boost</span><h2>${current ? esc(current.plan_name) : 'No active boost'}</h2><p>${current ? `Ends ${date(current.expires_at)}` : 'Your regular provider account remains available.'}</p></div>${current ? `<div class="promotion-current-action">${status('active')}${button('current','View Details')}</div>` : ''}</section>` : ''}
    ${!state.verified ? '<p class="promotion-notice">Provider verification is required before purchasing a plan.</p>' : ''}
    ${!state.payment_ready ? '<p class="promotion-notice">Platform payments are not available yet.</p>' : ''}
+   ${automatic() && !state.gateway.livemode ? '<p class="promotion-notice">Test mode: payments do not activate real promotions.</p>' : ''}
    ${state.has_pending && providerView !== 'purchases' ? `<div class="promotion-pending"><span>A purchase needs payment or admin review.</span>${button('pending','View Purchase')}</div>` : ''}
    ${providerView !== 'purchases' ? `<section class="promotion-section"><div class="promotion-heading"><h2>${providerView === 'subscription' ? 'Subscription Plans' : 'Available Promotions'}</h2><span class="promotion-muted">One-time payment / No automatic renewal</span></div><div class="promotion-plans">
    ${providerView === 'subscription' ? `<article class="promotion-plan promotion-basic"><div class="promotion-plan-top"><span class="promotion-symbol">${icon('user')}</span><span class="promotion-status">Included</span></div><h2>Basic</h2><div class="promotion-plan-price"><strong class="promotion-price">Free</strong></div><p>Your standard provider account, without a paid profile boost.</p><ul class="promotion-benefits"><li>${icon('check')}<span>Provider profile</span></li><li>${icon('check')}<span>Service and booking management</span></li></ul><span class="promotion-plan-footer">No subscription required</span></article>` : ''}
-   ${plans.map(plan => `<article class="promotion-plan"><div class="promotion-plan-top"><span class="promotion-symbol">${icon('star')}</span><span class="promotion-duration">${plan.duration_days} days</span></div><h2>${esc(plan.name)}</h2><div class="promotion-plan-price"><strong class="promotion-price">${money(plan.price_centavos)}</strong><span class="promotion-muted">/ ${plan.duration_days} days</span></div><p>${esc(plan.description)}</p><ul class="promotion-benefits"><li>${icon('check')}<span>Fixed-duration profile boost</span></li><li>${icon('check')}<span>Admin-verified QR payment</span></li></ul><button type="button" class="promotion-button primary" data-action="purchase" data-id="${plan.id}" ${unavailable ? 'disabled' : ''}>Choose Plan ${icon('arrow-right')}</button></article>`).join('')}
+   ${plans.map(plan => `<article class="promotion-plan"><div class="promotion-plan-top"><span class="promotion-symbol">${icon('star')}</span><span class="promotion-duration">${plan.duration_days} days</span></div><h2>${esc(plan.name)}</h2><div class="promotion-plan-price"><strong class="promotion-price">${money(plan.price_centavos)}</strong><span class="promotion-muted">/ ${plan.duration_days} days</span></div><p>${esc(plan.description)}</p><ul class="promotion-benefits"><li>${icon('check')}<span>Fixed-duration profile boost</span></li><li>${icon('check')}<span>${automatic() ? 'PayMongo QR Ph payment' : 'Admin-verified QR payment'}</span></li></ul><button type="button" class="promotion-button primary" data-action="purchase" data-id="${plan.id}" ${unavailable ? 'disabled' : ''}>Choose Plan ${icon('arrow-right')}</button></article>`).join('')}
    </div>${!plans.length ? `<div class="promotion-empty">${icon('star')}<h3>No ${providerView === 'subscription' ? 'paid subscription plans' : 'promotions'} available yet</h3><p>Plans will appear here when the admin makes them available.</p></div>` : ''}</section>` : ''}</div>`;
  }
  function render() {
   if (role === 'admin') {
    host.innerHTML = `<div class="promotion-metrics"><div class="promotion-metric"><span>Verified platform revenue</span><strong>${money(state.metrics.revenue_centavos)}</strong></div><div class="promotion-metric"><span>Payments awaiting review</span><strong>${state.metrics.pending_count}</strong></div><div class="promotion-metric"><span>Providers with active boosts</span><strong>${state.metrics.active_providers}</strong></div></div>
-    <section class="promotion-section"><div class="promotion-heading"><h2>Platform Receiving Account</h2>${button('settings','Edit Receiving QR')}</div><p>${state.settings.configured ? `${esc(state.settings.wallet)} / ${esc(state.settings.account_name)} / ${esc(state.settings.account_number)}` : 'No receiving account configured. Purchases are unavailable.'}</p><p class="promotion-muted">Subscription and promotion payments go to this account. Customer service payments go directly to providers. Revenue shown is before fees and expenses, not net profit.</p></section>
+    <section class="promotion-section"><div class="promotion-heading"><h2>${automatic() ? 'PayMongo QR Ph' : 'Platform Receiving Account'}</h2>${automatic() ? status(!state.gateway.ready ? 'not_configured' : state.gateway.livemode ? 'live' : 'test_mode') : button('settings','Edit Receiving QR')}</div><p>${automatic() ? 'Promotions activate after confirmed payment. Test payments do not activate boosts or count as revenue.' : state.settings.configured ? `${esc(state.settings.wallet)} / ${esc(state.settings.account_name)} / ${esc(state.settings.account_number)}` : 'No receiving account configured. Purchases are unavailable.'}</p><p class="promotion-muted">Subscription and promotion payments are platform revenue. Customer service payments go directly to providers. Revenue shown is before fees and expenses, not net profit.</p></section>
     <section class="promotion-section"><div class="promotion-heading"><h2>Subscription &amp; Promotion Plans</h2>${button('plan','Add Plan','',true)}</div><div class="promotion-table-wrap"><table class="promotion-table"><thead><tr><th>Plan</th><th>Type</th><th>Duration</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>${state.plans.map(plan => `<tr><td>${esc(plan.name)}</td><td>${esc(plan.kind)}</td><td>${plan.duration_days} days</td><td>${money(plan.price_centavos)}</td><td>${status(plan.enabled ? 'active' : 'draft')}</td><td><button class="promotion-button promotion-icon-button" data-action="plan" data-id="${plan.id}" title="Edit ${esc(plan.name)}" aria-label="Edit ${esc(plan.name)}"><img src="/shared/icons/lucide/pencil.svg" alt=""></button></td></tr>`).join('')}</tbody></table></div></section>`;
   } else {
    host.innerHTML = providerContent();
   }
   const historyHost = role === 'provider' ? host.querySelector('#promotion-panel') : host;
-  if (role === 'admin' || providerView === 'purchases') historyHost.insertAdjacentHTML('beforeend', `<section class="promotion-section"><div class="promotion-heading"><h2>${role === 'admin' ? 'Recent Platform Payments' : 'My Purchases'}</h2><label class="promotion-field">Payment status<select id="promotion-filter">${['all','awaiting_payment','awaiting_verification','rejected','active','scheduled','expired','cancelled'].map(value => `<option value="${value}" ${value === filter ? 'selected' : ''}>${esc(label(value))}</option>`).join('')}</select></label></div><div id="promotion-orders">${orderList()}</div></section>`);
+  if (role === 'admin' || providerView === 'purchases') historyHost.insertAdjacentHTML('beforeend', `<section class="promotion-section"><div class="promotion-heading"><h2>${role === 'admin' ? 'Recent Platform Payments' : 'My Purchases'}</h2><label class="promotion-field">Payment status<select id="promotion-filter">${['all','awaiting_payment','awaiting_verification','rejected','active','scheduled','expired','cancelled','test_paid','refund_review'].map(value => `<option value="${value}" ${value === filter ? 'selected' : ''}>${esc(label(value))}</option>`).join('')}</select></label></div><div id="promotion-orders">${orderList()}</div></section>`);
   if (role === 'admin') host.innerHTML += `<section class="promotion-section"><h2>Provider Service Payment Records</h2><p class="promotion-muted">These amounts belong to providers and are not platform revenue. Remaining cash/QR balances are not marked received without payment confirmation.</p><div class="promotion-table-wrap"><table class="promotion-table"><thead><tr><th>Provider</th><th>Completed services</th><th>Verified downpayments</th><th>Completed service totals</th><th>Unverified remaining balances</th></tr></thead><tbody>${state.earnings.map(row => `<tr><td>${esc(row.full_name)}</td><td>${row.completed_jobs}</td><td>${money(Number(row.verified_downpayments)*100)}</td><td>${money(Number(row.completed_service_totals)*100)}</td><td>${money(Number(row.unverified_balances)*100)}</td></tr>`).join('') || '<tr><td colspan="5">No service payment records yet.</td></tr>'}</tbody></table></div></section>`;
   const filterControl = host.querySelector('#promotion-filter');
   if (filterControl) filterControl.onchange = event => { filter = event.target.value; orderPage = 1; load(); };
@@ -125,12 +127,51 @@
   if (settings.configured) media(dialog, 'settings', 1, '[data-settings-qr]');
   form.onsubmit = event => { event.preventDefault(); const data = new FormData(form); if (!form.elements.qr.files.length) data.delete('qr'); save(dialog, () => request(base() + '/payment-qr', 'PUT', data)); };
  }
+ function purchaseCheckout(plan) {
+  const id = crypto.randomUUID();
+  const dialog = modal(plan.name, `<p><strong>${money(plan.price_centavos)}</strong> / ${plan.duration_days} days</p><p>${esc(plan.description)}</p><p>Activation follows PayMongo payment confirmation. An additional purchase extends your current boost. No automatic renewal.</p>${!state.gateway.livemode ? '<p class="promotion-notice">Test mode: no real payment or profile boost.</p>' : ''}<form><label class="promotion-check"><input type="checkbox" required>I agree to this price, duration and one-time payment.</label><div class="promotion-actions"><button class="promotion-button primary" type="submit">Continue to QR Ph</button></div></form>`);
+  dialog.querySelector('form').onsubmit = event => {
+   event.preventDefault(); filter = 'all'; orderPage = 1; providerView = 'purchases';
+   save(dialog, () => request(base() + '/orders','POST',{ plan_id:plan.id,revision:plan.updated_at,request_id:id,accept_terms:true }), result => {
+    const order = state.orders.find(item => item.id === result.id);
+    if (order) openCheckoutOrder(order);
+   });
+  };
+ }
+ function openCheckoutOrder(order) {
+  const pending = order.status === 'awaiting_payment';
+  const messages = {
+   awaiting_payment:'Payment is not confirmed yet. Do not pay again if your account was debited; check payment status first.',
+   paid:order.display_status === 'scheduled' ? 'Payment confirmed. Your boost is scheduled below.' : order.display_status === 'expired' ? 'This promotion has ended.' : 'Payment confirmed. Your promotion is active.',
+   test_paid:'Test payment confirmed. No real funds were collected and no profile boost was activated.',
+   refund_review:'Payment needs admin review. Do not pay again. Contact support for reconciliation or a refund.',
+   cancelled:'This checkout is closed. No promotion was activated.'
+  };
+  const dialog = modal(`Payment #${order.id}`, `<div class="promotion-detail-summary"><div><strong>${esc(order.plan_name)}</strong><p>${money(order.amount_centavos)} / ${order.duration_days} days</p></div>${status(order.display_status)}</div><p>${esc(messages[order.status] || 'Payment needs review.')}</p><p>PayMongo QR Ph${order.payment_livemode === false ? ' / Test mode' : ''}</p>${order.gateway_reference ? `<p>Reference: ${esc(order.gateway_reference)}</p>` : ''}${order.checkout_status === 'review' || order.checkout_status === 'creating' ? '<p class="promotion-notice">Checkout confirmation is pending. Contact the admin before starting another payment.</p>' : ''}${order.expires_at ? `<p>${date(order.starts_at)} to ${date(order.expires_at)}</p>` : ''}<div class="promotion-actions">${role === 'provider' && pending && !['creating','review'].includes(order.checkout_status) ? '<button type="button" class="promotion-button primary" data-checkout>Pay with QR Ph</button>' : ''}${pending ? '<button type="button" class="promotion-button" data-payment-refresh>Check Payment Status</button>' : ''}${role === 'provider' && pending ? '<button type="button" class="promotion-button danger" data-checkout-cancel>Cancel Unpaid Order</button>' : ''}</div>`);
+  dialog.querySelector('[data-checkout]')?.addEventListener('click', () => save(dialog, () => request(`${base()}/orders/${order.id}/checkout`,'POST'), result => {
+   const url = new URL(result.checkout_url);
+   if (url.protocol === 'https:' && url.hostname === 'checkout.paymongo.com' && !url.username && !url.password && !url.port) window.location.assign(url.href);
+  }));
+  dialog.querySelector('[data-payment-refresh]')?.addEventListener('click', () => save(dialog, () => request(`${base()}/orders/${order.id}/payment-status`,'POST'), () => {
+   const updated = state.orders.find(item => item.id === order.id);
+   if (updated) openCheckoutOrder(updated);
+  }));
+  dialog.querySelector('[data-checkout-cancel]')?.addEventListener('click', () => {
+   const confirm = modal('Cancel Unpaid Order','<p>Cancel only if you have not paid. If your balance was debited, check payment status instead.</p><label class="promotion-check"><input type="checkbox" required data-confirm-unpaid>I have not paid this order.</label><div class="promotion-actions"><button type="button" class="promotion-button danger" data-confirm-cancel>Cancel Order</button></div>');
+   confirm.querySelector('[data-confirm-cancel]').onclick = () => {
+    if (!confirm.querySelector('[data-confirm-unpaid]').checked) { confirm.querySelector('[role=alert]').textContent = 'Confirm that this order is unpaid.'; return; }
+    save(confirm, () => request(`${base()}/orders/${order.id}/cancel`,'PATCH'), () => dialog.closeSafely());
+   };
+  });
+ }
  function purchase(plan) {
+  if (automatic()) return purchaseCheckout(plan);
   const id = crypto.randomUUID();
   const dialog = modal(plan.name, `<div class="promotion-detail-summary"><span class="promotion-symbol">${icon('star')}</span><div><span class="promotion-eyebrow">${esc(label(plan.kind))}</span><p class="promotion-detail-price"><strong>${money(plan.price_centavos)}</strong><span>${plan.duration_days} days</span></p></div></div><p>${esc(plan.description)}</p><ul class="promotion-benefits"><li>${icon('check')}<span>Starts after admin payment verification.</span></li><li>${icon('check')}<span>An additional purchase extends your current boost.</span></li><li>${icon('check')}<span>One-time payment. No automatic renewal.</span></li></ul><div class="promotion-payment-method">${icon('qr-code')}<div><strong>Admin QR</strong><p>Receipt upload and admin verification</p></div></div><form><label class="promotion-check"><input type="checkbox" required>I agree to this price, duration and one-time payment.</label><div class="promotion-actions"><button class="promotion-button primary" type="submit">Continue to Admin QR</button></div></form>`);
   dialog.querySelector('form').onsubmit = event => { event.preventDefault(); filter = 'all'; orderPage = 1; providerView = 'purchases'; save(dialog, () => request(base() + '/orders', 'POST', { plan_id:plan.id,revision:plan.updated_at,request_id:id,accept_terms:true }), result => { const order = state.orders.find(item => item.id === result.id); if (order) openOrder(order); }); };
  }
  function openOrder(order) {
+  if (order.payment_channel === 'paymongo') return openCheckoutOrder(order);
   const payable = role === 'provider' && ['awaiting_payment','rejected'].includes(order.status);
   const review = role === 'admin' && order.status === 'awaiting_verification';
   const outcome = order.status === 'paid' ? ['check','Payment verified',order.display_status === 'active' ? 'Your profile boost is active.' : order.display_status === 'scheduled' ? 'Your profile boost is scheduled for the dates below.' : 'This profile boost has ended.'] : order.status === 'awaiting_verification' ? ['clock','Awaiting verification','Your receipt was submitted. Activation follows admin confirmation of the payment.'] : null;
@@ -183,6 +224,16 @@
  document.addEventListener('DOMContentLoaded', async () => {
   await window.snAccountSessionReady;
   await load();
+  const returnedOrder = new URLSearchParams(location.search).get('order_id');
+  if (role === 'provider' && /^[1-9]\d*$/.test(returnedOrder || '')) {
+   providerView = 'purchases';
+   let error;
+   try { await request(`${base()}/orders/${returnedOrder}/payment-status`,'POST'); } catch (reason) { error = reason.message; }
+   await load();
+   const order = state?.orders?.find(item => String(item.id) === returnedOrder);
+   if (order) { openOrder(order); if (error) currentDialog.querySelector('[role=alert]').textContent = error; }
+   history.replaceState(null,'',location.pathname);
+  }
   window.snStartLiveRefresh?.(`promotions-${role}`, () => load(true));
  });
 })();

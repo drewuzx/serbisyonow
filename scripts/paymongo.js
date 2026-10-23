@@ -14,7 +14,7 @@ function createPayMongo({ env = process.env, fetcher = globalThis.fetch, now = (
  const ready = configured && (!livemode || env.PAYMONGO_LIVE_PAYMENTS_ENABLED === 'true');
 
  async function request(endpoint, method, attributes) {
-  if (!configured) fail(503, 'E-wallet downpayment checkout is not configured yet. Please contact support.');
+  if (!configured) fail(503, 'PayMongo checkout is not configured yet. Please contact support.');
   let response;
   try {
    response = await fetcher(`https://api.paymongo.com${endpoint}`, {
@@ -22,28 +22,30 @@ function createPayMongo({ env = process.env, fetcher = globalThis.fetch, now = (
     ...(attributes ? { body: JSON.stringify({ data: { attributes } }) } : {}),
     signal: AbortSignal.timeout(15000),
    });
-  } catch { fail(502, 'PayMongo could not be reached. No booking has been confirmed; please try again.'); }
+  } catch { fail(502, 'PayMongo could not be reached. Check payment status before trying again.'); }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) fail(502, 'PayMongo could not complete this request. Please try again or contact support.');
   return payload.data;
  }
 
- async function checkout({ bookingId, priceVersion, amountCentavos, reference, service, returnBase }) {
-  if (!ready) fail(503, 'E-wallet downpayment checkout is not available yet. Please contact support.');
-  if (!Number.isSafeInteger(amountCentavos) || amountCentavos < 100 || amountCentavos > 10000000) fail(400, 'The 30% e-wallet downpayment must be from PHP 1 to PHP 100,000.');
+ async function checkout({ bookingId, priceVersion, amountCentavos, reference, service, returnBase, promotionOrderId }) {
+  if (!ready) fail(503, 'PayMongo checkout is not available yet. Please contact support.');
+  if (!Number.isSafeInteger(amountCentavos) || amountCentavos < 100 || amountCentavos > 10000000) fail(400, 'The payment amount must be from PHP 1 to PHP 100,000.');
   let url;
   try { url = new URL(returnBase); } catch { fail(503, 'The payment return address is not configured.'); }
   if (!['http:', 'https:'].includes(url.protocol) || (livemode && url.protocol !== 'https:') || url.username || url.password) fail(503, 'Configure a valid payment return address; live payments require HTTPS.');
-  const success = new URL('/pages/customer/bookings/bookings.html', url);
+  const promotion = promotionOrderId !== undefined;
+  const success = new URL(promotion ? '/pages/provider/promotions/promotions.html' : '/pages/customer/bookings/bookings.html', url);
   success.searchParams.set('payment_return', 'success');
-  success.searchParams.set('booking_id', String(bookingId));
+  success.searchParams.set(promotion ? 'order_id' : 'booking_id', String(promotion ? promotionOrderId : bookingId));
   const cancel = new URL(success);
   cancel.searchParams.set('payment_return', 'cancelled');
   const session = await request('/v2/checkout_sessions', 'POST', {
-   line_items: [{ name: `30% downpayment - ${String(service).slice(0, 120)}`, amount: amountCentavos, currency: 'PHP', quantity: 1 }],
-   payment_method_types: paymentMethods, success_url: success.href, cancel_url: cancel.href,
+   line_items: [{ name: `${promotion ? 'Promotion' : '30% downpayment'} - ${String(service).slice(0, 120)}`, amount: amountCentavos, currency: 'PHP', quantity: 1 }],
+   payment_method_types: promotion ? ['qrph'] : paymentMethods, success_url: success.href, cancel_url: cancel.href,
    reference_number: reference, send_email_receipt: true, pass_on_fees: false,
-   metadata: { booking_id: String(bookingId), price_version: String(priceVersion), purpose: 'booking_downpayment' },
+   metadata: promotion ? { promotion_order_id: String(promotionOrderId), purpose: 'promotion_purchase' }
+    : { booking_id: String(bookingId), price_version: String(priceVersion), purpose: 'booking_downpayment' },
   });
   let checkoutUrl;
   try { checkoutUrl = new URL(session?.attributes?.checkout_url); } catch { fail(502, 'PayMongo returned an invalid checkout address.'); }
@@ -54,6 +56,11 @@ function createPayMongo({ env = process.env, fetcher = globalThis.fetch, now = (
  async function expire(sessionId) {
   if (!validSessionId(sessionId)) fail(400, 'Invalid checkout session.');
   return request(`/v1/checkout_sessions/${sessionId}/expire`, 'POST');
+ }
+
+ async function retrieve(sessionId) {
+  if (!validSessionId(sessionId)) fail(400, 'Invalid checkout session.');
+  return request(`/v1/checkout_sessions/${sessionId}`, 'GET');
  }
 
  function verifyWebhook(raw, header) {
@@ -72,7 +79,7 @@ function createPayMongo({ env = process.env, fetcher = globalThis.fetch, now = (
   if (!event || typeof event.type !== 'string' || event.livemode !== livemode) fail(400, 'The PayMongo event mode does not match this integration.');
   return { type: event.type, session: event.data, livemode };
  }
- return { ready, livemode, paymentMethods, checkout, expire, verifyWebhook };
+ return { ready, livemode, paymentMethods, checkout, expire, retrieve, verifyWebhook };
 }
 
 module.exports = { createPayMongo };
