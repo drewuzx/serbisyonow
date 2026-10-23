@@ -3148,6 +3148,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
     SELECT
       p.*,
       EXISTS(SELECT 1 FROM promotion_orders po WHERE po.provider_id=p.id AND po.status='paid' AND po.starts_at<=NOW() AND po.expires_at>NOW()) AS promoted,
+      ARRAY_AGG(DISTINCT s.title) FILTER (WHERE s.title IS NOT NULL) AS matched_services,
       COALESCE(AVG(r.rating), 4.8) AS rating,
       COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END)::int AS completed_jobs,
       COUNT(DISTINCT f.id)::int AS favorite_count,
@@ -3226,6 +3227,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
     },
     providers: providerRows.slice(0, 30).map((row) => ({
       ...providerRow(row),
+      matched_services: row.matched_services || [],
       rating: row.rating,
       completed_jobs: Number(row.completed_jobs || 0),
       favorite_count: Number(row.favorite_count || 0),

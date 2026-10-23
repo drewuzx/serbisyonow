@@ -162,6 +162,95 @@ function attachDashboardShell() {
   else closeSidebar();
 }
 
+function attachDashboardSearch() {
+  const old = document.querySelector('.sn-hero-search');
+  if (!old || old.tagName === 'FORM') return;
+  const wrapper = document.createElement('div'); wrapper.className = 'sn-home-search';
+  const form = document.createElement('form'); form.className = old.className; form.setAttribute('role', 'search');
+  form.append(...old.childNodes); old.replaceWith(wrapper); wrapper.append(form);
+  wrapper.closest('.sn-hero').classList.add('sn-home-search-hero');
+  const input = form.querySelector('input');
+  input.id = 'sn-home-search-input'; input.name = 'q'; input.maxLength = 120; input.autocomplete = 'off';
+  input.placeholder = 'Search services, providers, categories...';
+  input.setAttribute('aria-label', 'Search services, providers, or categories');
+  input.setAttribute('aria-controls', 'sn-home-search-results'); input.setAttribute('aria-expanded', 'false');
+  const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'sn-home-search-submit';
+  submit.title = 'Search'; submit.setAttribute('aria-label', 'Search');
+  submit.innerHTML = '<img src="/shared/icons/lucide/arrow-right.svg" alt="" width="20" height="20">'; form.append(submit);
+  const panel = document.createElement('div'); panel.id = 'sn-home-search-results'; panel.className = 'sn-home-search-results'; panel.hidden = true;
+  panel.setAttribute('role', 'region'); panel.setAttribute('aria-label', 'Search matches');
+  const status = document.createElement('p'); status.className = 'sn-home-search-status'; status.setAttribute('role', 'status');
+  const list = document.createElement('ul'); list.className = 'sn-home-search-list';
+  const all = document.createElement('a'); all.className = 'sn-home-search-all'; all.textContent = 'View all results'; all.hidden = true;
+  const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'sn-home-search-retry'; retry.textContent = 'Retry'; retry.hidden = true;
+  panel.append(status, list, all, retry); wrapper.append(panel);
+  let timer, controller, version = 0, query = '';
+  const searchUrl = value => `../search/search.html?${new URLSearchParams({ q: value })}`;
+  const show = () => { panel.hidden = false; input.setAttribute('aria-expanded', 'true'); };
+  const close = () => { clearTimeout(timer); controller?.abort(); version++; panel.hidden = true; input.setAttribute('aria-expanded', 'false'); };
+  async function search() {
+    query = input.value.trim(); controller?.abort(); const current = ++version;
+    list.replaceChildren(); all.hidden = retry.hidden = true;
+    if (!query) { close(); return; }
+    show(); status.textContent = 'Searching...'; controller = new AbortController();
+    const requestController = controller;
+    const timeout = setTimeout(() => requestController.abort(), 10000);
+    try {
+      const params = new URLSearchParams({ q: query, customerId: String(getCurrentCustomer()?.id || '') });
+      const response = await fetch(`${API_BASE}/api/providers/search?${params}`, { signal: requestController.signal, cache: 'no-store' });
+      if (!response.ok) throw new Error('Search unavailable');
+      const data = await response.json();
+      if (!Array.isArray(data.providers)) throw new Error('Invalid search response');
+      if (current !== version) return;
+      const providers = data.providers.slice(0, 5);
+      status.textContent = providers.length ? 'Matching providers' : 'No available services or providers match your search.';
+      for (const provider of providers) {
+        const item = document.createElement('li'), link = document.createElement('a');
+        link.href = `../provider-profile/provider-profile.html?id=${encodeURIComponent(provider.id)}`;
+        const name = document.createElement('strong'); name.textContent = provider.full_name || 'Service provider';
+        const details = document.createElement('span');
+        details.textContent = (provider.matched_services || [provider.service || provider.category]).filter(Boolean).join(' / ');
+        const rate = document.createElement('small'); rate.textContent = Number(provider.starting_price) > 0 ? `Starts at PHP ${Number(provider.starting_price).toLocaleString('en-PH')}` : 'Price not set';
+        link.append(name, details, rate); item.append(link); list.append(item);
+      }
+      all.href = searchUrl(query); all.hidden = !providers.length;
+    } catch (error) {
+      if (current !== version) return;
+      status.textContent = 'Search is unavailable right now. Please try again.'; retry.hidden = false;
+    } finally { clearTimeout(timeout); }
+  }
+  function queueSearch() {
+    clearTimeout(timer); controller?.abort(); version++;
+    list.replaceChildren(); all.hidden = retry.hidden = true;
+    if (!input.value.trim()) { close(); return; }
+    show(); status.textContent = 'Searching...'; timer = setTimeout(search, 250);
+  }
+  input.addEventListener('input', event => { if (!event.isComposing) queueSearch(); });
+  input.addEventListener('compositionend', queueSearch);
+  input.addEventListener('focus', () => { if (input.value.trim() && panel.hidden) queueSearch(); });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown' && !panel.hidden) { event.preventDefault(); panel.querySelector('li a')?.focus(); }
+    if (event.key === 'Escape') { event.preventDefault(); close(); }
+  });
+  panel.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { input.focus(); close(); return; }
+    if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+    const links = [...panel.querySelectorAll('li a')], index = links.indexOf(document.activeElement);
+    if (index < 0) return;
+    event.preventDefault(); const next = index + (event.key === 'ArrowDown' ? 1 : -1);
+    if (next < 0) input.focus(); else links[Math.min(next, links.length - 1)]?.focus();
+  });
+  document.addEventListener('pointerdown', event => { if (!wrapper.contains(event.target)) close(); });
+  wrapper.addEventListener('focusout', () => setTimeout(() => { if (!wrapper.contains(document.activeElement)) close(); }, 0));
+  retry.onclick = () => { input.focus(); search(); };
+  form.addEventListener('submit', event => {
+    event.preventDefault(); const value = input.value.trim();
+    if (!value) { close(); input.focus(); return; }
+    close(); window.location.href = searchUrl(value);
+  });
+  window.addEventListener('pagehide', close);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await window.snAccountSessionReady;
   const currentCustomer = getCurrentCustomer();
@@ -172,6 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   applyVerificationState(currentCustomer);
   attachDashboardShell();
+  attachDashboardSearch();
 
   let previousStatus = currentCustomer.verification_status;
   document.addEventListener('sn:customer-account-updated', ({ detail: user }) => {
