@@ -24,6 +24,7 @@ const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
 const { registerPromotionRoutes } = require('./promotions');
+const { settlePromotionPayment } = require('./promotion-checkout');
 const { registerAdminProviderDetails } = require('./admin-provider-details');
 const { registerAdminReports } = require('./admin-reports');
 const { registerProfilePhotos } = require('./profile-photos');
@@ -146,10 +147,12 @@ function canonicalCategoryName(value) {
 app.use(cors());
 app.post('/api/payments/paymongo/webhook', express.raw({ type: 'application/json', limit: '1mb' }), asyncRoute(async (req, res) => {
   const event = paymongo.verifyWebhook(req.body, req.headers['paymongo-signature']);
-  res.json(await settleBookingPayment(db, event));
+  res.json(event.session?.attributes?.metadata?.purpose === 'promotion_purchase'
+    ? await settlePromotionPayment(db, event) : await settleBookingPayment(db, event));
 }));
 app.use(express.json());
-registerPromotionRoutes(app, db, paymentImageUpload);
+registerPromotionRoutes(app, db, paymentImageUpload, { gateway:paymongo,
+  returnBase:configuredFrontendBaseUrl || configuredApiBaseUrl, channel:process.env.PROMOTION_PAYMENT_CHANNEL || 'paymongo' });
 registerAdminProviderDetails(app, db, providerView, uploadDir);
 registerAdminReports(app, db, adminCategoryAliases);
 registerProfilePhotos(app, db);
