@@ -48,7 +48,7 @@ async function orders(db, providerId, query) {
  return { orders:rows,order_count:count,order_page:page,page_size:size };
 }
 
-function registerPromotionRoutes(app, db, upload, { gateway, returnBase, channel = 'paymongo' } = {}) {
+function registerPromotionRoutes(app, db, upload, { gateway, returnBase, channel = 'manual' } = {}) {
  const automatic = channel === 'paymongo';
  const paymentConfig = () => ({ channel: automatic ? 'paymongo' : 'manual', ready: Boolean(gateway?.ready), livemode: Boolean(gateway?.livemode) });
  const admin = async req => {

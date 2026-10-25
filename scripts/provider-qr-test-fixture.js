@@ -10,7 +10,7 @@ const { Pool } = require('pg');
 const express = require('express');
 const { issueSession } = require('./account-sessions');
 
-async function startQrFixture({ gateway, promotionChannel = 'manual', returnBase = 'http://localhost:3000' } = {}) {
+async function startQrFixture({ gateway, promotionChannel, returnBase = 'http://localhost:3000' } = {}) {
  const url = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/serbisyonow_db';
  if (!['localhost', '127.0.0.1', '::1'].includes(new URL(url).hostname)) throw new Error('QR tests only run against a local PostgreSQL instance.');
  const schema = `sn_qr_test_${crypto.randomBytes(8).toString('hex')}`;

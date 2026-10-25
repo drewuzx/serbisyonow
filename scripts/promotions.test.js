@@ -26,6 +26,7 @@ test('admin QR purchases verify once, keep payment snapshots, expire, and boost 
   assert.equal(initial.status,200,JSON.stringify(initial.data));
   assert.equal(initial.data.plans[0].enabled,false);
   assert.equal(initial.data.settings.configured,false);
+  assert.equal(initial.data.gateway.channel,'manual','New purchases default to admin-verified QR payments');
   let plan = initial.data.plans[0];
   const body = { name:'14-day Profile Boost',description:'Priority in matching recommended searches.',kind:'promotion',duration_days:14,price:199,enabled:true };
   plan = (await adminRequest('/plans/'+plan.id,'PATCH',body)).data.plan;
@@ -45,12 +46,15 @@ test('admin QR purchases verify once, keep payment snapshots, expire, and boost 
   await adminRequest('/payment-qr','PUT',f.qrForm('Changed Admin'));
   await adminRequest('/plans/'+plan.id,'PATCH',{...body,price:499,duration_days:30});
   let order = (await providerRequest()).data.orders[0];
+  assert.equal(order.payment_channel,'manual');
   assert.equal(order.account_name,'Platform Admin');
   assert.equal(order.amount_centavos,19900); assert.equal(order.duration_days,14);
   const receipt = reference => { const form = new FormData(); form.append('reference_number',reference); form.append('receipt',new Blob([f.image],{type:'image/png'}),'receipt.png'); return form; };
   assert.equal((await providerRequest(`/orders/${id}/receipt`,'POST',receipt('PROMO-ONE'))).status,201);
   assert.equal((await providerRequest(`/orders/${id}/cancel`,'PATCH')).status,409);
   order = (await providerRequest()).data.orders[0];
+  assert.equal(order.status,'awaiting_verification');
+  assert.equal((await providerRequest()).data.current_boost,null,'Uploading a receipt does not activate the promotion');
   const review = { decision:'verify',receipt_id:order.receipt_id,payment_received:true };
   assert.equal((await adminRequest(`/orders/${id}/review`,'PATCH',{...review,payment_received:false})).status,400);
   assert.equal((await adminRequest(`/orders/${id}/review`,'PATCH',{...review,decision:'reject',notes:''})).status,400);

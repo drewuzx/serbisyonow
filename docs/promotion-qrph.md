@@ -1,12 +1,23 @@
 # Promotion QR Ph checkout
 
-New promotion and subscription purchases use PayMongo hosted checkout with
-`qrph` as the only payment method. Existing manual-QR purchases retain their
-receipt review flow. Booking downpayments and provider payouts are unchanged.
+New promotion and subscription purchases default to manual admin QR payment,
+receipt upload, and admin verification. In Admin Promotions, configure the
+Platform Receiving QR and receiving account before providers can purchase.
+Uploading a receipt alone does not activate a promotion: the admin must confirm
+the actual funds received and choose Verify & Activate.
+
+Existing PayMongo orders retain their original channel, status checks, and signed
+webhook processing. Do not convert or delete them, disable their webhook, or
+remove their credentials while payments remain unreconciled. Existing active
+promotions, booking downpayments, and provider payouts are unchanged.
 
 ## Render configuration
 
-- `PROMOTION_PAYMENT_CHANNEL=paymongo` (the default).
+- `PROMOTION_PAYMENT_CHANNEL=manual` (the default). An explicit Render value of
+  `paymongo` overrides the default; change it to `manual` when restoring this flow.
+
+The following configuration is needed only for existing PayMongo orders or an
+explicit future opt-in using `PROMOTION_PAYMENT_CHANNEL=paymongo`:
 - `PAYMONGO_SECRET_KEY`: secret key from the correct PayMongo account and mode.
 - `PAYMONGO_WEBHOOK_SECRET`: signing secret for the webhook below, in the same mode.
 - `PAYMONGO_LIVE_PAYMENTS_ENABLED=true` only after live QR Ph is enabled on the merchant account.

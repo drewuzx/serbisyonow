@@ -153,7 +153,7 @@ app.post('/api/payments/paymongo/webhook', express.raw({ type: 'application/json
 }));
 app.use(express.json());
 registerPromotionRoutes(app, db, paymentImageUpload, { gateway:paymongo,
-  returnBase:configuredFrontendBaseUrl || configuredApiBaseUrl, channel:process.env.PROMOTION_PAYMENT_CHANNEL || 'paymongo' });
+  returnBase:configuredFrontendBaseUrl || configuredApiBaseUrl, channel:process.env.PROMOTION_PAYMENT_CHANNEL || 'manual' });
 registerAdminProviderDetails(app, db, providerView, uploadDir);
 registerAdminReports(app, db, adminCategoryAliases);
 registerProfilePhotos(app, db);
