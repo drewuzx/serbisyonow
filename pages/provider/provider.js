@@ -1843,6 +1843,91 @@ function setScheduleStatus(message, type = 'info') {
   status.className = `sn-profile-status sn-profile-status--${type}`;
 }
 
+let scheduleWeekStart = scheduleMonday(providerDateInputValue());
+let scheduleWeekRequest = 0;
+
+function scheduleMonday(value) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() - (date.getDay() + 6) % 7);
+  return providerDateInputValue(date);
+}
+
+function scheduleDay(value, offset) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + offset);
+  return providerDateInputValue(date);
+}
+
+function scheduleDayChoices() {
+  const date = document.getElementById('sn-availability-date').value;
+  const container = document.getElementById('sn-schedule-days');
+  if (!date) { container.innerHTML = ''; return; }
+  const start = scheduleMonday(date);
+  container.innerHTML = Array.from({ length: 7 }, (_, index) => {
+    const day = scheduleDay(start, index);
+    return `<label><input type="checkbox" name="dates" value="${day}" ${day === date ? 'checked' : ''} ${day < providerDateInputValue() ? 'disabled' : ''}>
+      <span>${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]} <small>${day.slice(8)}</small></span></label>`;
+  }).join('');
+}
+
+async function loadScheduleWeek() {
+  const request = ++scheduleWeekRequest;
+  const panel = document.querySelector('.sn-schedule-week');
+  if (!panel) return;
+  panel.setAttribute('aria-busy', 'true');
+  try {
+    const data = await providerGet(`/api/provider/${getProviderUser().id}/schedule-week?start=${scheduleWeekStart}`);
+    if (request !== scheduleWeekRequest || !panel.isConnected) return;
+    const today = providerDateInputValue();
+    panel.innerHTML = `<div class="sn-week-header"><div><h3>Weekly Schedule</h3><p>${shortDate(scheduleWeekStart)} - ${shortDate(scheduleDay(scheduleWeekStart, 6))}</p></div>
+      <div class="sn-week-nav"><button class="btn btn-outline" type="button" data-week-offset="-7" aria-label="Previous week" title="Previous week">&#8592;</button>
+      <button class="btn btn-outline" type="button" data-week-today>This week</button>
+      <button class="btn btn-outline" type="button" data-week-offset="7" aria-label="Next week" title="Next week">&#8594;</button></div></div>
+      <div class="sn-week-grid">${Array.from({ length: 7 }, (_, index) => {
+        const date = scheduleDay(scheduleWeekStart, index);
+        const slots = data.availability.filter(slot => slot.available_date === date).sort((a, b) => SNTime.minutes(a.start_time) - SNTime.minutes(b.start_time));
+        const appointments = data.bookings.filter(booking => booking.scheduled_date === date).sort((a, b) => SNTime.minutes(a.scheduled_time) - SNTime.minutes(b.scheduled_time));
+        return `<section class="sn-week-day ${date === today ? 'is-today' : ''}" aria-label="${date}">
+          <h4>${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][index]} <span>${shortDate(date)}</span></h4>
+          ${slots.map(slot => `<div class="sn-schedule-slot sn-week-slot" data-slot-id="${esc(slot.id)}"><div><span>${esc(SNTime.format(slot.start_time))} - ${esc(SNTime.format(slot.end_time))}</span></div>
+            ${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Closed</span>'}
+            ${date >= today ? `<div class="sn-schedule-slot-actions"><button class="btn btn-outline btn-sm" type="button" data-schedule-action="toggle" data-next-state="${!slot.is_available}">${slot.is_available ? 'Close' : 'Reopen'}</button>
+            <button class="btn btn-danger btn-sm" type="button" data-schedule-action="delete">Delete</button></div>` : ''}</div>`).join('')}
+          ${appointments.map(booking => `<div class="sn-week-appointment"><strong>${esc(SNTime.format(booking.scheduled_time))}</strong><span>${esc(booking.service)}</span><span>${esc(booking.customer_name || 'Customer')}</span>${statusPill(booking.status)}</div>`).join('')}
+          ${!slots.length && !appointments.length ? '<p class="sn-week-empty">No schedule</p>' : ''}
+          ${date >= today ? `<button type="button" class="btn btn-outline btn-sm sn-week-add" data-add-date="${date}">+ Add hours</button>` : ''}
+        </section>`;
+      }).join('')}</div>`;
+    panel.querySelectorAll('[data-week-offset]').forEach(button => button.onclick = () => {
+      scheduleWeekStart = scheduleDay(scheduleWeekStart, Number(button.dataset.weekOffset));
+      loadScheduleWeek();
+    });
+    panel.querySelector('[data-week-today]').onclick = () => { scheduleWeekStart = scheduleMonday(today); loadScheduleWeek(); };
+    panel.querySelectorAll('[data-add-date]').forEach(button => button.onclick = () => {
+      document.getElementById('sn-availability-date').value = button.dataset.addDate;
+      scheduleDayChoices();
+      document.querySelector('.sn-schedule-create-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector('[data-time-hour]').focus({ preventScroll: true });
+    });
+    bindScheduleActions(panel);
+  } catch (error) {
+    if (request !== scheduleWeekRequest || !panel.isConnected) return;
+    panel.innerHTML = `<h3>Weekly Schedule</h3><p role="alert">${esc(error.message || 'Unable to load this week.')}</p><button class="btn btn-outline" type="button">Retry</button>`;
+    panel.querySelector('button').onclick = loadScheduleWeek;
+  } finally {
+    if (request === scheduleWeekRequest) panel.removeAttribute('aria-busy');
+  }
+}
+
+function bindScheduleActions(root) {
+  root.querySelectorAll('[data-schedule-action="toggle"]').forEach(button => {
+    button.onclick = () => updateAvailabilitySlot(button.closest('[data-slot-id]').dataset.slotId, button.dataset.nextState === 'true', button);
+  });
+  root.querySelectorAll('[data-schedule-action="delete"]').forEach(button => {
+    button.onclick = () => removeAvailabilitySlot(button.closest('[data-slot-id]').dataset.slotId);
+  });
+}
+
 function renderSchedule(availability, bookings, preserveDraft = false) {
   const grid = document.querySelector('.sn-page-grid');
   if (!grid) return;
@@ -1850,13 +1935,8 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
   const activeBookings = (bookings || [])
     .filter((booking) => !['completed', 'cancelled'].includes(String(booking.status || '').toLowerCase()))
     .slice(0, 8);
-  const slots = [...(availability || [])].sort((a, b) => {
-    const dateSort = String(a.available_date || '').localeCompare(String(b.available_date || ''));
-    if (dateSort) return dateSort;
-    return (SNTime.minutes(a.start_time) ?? -1) - (SNTime.minutes(b.start_time) ?? -1);
-  });
-
   const markup = `
+    <article class="sn-panel sn-schedule-week"><h3>Weekly Schedule</h3><p>Loading schedule...</p></article>
     <article class="sn-panel sn-schedule-create-panel">
       <h3>Add Availability</h3>
       <form id="sn-provider-availability-form" class="sn-form-grid sn-schedule-form">
@@ -1864,6 +1944,7 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
           <label for="sn-availability-date">Date</label>
           <input id="sn-availability-date" name="available_date" type="date" min="${today}" value="${today}" required />
         </div>
+        <fieldset class="sn-schedule-days-field"><legend>Apply hours to</legend><div id="sn-schedule-days" class="sn-schedule-days"></div></fieldset>
         ${availabilityTimeField('start', 'Start')}
         ${availabilityTimeField('end', 'End')}
         <label class="sn-schedule-check">
@@ -1888,32 +1969,22 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
         </div>
       `).join('') || '<p>No active bookings yet.</p>'}</div>
     </article>
-    <article class="sn-panel sn-schedule-slots-panel">
-      <h3>Availability Slots</h3>
-      <div class="sn-panel-list">${slots.map(slot => `
-        <div class="sn-module-card sn-schedule-slot" data-slot-id="${esc(slot.id)}">
-          <div>
-            <strong>${shortDate(slot.available_date)}</strong>
-            <span>${esc(SNTime.format(slot.start_time))} - ${esc(SNTime.format(slot.end_time))}</span>
-          </div>
-          <div class="sn-schedule-slot-actions">
-            ${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Closed</span>'}
-            <button class="btn btn-outline btn-sm" type="button" data-schedule-action="toggle" data-next-state="${slot.is_available ? 'false' : 'true'}">${slot.is_available ? 'Close' : 'Reopen'}</button>
-            <button class="btn btn-danger btn-sm" type="button" data-schedule-action="delete">Delete</button>
-          </div>
-        </div>
-      `).join('') || '<p>No availability slots yet. Add one so customers can book you.</p>'}</div>
-    </article>
   `;
 
   if (preserveDraft && document.getElementById('sn-provider-availability-form')) {
     const updated = document.createElement('div');
     updated.innerHTML = markup;
-    for (const selector of ['.sn-schedule-appointments-panel', '.sn-schedule-slots-panel']) {
+    for (const selector of ['.sn-schedule-appointments-panel']) {
       grid.querySelector(selector)?.replaceWith(updated.querySelector(selector));
     }
   } else {
     grid.innerHTML = markup;
+    scheduleDayChoices();
+    document.getElementById('sn-availability-date').addEventListener('change', () => {
+      scheduleDayChoices();
+      const date = document.getElementById('sn-availability-date').value;
+      if (date) { scheduleWeekStart = scheduleMonday(date); loadScheduleWeek(); }
+    });
     grid.querySelectorAll('[data-availability-time]').forEach(field => {
       field.addEventListener('change', () => {
         const hour = field.querySelector('[data-time-hour]').value;
@@ -1925,16 +1996,7 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
     });
     document.getElementById('sn-provider-availability-form')?.addEventListener('submit', saveAvailabilitySlot);
   }
-  grid.querySelectorAll('[data-schedule-action="toggle"]').forEach((button) => {
-    button.addEventListener('click', () => updateAvailabilitySlot(
-      button.closest('[data-slot-id]')?.dataset.slotId,
-      button.dataset.nextState === 'true',
-      button,
-    ));
-  });
-  grid.querySelectorAll('[data-schedule-action="delete"]').forEach((button) => {
-    button.addEventListener('click', () => removeAvailabilitySlot(button.closest('[data-slot-id]')?.dataset.slotId));
-  });
+  loadScheduleWeek();
 
   const addButton = document.querySelector('.sn-topbar-right .btn');
   if (addButton) {
@@ -1983,16 +2045,23 @@ async function saveAvailabilitySlot(event) {
     start_time: startTime,
     end_time: endTime,
     is_available: formData.get('is_available') === 'on',
+    dates: formData.getAll('dates'),
   };
+  if (!body.dates.length) {
+    setScheduleStatus('Select at least one day.', 'error');
+    return;
+  }
 
   if (submit) {
     submit.disabled = true;
     submit.textContent = 'Saving...';
   }
   try {
-    await providerSend(`/api/provider/${provider.id}/availability`, 'POST', body);
-    setScheduleStatus('Availability saved.', 'success');
-    await loadProviderDatabase();
+    await providerSend(`/api/provider/${provider.id}/availability-week`, 'POST', body);
+    scheduleWeekStart = scheduleMonday(body.available_date);
+    await loadProviderDatabase({ background: true });
+    await loadScheduleWeek();
+    setScheduleStatus(`Availability saved for ${body.dates.length} day${body.dates.length === 1 ? '' : 's'}.`, 'success');
   } catch (error) {
     setScheduleStatus(error.message || 'Unable to save availability.', 'error');
   } finally {
@@ -2009,7 +2078,8 @@ async function updateAvailabilitySlot(slotId, isAvailable, button) {
   if (button) button.disabled = true;
   try {
     await providerSend(`/api/provider/${provider.id}/availability/${slotId}`, 'PATCH', { is_available: isAvailable });
-    await loadProviderDatabase();
+    await loadProviderDatabase({ background: true });
+    await loadScheduleWeek();
   } catch (error) {
     await openProviderModal({
       title: 'Schedule not updated',
@@ -2031,8 +2101,13 @@ async function removeAvailabilitySlot(slotId) {
     danger: true,
   });
   if (!confirmed) return;
-  await providerSend(`/api/provider/${provider.id}/availability/${slotId}`, 'DELETE');
-  loadProviderDatabase();
+  try {
+    await providerSend(`/api/provider/${provider.id}/availability/${slotId}`, 'DELETE');
+    await loadProviderDatabase({ background: true });
+    await loadScheduleWeek();
+  } catch (error) {
+    await openProviderModal({ title: 'Schedule not updated', message: error.message || 'Unable to delete this slot.', confirmText: 'OK' });
+  }
 }
 
 function renderInbox(messages) {

@@ -28,6 +28,7 @@ const { settlePromotionPayment } = require('./promotion-checkout');
 const { registerAdminProviderDetails } = require('./admin-provider-details');
 const { registerAdminReports } = require('./admin-reports');
 const { registerProfilePhotos } = require('./profile-photos');
+const { loadWeek, saveWeek } = require('./provider-schedule');
 const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
@@ -3656,7 +3657,18 @@ app.delete('/api/provider/:providerId/services/:serviceId', asyncRoute(async (re
   res.json({ ok: true });
 }));
 
+app.get('/api/provider/:id/schedule-week', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
+  res.json(await loadWeek(db, req.params.id, req.query.start));
+}));
+
+app.post('/api/provider/:id/availability-week', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
+  res.status(201).json(await saveWeek(db, req.params.id, req.body));
+}));
+
 app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
   requireFields(req.body, ['available_date', 'start_time', 'end_time']);
   const result = await db.query(`
     INSERT INTO provider_availability (provider_id, available_date, start_time, end_time, is_available)
@@ -3669,6 +3681,7 @@ app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/provider/:providerId/availability/:slotId', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.providerId);
   const result = await db.query(`
     UPDATE provider_availability
     SET available_date = COALESCE($3, available_date),
@@ -3690,6 +3703,7 @@ app.patch('/api/provider/:providerId/availability/:slotId', asyncRoute(async (re
 }));
 
 app.delete('/api/provider/:providerId/availability/:slotId', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.providerId);
   const result = await db.query(`
     DELETE FROM provider_availability
     WHERE provider_id = $1 AND id = $2

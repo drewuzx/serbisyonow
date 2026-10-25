@@ -1826,6 +1826,46 @@ body {
 }
 
 .sn-schedule-form { grid-template-columns: minmax(0, 1fr); }
+.sn-schedule-week { grid-column:1 / -1; min-width:0; }
+.sn-week-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.sn-week-header h3 { margin:0; }
+.sn-week-header p { margin:6px 0 0; }
+.sn-week-nav { display:flex; gap:8px; }
+.sn-week-nav .btn { min-height:44px; padding:8px 12px; }
+.sn-week-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border-top:1px solid var(--border); }
+.sn-week-day { min-width:0; padding:14px 8px; border-right:1px solid var(--border); display:flex; flex-direction:column; gap:10px; }
+.sn-week-day:last-child { border-right:0; }
+.sn-week-day.is-today { background:#f0f5ff; }
+.sn-week-day h4 { margin:0 0 8px; font-size:14px; color:var(--blue-dark); }
+.sn-week-day h4 span { display:block; font-size:12px; font-weight:400; margin-top:4px; }
+.sn-week-slot, .sn-week-appointment { display:flex; flex-direction:column; align-items:flex-start; gap:8px; border:1px solid var(--border); border-radius:8px; padding:10px; font-size:12px; overflow-wrap:anywhere; background:white; }
+.sn-week-slot { border-left:3px solid #288064; }
+.sn-week-appointment { border-left:3px solid #dda329; background:#fffcf3; }
+.sn-week-slot .sn-schedule-slot-actions { justify-content:flex-start; gap:6px; }
+.sn-week-day .btn-sm { padding:8px; font-size:12px; min-height:36px; white-space:normal; }
+.sn-week-day .sn-status-pill { font-size:11px; padding:4px 8px; max-width:100%; }
+.sn-week-empty { font-size:12px; color:var(--text-muted); margin:0; }
+.sn-week-add { margin-top:auto; width:100%; }
+.sn-schedule-days-field { border:0; padding:0; margin:0; min-width:0; }
+.sn-schedule-days-field legend { color:var(--blue-dark); font-weight:800; margin-bottom:8px; }
+.sn-schedule-days { display:flex; gap:10px; flex-wrap:wrap; }
+.sn-schedule-days label { display:flex; align-items:center; gap:5px; font-size:13px; min-height:36px; cursor:pointer; }
+.sn-schedule-days input { width:18px; height:18px; accent-color:var(--blue-main); }
+.sn-schedule-days small { color:var(--text-muted); }
+.sn-schedule-days label:has(input:disabled) { opacity:.5; cursor:default; }
+@media (max-width:1200px) {
+  .sn-week-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .sn-week-day { border-bottom:1px solid var(--border); min-height:180px; }
+}
+@media (max-width:600px) {
+  .sn-week-grid { grid-template-columns:minmax(0,1fr); }
+  .sn-week-day { border-right:0; padding:16px 0; min-height:120px; }
+  .sn-week-day.is-today { padding:16px 8px; }
+  .sn-week-nav { width:100%; }
+  .sn-week-nav [data-week-today] { flex:1; }
+  .sn-week-day h4 { font-size:16px; }
+  .sn-week-slot, .sn-week-appointment, .sn-week-empty { font-size:14px; }
+}
 .sn-schedule-form input[type="date"] { min-width:0; max-width:100%; }
 .sn-time-field { border:0; padding:0; margin:0; }
 .sn-time-field legend { color:var(--blue-dark); font-weight:800; font-size:var(--text-xs); padding:0 0 6px; }

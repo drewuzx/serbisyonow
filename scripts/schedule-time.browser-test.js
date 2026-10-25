@@ -18,13 +18,19 @@ async function main() {
   await context.route('**/*',route=>new URL(route.request().url()).origin===f.base ? route.continue() : route.fulfill({body:'',contentType:route.request().url().includes('fonts.googleapis.com')?'text/css':'application/javascript'}));
   const provider=(await f.request('/api/auth/provider/session','GET',undefined,f.providerToken)).data.user;
   const customer=(await f.request('/api/auth/customer/session','GET',undefined,f.customerToken)).data.user;
+  provider.auth_token = f.providerToken;
+  customer.auth_token = f.customerToken;
   await context.addInitScript(({provider,customer})=>{
    localStorage.setItem('sn_provider_user',JSON.stringify(provider));
    localStorage.setItem('sn_customer_user',JSON.stringify(customer));
   },{provider,customer});
   const page=await context.newPage(), errors=[];
+  page.setDefaultTimeout(15000);
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto(`${f.base}/pages/provider/schedule/schedule.html`);
+  await page.locator('#sn-availability-date').fill('2099-10-10');
+  await page.locator('#sn-availability-date').dispatchEvent('change');
+  await page.locator('.sn-week-slot').first().waitFor();
   await page.locator('.sn-schedule-appointments-panel').getByText('5:40 AM',{exact:true}).waitFor();
   assert.deepEqual(await page.locator('.sn-schedule-slot > div:first-child > span').allTextContents(),['5:40 AM - 10:40 AM','9:00 AM - 12:00 PM','5:40 PM - 7:00 PM']);
   await page.locator('#sn-availability-date').fill('2099-10-11');
