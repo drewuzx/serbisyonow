@@ -22,8 +22,10 @@ async function main() {
     return route.fulfill({ body: '', contentType: url.hostname.includes('fonts') ? 'text/css' : 'application/javascript' });
    });
    const user = role === 'admin' ? token : (await f.request(`/api/auth/${role}/session`, 'GET', undefined, token)).data.user;
+   if (role !== 'admin') user.auth_token = token;
    await context.addInitScript(({ role, user }) => localStorage.setItem(`sn_${role}_user`, JSON.stringify(user)), { role, user });
    const page = await context.newPage();
+   page.setDefaultTimeout(15000);
    page.on('pageerror', error => errors.push(`${role}: ${error.message}`));
    await page.clock.install();
    return page;
@@ -88,14 +90,20 @@ async function main() {
   await panel.getByRole('button', { name: 'Submit Feedback' }).click();
   await panel.locator('.sn-feedback-thanks').waitFor();
   assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM admin_feedback')).rows[0].count, 1);
+  await checkLayout(provider, 'success');
+  await panel.getByRole('button',{name:'Send another feedback',exact:true}).click();
+  assert.equal(await panel.locator('form').isVisible(),true);
+  assert.equal(await panel.locator('textarea').inputValue(),'');
+  assert.equal(await panel.locator('[data-feedback-count]').textContent(),'0');
+  assert.equal(await panel.getByRole('button',{name:'Submit Feedback',exact:true}).isDisabled(),true);
   await provider.getByRole('button', { name: 'Close feedback', exact: true }).click();
   await provider.reload();
   await loaded(provider, 'provider', 81);
   await provider.clock.runFor(95000);
   assert(await panel.isHidden(), 'Submitted ratings are not automatically prompted again');
   await provider.getByRole('button', { name: 'Rate SerbisyoNow', exact: true }).click();
-  await panel.locator('.sn-feedback-thanks').waitFor();
-  assert.equal(await panel.locator('form').isHidden(), true);
+  await panel.locator('form').waitFor();
+  assert.equal(await panel.locator('.sn-feedback-thanks').isHidden(), true);
 
   await f.db.query('INSERT INTO admins (username,password_hash) VALUES ($1,$2)', ['feedback-browser-admin', await bcrypt.hash('fixture-password',4)]);
   const adminUser = (await f.request('/api/auth/admin/login','POST',{username:'feedback-browser-admin',password:'fixture-password'},'')).data.user;
@@ -180,8 +188,22 @@ async function main() {
   await anonymous.goto(`${f.base}/pages/admin/feedback/feedback.html`);
   await anonymous.locator('#feedback-login').waitFor();
   assert.equal(await anonymous.locator('.admin-feedback-rating').count(),0);
+  await panel.getByRole('radio',{name:'3 stars',exact:true}).check();
+  await panel.getByLabel('Comment (optional)').fill('A new provider suggestion after my first rating.');
+  await panel.getByRole('button',{name:'Submit Feedback',exact:true}).click();
+  await panel.locator('.sn-feedback-thanks').waitFor();
+  await customer.getByRole('button',{name:'Send another feedback',exact:true}).click();
+  await customer.getByRole('radio',{name:'4 stars',exact:true}).check();
+  await customer.getByLabel('Comment (optional)').fill('Customer follow-up feedback.');
+  await customer.getByRole('button',{name:'Submit Feedback',exact:true}).click();
+  await customer.locator('.sn-feedback-thanks').waitFor();
+  assert.equal((await f.db.query("SELECT COUNT(*)::int AS count FROM admin_feedback WHERE source='system'")).rows[0].count,5);
+  await admin.getByRole('button',{name:'Refresh',exact:true}).click();
+  await admin.getByText('Customer follow-up feedback.',{exact:true}).waitFor();
+  await admin.getByText('A new provider suggestion after my first rating.',{exact:true}).waitFor();
+  assert((await admin.locator('#feedback-list').innerText()).includes(comment),'Original feedback remains visible');
   assert.deepEqual(errors,[]);
-  console.log('PASS: customer/provider submission, keyboard stars, empty comments, retry/draft preservation, random idle prompt, dismissal/submission cooldowns, chat/modal coexistence, admin privacy/filters/live refresh, and responsive screenshots.');
+  console.log('PASS: repeat customer/provider feedback, fresh form after reload, retained admin history, keyboard stars, retry/draft preservation, automatic reminder cooldowns, admin privacy/filters, and responsive screenshots.');
  } finally { if (browser) await browser.close(); await f.close(); }
 }
 main().catch(error => {console.error(error);process.exitCode=1;});

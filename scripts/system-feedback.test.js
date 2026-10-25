@@ -47,14 +47,14 @@ test('system feedback API uses authenticated accounts and persists every rating 
   assert.equal(row.message, body.comment.trim());
   assert(Date.parse(first.data.next_prompt_at) > Date.now() + 29 * 86400000);
  });
- await t.test('retries are idempotent, cooldown is server-enforced, and other accounts cannot reuse a submission', async () => {
+ await t.test('retries are idempotent, new feedback is allowed immediately, and other accounts cannot reuse a submission', async () => {
   assert.equal((await f.request('/api/system-feedback', 'POST', first.body)).data.id, first.data.id);
-  const limited = await f.request('/api/system-feedback', 'POST', payload());
-  assert.equal(limited.status, 429);
-  assert.equal(limited.data.next_prompt_at, first.data.next_prompt_at);
-  assert.equal((await f.request('/api/system-feedback?role=customer')).data.next_prompt_at, first.data.next_prompt_at);
+  const followup = await f.request('/api/system-feedback', 'POST', payload());
+  assert.equal(followup.status, 201);
+  assert.notEqual(followup.data.id, first.data.id);
+  assert.equal((await f.request('/api/system-feedback?role=customer')).data.next_prompt_at, followup.data.next_prompt_at);
   assert.equal((await f.request('/api/system-feedback', 'POST', first.body, f.otherCustomerToken)).status, 409);
-  assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM admin_feedback')).rows[0].count, 1);
+  assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM admin_feedback')).rows[0].count, 2);
  });
  await t.test('supports providers and optional comments without changing service reviews', async () => {
   const result = await f.request('/api/system-feedback', 'POST', payload({ role: 'provider' }), f.providerToken);
@@ -66,9 +66,10 @@ test('system feedback API uses authenticated accounts and persists every rating 
   assert.equal(row.rating, 5);
   assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM customer_reviews')).rows[0].count, 0);
  });
- await t.test('concurrent submissions save one record per account', async () => {
+ await t.test('distinct submissions are retained while concurrent retries save only one record', async () => {
   const responses = await Promise.all([1, 2].map(() => f.request('/api/system-feedback', 'POST', payload({ role: 'provider', rating: 4 }), f.otherProviderToken)));
-  assert.deepEqual(responses.map(result => result.status).sort(), [201, 429]);
+  assert.deepEqual(responses.map(result => result.status).sort(), [201, 201]);
+  assert.notEqual(responses[0].data.id,responses[1].data.id);
   const body = payload({ rating: 3 });
   const retries = await Promise.all([1, 2].map(() => f.request('/api/system-feedback', 'POST', body, f.otherCustomerToken)));
   assert.deepEqual(retries.map(result => result.status), [201, 201]);
@@ -92,7 +93,7 @@ test('system feedback API uses authenticated accounts and persists every rating 
   assert.equal(legacy.status, 201);
   const result = await f.request('/api/admin/feedback', 'GET', undefined, adminToken);
   assert.equal(result.status, 200);
-  assert.equal(result.data.feedback.length, 5);
+  assert.equal(result.data.feedback.length, 7);
   assert(result.data.feedback.some(row => row.rating === 1 && row.submitted_role === 'customer'));
   assert(result.data.feedback.some(row => row.rating === 5 && row.submitted_role === 'provider'));
   assert(result.data.feedback.some(row => row.subject === 'Positive Feedback'));
@@ -101,10 +102,10 @@ test('system feedback API uses authenticated accounts and persists every rating 
   assert.equal((await f.request(`/api/admin/feedback/${first.data.id}/status`, 'PATCH', {status:'review'}, adminToken)).status, 200);
   assert.equal((await f.request('/api/admin/feedback?status=review', 'GET', undefined, adminToken)).data.feedback.length, 1);
  });
- await t.test('ratings after the cooldown are separate records and migrations are repeatable', async () => {
+ await t.test('later ratings are separate records and migrations are repeatable', async () => {
   await f.db.query("UPDATE admin_feedback SET created_at = NOW() - INTERVAL '31 days' WHERE id = $1", [first.data.id]);
   assert.equal((await f.request('/api/system-feedback', 'POST', payload({rating: 4}))).status, 201);
-  assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM admin_feedback WHERE customer_id = 61')).rows[0].count, 2);
+  assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM admin_feedback WHERE customer_id = 61')).rows[0].count, 3);
   await f.db.query(fs.readFileSync(path.join(__dirname, 'feedback-schema.sql'), 'utf8'));
   assert.equal((await f.request('/api/admin/feedback', 'GET', undefined, adminToken)).status, 200);
  });

@@ -1,7 +1,7 @@
 'use strict';
 
 const { transaction } = require('./booking-payments');
-const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+const PROMPT_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
 
 function fail(statusCode, message) {
  const error = new Error(message);
@@ -15,7 +15,7 @@ function feedbackRole(role) {
 }
 
 function nextPrompt(row) {
- return row ? new Date(new Date(row.created_at).getTime() + COOLDOWN_MS).toISOString() : null;
+ return row ? new Date(new Date(row.created_at).getTime() + PROMPT_DELAY_MS).toISOString() : null;
 }
 
 async function feedbackState(db, actor) {
@@ -46,13 +46,7 @@ async function submitSystemFeedback(db, actor, body) {
    if (duplicate.submitted_role !== actor.role || Number(duplicate[column]) !== actor.id) fail(409, 'This feedback submission already exists.');
    return { id: duplicate.id, next_prompt_at: nextPrompt(duplicate) };
   }
-  const state = await feedbackState(client, actor);
-  if (state.next_prompt_at && new Date(state.next_prompt_at).getTime() > Date.now()) {
-   const error = new Error('You have already rated SerbisyoNow recently. Thank you for your feedback.');
-   error.statusCode = 429;
-   error.nextPromptAt = state.next_prompt_at;
-   throw error;
-  }
+  // Delay automatic reminders, not feedback intentionally submitted by the user.
   const { rows: [feedback] } = await client.query(`INSERT INTO admin_feedback
    (type, source, subject, message, submitted_by, submitted_role, rating, submission_id, customer_id, provider_id)
    VALUES ('feedback', 'system', 'System Rating', $1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,

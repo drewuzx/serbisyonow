@@ -29,6 +29,7 @@
  let statusKnown = false;
  let statusVersion = 0;
  let sending = false;
+ let submitted = false;
  let shownAutomatically = false;
  let submissionId = crypto.randomUUID();
  const style = document.createElement('link');
@@ -60,6 +61,7 @@
     <button class="sn-feedback-later" type="button">Not now</button>
    </form>
    <p class="sn-feedback-thanks" role="status" hidden>Thank you! Your feedback has been sent to the admin.</p>
+   <button class="sn-feedback-submit sn-feedback-again" type="button" hidden>Send another feedback</button>
   </section>
   <button class="sn-feedback-launch" type="button" title="Rate SerbisyoNow" aria-label="Rate SerbisyoNow" aria-controls="sn-system-feedback" aria-expanded="false"><i class="sn-feedback-icon" aria-hidden="true"></i></button>`;
  document.body.appendChild(root);
@@ -73,6 +75,7 @@
  const comment = root.querySelector('textarea');
  const errorText = root.querySelector('.sn-feedback-error');
  const thanks = root.querySelector('.sn-feedback-thanks');
+ const again = root.querySelector('.sn-feedback-again');
  const labels = ['Very poor', 'Poor', 'Okay', 'Good', 'Excellent'];
 
  function updateRating() {
@@ -82,9 +85,9 @@
   submit.disabled = sending || !rating;
  }
  function syncThanks() {
-  const rated = Number(preferences().submitted_until || 0) > Date.now();
-  form.hidden = rated;
-  thanks.hidden = !rated;
+  form.hidden = submitted;
+  thanks.hidden = !submitted;
+  again.hidden = !submitted;
  }
  function closePanel(dismiss = true) {
   if (sending) return;
@@ -142,6 +145,13 @@
   openPanel();
  }
  launch.addEventListener('click', () => panel.hidden ? openPanel(true) : closePanel());
+ again.addEventListener('click', () => {
+  if (sending || !sameAccount()) return;
+  submitted = false;
+  errorText.hidden = true;
+  syncThanks();
+  form.querySelector('input[name="rating"]').focus({ preventScroll: true });
+ });
  close.addEventListener('click', () => closePanel());
  later.addEventListener('click', () => closePanel());
  panel.addEventListener('keydown', event => {
@@ -164,11 +174,13 @@
    remember({ submitted_until: Date.parse(data.next_prompt_at) || Date.now() + 30 * day });
    submissionId = crypto.randomUUID();
    form.reset();
+   root.querySelector('[data-feedback-count]').textContent = '0';
+   submitted = true;
    syncThanks();
-   close.focus({ preventScroll: true });
+   again.focus({ preventScroll: true });
   } catch (error) {
-   if (error.nextPromptAt) { remember({ submitted_until: Date.parse(error.nextPromptAt) }); syncThanks(); }
-   else { errorText.textContent = error.name === 'TimeoutError' || error instanceof TypeError ? 'Connection unavailable. Your feedback is still here. Please try again.' : error.message; errorText.hidden = false; }
+   errorText.textContent = error.name === 'TimeoutError' || error instanceof TypeError ? 'Connection unavailable. Your feedback is still here. Please try again.' : error.message;
+   errorText.hidden = false;
   } finally {
    sending = false;
    fields.disabled = close.disabled = later.disabled = false;
