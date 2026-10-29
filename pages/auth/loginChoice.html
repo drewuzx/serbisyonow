@@ -17,6 +17,10 @@
     .choice-btn { display: flex; align-items: center; justify-content: center; gap: 12px; text-decoration: none; transition: all 0.3s ease; }
     .choice-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
     .choice-btn svg { flex-shrink: 0; }
+    #admin-login-choice[hidden] { display: flex !important; visibility: hidden; pointer-events: none; }
+    #admin-login-choice { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+    #admin-login-reveal { appearance: none; padding: 0; background: #fff; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; touch-action: manipulation; }
+    #admin-login-reveal:focus-visible { outline: 3px solid var(--blue-main); outline-offset: 4px; }
   </style>
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
@@ -44,7 +48,7 @@
     <div class="container hero-content">
         <div class="auth-card">
           <div class="auth-logo">
-            <div class="nav-logo-icon-login"><img src="../../image_logo/main_logo.svg" alt="SerbisyoNow logo"/></div>
+            <button class="nav-logo-icon-login" id="admin-login-reveal" type="button" aria-label="SerbisyoNow logo" aria-controls="admin-login-choice" aria-expanded="false"><img src="../../image_logo/main_logo.svg" alt=""/></button>
             <div class="auth-logo-text"><span class="part1">Serbisyo</span><span class="part2">Now</span></div>
           </div>
           <div class="auth-heading">
@@ -60,7 +64,7 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               Provider Login
             </a>
-            <a href="adminLogin.html" class="btn btn-outline btn-full btn-lg choice-btn">
+            <a href="adminLogin.html" id="admin-login-choice" class="btn btn-outline btn-full btn-lg choice-btn" hidden>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1l3 6 6 3-6 3-3 6-3-6-6-3 6-3z"/></svg>
               Admin Login
             </a>
@@ -150,6 +154,7 @@
     })();
   </script>
   <script src="../../shared/js/app.js?v=20260915-api"></script>
+  <script src="../../shared/js/login-choice.js"></script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>
 </html>
