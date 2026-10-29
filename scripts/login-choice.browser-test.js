@@ -29,6 +29,10 @@ async function main() {
    assert.equal(await page.getByRole('link',{name:'Admin Login',exact:true}).count(),0);
    assert.match(await page.getByRole('link',{name:'Customer Login',exact:true}).getAttribute('href'),/category=Cleaning/);
    assert.equal(await page.getByRole('link',{name:'Provider Login',exact:true}).getAttribute('href'),'providerLogin.html');
+   const provider = page.getByRole('link',{name:'Provider Login',exact:true});
+   assert.equal(await provider.evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(244, 130, 10)');
+   assert.equal(await provider.evaluate(node=>getComputedStyle(node).color),'rgb(23, 43, 77)');
+   assert.equal(await page.getByRole('link',{name:'Customer Login',exact:true}).evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(43, 85, 204)');
    await activate(); await activate();
    assert(await admin.isHidden(),'Two clicks do not reveal admin');
    await page.clock.runFor(3100);
