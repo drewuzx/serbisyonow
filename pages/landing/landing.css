@@ -326,6 +326,7 @@
 }
 
 .cta-buttons { display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap; }
+.provider-entry-button { --control-bg: #f4820a; --control-hover: #dc7208; --control-text: #fff; --control-border: #f4820a; }
 
 /* ── Footer ── */
 .footer {

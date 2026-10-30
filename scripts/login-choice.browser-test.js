@@ -31,7 +31,8 @@ async function main() {
    assert.equal(await page.getByRole('link',{name:'Provider Login',exact:true}).getAttribute('href'),'providerLogin.html');
    const provider = page.getByRole('link',{name:'Provider Login',exact:true});
    assert.equal(await provider.evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(244, 130, 10)');
-   assert.equal(await provider.evaluate(node=>getComputedStyle(node).color),'rgb(23, 43, 77)');
+   assert.equal(await provider.evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)');
+   assert.equal(await provider.locator('svg').evaluate(node=>getComputedStyle(node).stroke),'rgb(255, 255, 255)');
    assert.equal(await page.getByRole('link',{name:'Customer Login',exact:true}).evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(43, 85, 204)');
    await activate(); await activate();
    assert(await admin.isHidden(),'Two clicks do not reveal admin');
@@ -63,6 +64,19 @@ async function main() {
    await page.clock.runFor(1000);
    assert(await admin.isHidden(),'Returning from admin login hides the link');
    await page.screenshot({path:path.join(os.tmpdir(),`admin-login-hidden-${width}.png`),fullPage:true,animations:'disabled'});
+   await page.goto(`${fixture.base}/pages/landing/index.html`);
+   await page.clock.runFor(1000);
+   for (const button of await page.getByRole('link',{name:'Be a Provider',exact:true}).all()) {
+    assert.equal(await button.evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(244, 130, 10)');
+    assert.equal(await button.evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)');
+    assert.equal(await button.getAttribute('href'),'../auth/loginChoice.html');
+   }
+   for (const button of await page.getByRole('link',{name:'Get Service',exact:true}).all()) {
+    assert.equal(await button.evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(255, 255, 255)');
+   }
+   await page.locator('.cta-section').scrollIntoViewIfNeeded();
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+   await page.locator('.cta-section').screenshot({path:path.join(os.tmpdir(),`provider-cta-orange-${width}.png`),animations:'disabled'});
    assert.deepEqual(errors,[]);
    await context.close();
   }
@@ -72,7 +86,7 @@ async function main() {
   await page.goto(`${fixture.base}/pages/auth/loginChoice.html`);
   assert(await page.locator('#admin-login-choice').isHidden(),'No initial visible flash without JavaScript');
   await noJs.close();
-  console.log('PASS: default hidden, triple click/tap, reset interval, exact five-second expiry, keyboard/focus, navigation, reload/back, and desktop/mobile layouts.');
+  console.log('PASS: hidden admin reveal behavior, orange provider login and landing buttons, unchanged customer buttons, navigation, and desktop/mobile layouts.');
  } finally { if(browser) await browser.close(); await fixture.close(); }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
