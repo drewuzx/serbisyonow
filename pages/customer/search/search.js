@@ -130,6 +130,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resultList = document.getElementById('sn-results-list');
   const countEl = document.getElementById('sn-results-count');
   const tabs = document.querySelectorAll('.sn-filter-tab');
+  const searchWrapper = pageSearch?.closest('.sn-page-search');
+  let searchForm = null;
+  if (searchWrapper) {
+    searchForm = document.createElement('form');
+    searchForm.className = searchWrapper.className;
+    searchForm.setAttribute('role', 'search');
+    searchForm.setAttribute('aria-label', 'Find providers and services');
+    searchForm.append(...searchWrapper.childNodes);
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.className = 'btn btn-primary sn-page-search-submit';
+    submit.textContent = 'Search';
+    searchForm.append(submit);
+    searchWrapper.replaceWith(searchForm);
+    pageSearch.placeholder = 'Search providers, services, or categories';
+    pageSearch.setAttribute('aria-label', 'Search providers, services, or categories');
+    pageSearch.setAttribute('aria-controls', 'sn-results-list');
+    pageSearch.setAttribute('enterkeyhint', 'search');
+  }
+  countEl?.setAttribute('role', 'status');
   const sortLabels = {
     recommended: {
       title: 'Recommended',
@@ -250,10 +270,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   let providerRequestId = 0;
   let providerSignature = '';
   let mapSignature = '';
+  let searchTimer;
   async function loadProviders({ background = false } = {}) {
     if (!resultList) return;
+    if (background && searchTimer) return;
     const requestId = ++providerRequestId;
-    if (!background) resultList.innerHTML = '<p class="sn-search-empty">Loading providers...</p>';
+    if (!background) {
+      resultList.innerHTML = '<p class="sn-search-empty">Loading providers...</p>';
+      resultList.setAttribute('aria-busy', 'true');
+      if (countEl) countEl.textContent = 'Searching...';
+    }
     try {
       const params = new URLSearchParams({
         q: currentQuery,
@@ -274,11 +300,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSortSummary(data.algorithm);
         renderProviders(data.providers || []);
       }
+      resultList.setAttribute('aria-busy', 'false');
       await loadLocationMap({ background });
     } catch (error) {
       if (background || requestId !== providerRequestId) return;
-      resultList.innerHTML = `<p class="sn-search-empty">${esc(error.message || 'Failed to load providers.')}</p>`;
-      if (countEl) countEl.textContent = '0 providers found';
+      resultList.setAttribute('aria-busy', 'false');
+      resultList.innerHTML = '<div class="sn-search-empty"><p>Search is unavailable right now. Please try again.</p><button class="btn btn-outline" type="button" data-retry-search>Retry</button></div>';
+      if (countEl) countEl.textContent = 'Unable to load results';
     }
   }
 
@@ -598,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!providers.length) {
-      resultList.innerHTML = '<p class="sn-search-empty">No providers matched your search and filters.</p>';
+      resultList.innerHTML = '<p class="sn-search-empty">No available services or providers match your search and filters.</p>';
       return;
     }
 
@@ -634,6 +662,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   resultList?.addEventListener('click', async (event) => {
+    if (event.target.closest('[data-retry-search]')) {
+      loadProviders();
+      return;
+    }
     const favoriteButton = event.target.closest('.sn-fav-btn[data-provider-id]');
     if (!favoriteButton) return;
     event.preventDefault();
@@ -658,16 +690,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  let searchTimer;
-  function applySearchQuery(value) {
-    currentQuery = value.trim();
-    if (topSearch) topSearch.value = currentQuery;
-    if (pageSearch) pageSearch.value = currentQuery;
+  function applySearchQuery(source, { immediate = false } = {}) {
+    // Keep the editable draft intact; trimming it on every keystroke eats spaces.
+    currentQuery = source.value.trim().replace(/\s+/g, ' ');
+    if (topSearch && topSearch !== source) topSearch.value = source.value;
+    if (pageSearch && pageSearch !== source) pageSearch.value = source.value;
     window.clearTimeout(searchTimer);
-    searchTimer = window.setTimeout(loadProviders, 300);
+    searchTimer = null;
+    ++providerRequestId;
+    ++mapRequestId;
+    const url = new URL(window.location.href);
+    if (currentQuery) url.searchParams.set('q', currentQuery);
+    else url.searchParams.delete('q');
+    window.history.replaceState(window.history.state, '', url);
+    if (immediate) loadProviders();
+    else searchTimer = window.setTimeout(() => { searchTimer = null; loadProviders(); }, 300);
   }
-  topSearch?.addEventListener('input', () => applySearchQuery(topSearch.value));
-  pageSearch?.addEventListener('input', () => applySearchQuery(pageSearch.value));
+  for (const input of [topSearch, pageSearch].filter(Boolean)) {
+    input.addEventListener('input', event => {
+      if (!event.isComposing) applySearchQuery(input);
+    });
+    input.addEventListener('compositionend', () => applySearchQuery(input));
+  }
+  function submitSearch(event) {
+    event.preventDefault();
+    applySearchQuery(pageSearch || topSearch, { immediate: true });
+    countEl?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }
+  searchForm?.addEventListener('submit', submitSearch);
+  topSearch?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing) submitSearch(event);
+  });
 
   function syncFilterControls() {
     const categorySelect = document.getElementById('sn-filter-category');
