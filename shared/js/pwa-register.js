@@ -1,6 +1,9 @@
 'use strict';
 
 (function registerSerbisyoNowPwa() {
+  const interactions = document.createElement('script');
+  interactions.src = '/shared/js/interactions.js';
+  document.head.appendChild(interactions);
   const mobileLayout = window.matchMedia('(max-width: 940px)');
   mobileLayout.addEventListener('change', () => {
     const shell = document.querySelector('.sn-shell');
