@@ -140,6 +140,34 @@ function snAttachCustomerSidebarFallback() {
  overlay?.addEventListener('click', closeSidebar, true);
 }
 
+function snAttachCategoryBrowseFilters(customer) {
+ const panel = document.querySelector('.sn-category-layout .sn-filter-panel');
+ if (!panel || panel.dataset.browseFiltersReady) return;
+ panel.dataset.browseFiltersReady = 'true';
+ const filters = {
+  all: { sort: 'recommended', available: false },
+  'available now': { sort: 'available', available: true },
+  'top-rated': { sort: 'top', available: false },
+  nearby: { sort: 'nearest', available: false },
+ };
+ panel.querySelectorAll('.sn-chip').forEach(button => {
+  const filter = filters[button.textContent.trim().toLowerCase()];
+  if (!filter) return;
+  button.type = 'button';
+  button.addEventListener('click', () => {
+   const current = snCurrentCustomer() || customer;
+   const query = document.querySelector('.sn-hero-search input[type="search"]')?.value.trim() || '';
+   const params = new URLSearchParams({
+    sort: filter.sort,
+    available: String(filter.available),
+    location: current.address || '',
+   });
+   if (query) params.set('q', query);
+   window.location.href = `../search/search.html?${params}`;
+  });
+ });
+}
+
 function snAttachUniversalCustomerFilter(customer) {
  const path = window.location.pathname;
  if (path.includes('/customer/search/') || window.snDisableCustomerTopbarSearch) return;
@@ -565,6 +593,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  snRenderCustomerChrome(customer);
  snAttachCustomerSidebarFallback();
  snAttachUniversalCustomerFilter(customer);
+ snAttachCategoryBrowseFilters(customer);
  window.snStartLiveRefresh('customer-account', async () => {
   if (window.snCustomerProfileSaving) return;
   const snapshot = localStorage.getItem('sn_customer_user');
