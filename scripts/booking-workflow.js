@@ -49,7 +49,9 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
   if (status === 'cancelled') await cancelBookingPayment(client, booking);
   await client.query(`
    UPDATE provider_availability AS a
-   SET is_available = NOT EXISTS (
+   SET is_available =
+    (a.repeat_id IS NULL OR EXISTS (SELECT 1 FROM provider_schedule_repeats r WHERE r.id=a.repeat_id AND r.is_active AND r.is_available))
+    AND NOT EXISTS (
     SELECT 1 FROM customer_bookings b
     WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
       AND b.scheduled_time = a.start_time AND b.status <> 'cancelled'

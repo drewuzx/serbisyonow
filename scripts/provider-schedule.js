@@ -2,6 +2,7 @@
 
 const { transaction, fail } = require('./booking-payments');
 const time = require('../shared/js/time-format');
+const { ensureRepeats, createRepeat } = require('./recurring-schedule');
 
 function dateKey(value) {
  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) fail(400, 'Choose a valid date.');
@@ -18,6 +19,8 @@ function monday(value) {
 
 async function loadWeek(db, providerId, start) {
  start = monday(start);
+ const end = new Date(`${start}T00:00:00Z`); end.setUTCDate(end.getUTCDate()+6);
+ await ensureRepeats(db,providerId,start,end.toISOString().slice(0,10));
  const slots = await db.query(`SELECT av.*, to_char(av.available_date, 'YYYY-MM-DD') AS available_date
   FROM provider_availability av WHERE provider_id=$1 AND available_date >= $2::date
   AND available_date < $2::date + 7 ORDER BY av.available_date, av.start_time`, [providerId, start]);
@@ -26,7 +29,9 @@ async function loadWeek(db, providerId, start) {
   FROM customer_bookings b LEFT JOIN customers c ON c.id=b.customer_id
   WHERE b.provider_id=$1 AND b.scheduled_date >= $2::date AND b.scheduled_date < $2::date + 7
   AND b.status NOT IN ('cancelled', 'completed') ORDER BY b.scheduled_date, b.id`, [providerId, start]);
- return { week_start: start, availability: slots.rows, bookings: bookings.rows };
+ const repeats = await db.query(`SELECT *,to_char(start_date,'YYYY-MM-DD') AS start_date
+  FROM provider_schedule_repeats WHERE provider_id=$1 AND is_active ORDER BY id`,[providerId]);
+ return { week_start: start, availability: slots.rows, bookings: bookings.rows, repeats: repeats.rows };
 }
 
 async function saveWeek(db, providerId, body) {
@@ -38,6 +43,9 @@ async function saveWeek(db, providerId, body) {
  const start = time.minutes(body.start_time), end = time.minutes(body.end_time);
  if (start === null || end === null || end <= start) fail(400, 'End time must be later than start time.');
  if (typeof body.is_available !== 'boolean') fail(400, 'Choose whether these hours are open for booking.');
+ if (body.repeat_weekly !== undefined && typeof body.repeat_weekly !== 'boolean') fail(400,'Choose whether to repeat weekly.');
+ if (body.repeat_weekly) return createRepeat(db,providerId,{dates,start_time:time.to24(body.start_time),end_time:time.to24(body.end_time),is_available:body.is_available});
+ await ensureRepeats(db,providerId,dates[0],dates[dates.length-1]);
  return transaction(db, async client => {
   // Serialize weekly submissions so overlapping batches cannot both pass validation.
   await client.query('SELECT id FROM providers WHERE id=$1 FOR UPDATE', [providerId]);

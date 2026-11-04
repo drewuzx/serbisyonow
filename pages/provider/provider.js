@@ -1890,14 +1890,24 @@ async function loadScheduleWeek() {
         return `<section class="sn-week-day ${date === today ? 'is-today' : ''}" aria-label="${date}">
           <h4>${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][index]} <span>${shortDate(date)}</span></h4>
           ${slots.map(slot => `<div class="sn-schedule-slot sn-week-slot" data-slot-id="${esc(slot.id)}"><div><span>${esc(SNTime.format(slot.start_time))} - ${esc(SNTime.format(slot.end_time))}</span></div>
-            ${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Closed</span>'}
+            ${slot.is_available ? '<span class="sn-status-pill active">Open</span>' : '<span class="sn-status-pill pending">Closed</span>'}${slot.repeat_id ? '<span class="sn-repeat-label">Weekly</span>' : ''}
             ${date >= today ? `<div class="sn-schedule-slot-actions"><button class="btn btn-outline btn-sm" type="button" data-schedule-action="toggle" data-next-state="${!slot.is_available}">${slot.is_available ? 'Close' : 'Reopen'}</button>
             <button class="btn btn-danger btn-sm" type="button" data-schedule-action="delete">Delete</button></div>` : ''}</div>`).join('')}
           ${appointments.map(booking => `<div class="sn-week-appointment"><strong>${esc(SNTime.format(booking.scheduled_time))}</strong><span>${esc(booking.service)}</span><span>${esc(booking.customer_name || 'Customer')}</span>${statusPill(booking.status)}</div>`).join('')}
           ${!slots.length && !appointments.length ? '<p class="sn-week-empty">No schedule</p>' : ''}
           ${date >= today ? `<button type="button" class="btn btn-outline btn-sm sn-week-add" data-add-date="${date}">+ Add hours</button>` : ''}
         </section>`;
-      }).join('')}</div>`;
+      }).join('')}</div>
+      <section class="sn-week-repeats" aria-label="Weekly repeats"><h3>Weekly Repeats</h3>
+        ${(data.repeats || []).map(rule => `<div class="sn-repeat-row"><div>
+          <strong>${esc(rule.weekdays.map(day => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]).join(', '))}</strong>
+          <span>${esc(SNTime.format(rule.start_time))} - ${esc(SNTime.format(rule.end_time))} &middot; ${rule.is_available ? 'Open' : 'Closed'}</span>
+          <small>From ${shortDate(rule.start_date)} &middot; Until stopped</small>
+        </div><button class="btn btn-outline btn-sm" type="button" data-stop-repeat="${esc(rule.id)}">Stop repeating</button></div>`).join('') || '<p>No active weekly repeats.</p>'}
+      </section>`;
+    panel.querySelectorAll('[data-stop-repeat]').forEach(button => {
+      button.onclick = () => stopScheduleRepeat(button.dataset.stopRepeat, button);
+    });
     panel.querySelectorAll('[data-week-offset]').forEach(button => button.onclick = () => {
       scheduleWeekStart = scheduleDay(scheduleWeekStart, Number(button.dataset.weekOffset));
       loadScheduleWeek();
@@ -1928,6 +1938,24 @@ function bindScheduleActions(root) {
   });
 }
 
+async function stopScheduleRepeat(id, button) {
+  const confirmed = await openProviderModal({
+    title: 'Stop weekly repeat',
+    message: 'Remove future hours from this repeat? Existing bookings and dates you changed individually will be kept.',
+    confirmText: 'Stop repeating', danger: true,
+  });
+  if (!confirmed) return;
+  button.disabled = true;
+  try {
+    await providerSend(`/api/provider/${getProviderUser().id}/schedule-repeats/${id}`, 'DELETE');
+    await loadProviderDatabase({ background: true });
+    await loadScheduleWeek();
+    setScheduleStatus('Weekly repeat stopped. Existing bookings and individual changes were kept.', 'success');
+  } catch (error) {
+    await openProviderModal({ title: 'Repeat not stopped', message: error.message || 'Please try again.', confirmText: 'OK' });
+  } finally { button.disabled = false; }
+}
+
 function renderSchedule(availability, bookings, preserveDraft = false) {
   const grid = document.querySelector('.sn-page-grid');
   if (!grid) return;
@@ -1950,6 +1978,10 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
         <label class="sn-schedule-check">
           <input id="sn-availability-open" name="is_available" type="checkbox" checked />
           <span>Open for customer booking</span>
+        </label>
+        <label class="sn-schedule-check">
+          <input id="sn-availability-repeat" name="repeat_weekly" type="checkbox" />
+          <span>Repeat weekly until stopped</span>
         </label>
         <div class="sn-actions-row full">
           <button class="btn btn-primary" type="submit">Save Availability</button>
@@ -2045,6 +2077,7 @@ async function saveAvailabilitySlot(event) {
     start_time: startTime,
     end_time: endTime,
     is_available: formData.get('is_available') === 'on',
+    repeat_weekly: formData.get('repeat_weekly') === 'on',
     dates: formData.getAll('dates'),
   };
   if (!body.dates.length) {
@@ -2057,11 +2090,13 @@ async function saveAvailabilitySlot(event) {
     submit.textContent = 'Saving...';
   }
   try {
-    await providerSend(`/api/provider/${provider.id}/availability-week`, 'POST', body);
+    const result = await providerSend(`/api/provider/${provider.id}/availability-week`, 'POST', body);
     scheduleWeekStart = scheduleMonday(body.available_date);
     await loadProviderDatabase({ background: true });
     await loadScheduleWeek();
-    setScheduleStatus(`Availability saved for ${body.dates.length} day${body.dates.length === 1 ? '' : 's'}.`, 'success');
+    setScheduleStatus(body.repeat_weekly
+      ? `Weekly repeat saved and will continue until stopped.${result.skipped ? ` ${result.skipped} dates with existing hours or bookings were left unchanged.` : ''}`
+      : `Availability saved for ${body.dates.length} day${body.dates.length === 1 ? '' : 's'}.`, 'success');
   } catch (error) {
     setScheduleStatus(error.message || 'Unable to save availability.', 'error');
   } finally {

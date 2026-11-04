@@ -1827,6 +1827,12 @@ body {
 
 .sn-schedule-form { grid-template-columns: minmax(0, 1fr); }
 .sn-schedule-week { grid-column:1 / -1; min-width:0; }
+.sn-week-repeats { border-top:1px solid var(--border); margin-top:20px; padding-top:20px; }
+.sn-repeat-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px 0; border-bottom:1px solid var(--border); }
+.sn-repeat-row > div { display:flex; flex-direction:column; gap:5px; min-width:0; overflow-wrap:anywhere; }
+.sn-repeat-row small, .sn-repeat-label { color:var(--text-muted); }
+.sn-repeat-row .btn { white-space:normal; }
+.sn-repeat-label { font-size:12px; }
 .sn-week-header { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
 .sn-week-header h3 { margin:0; }
 .sn-week-header p { margin:6px 0 0; }

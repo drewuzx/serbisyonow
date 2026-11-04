@@ -29,6 +29,7 @@ const { registerAdminProviderDetails } = require('./admin-provider-details');
 const { registerAdminReports } = require('./admin-reports');
 const { registerProfilePhotos } = require('./profile-photos');
 const { loadWeek, saveWeek } = require('./provider-schedule');
+const { ensureRepeats, stopRepeat } = require('./recurring-schedule');
 const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
@@ -1592,6 +1593,7 @@ function customerReviewRow(row) {
 }
 
 async function getCollaborativeRecommendations(customerId, limit = 8) {
+  await ensureRepeats(db);
   const result = await db.query(`
     WITH my_interactions AS (
       SELECT provider_id FROM customer_favorites WHERE customer_id = $1 AND provider_id IS NOT NULL
@@ -2444,6 +2446,7 @@ app.get('/api/customer/:id/recommendations', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
+  await ensureRepeats(db);
   const customerResult = await db.query('SELECT id, address, latitude, longitude, location_accuracy_m, location_updated_at FROM customers WHERE id = $1', [req.params.id]);
   if (!customerResult.rowCount) return res.status(404).json({ message: 'Customer not found.' });
 
@@ -2583,7 +2586,9 @@ app.patch('/api/customer/:id/bookings/:bookingId/cancel', asyncRoute(async (req,
     if (!['pending', 'upcoming', 'ongoing'].includes(current.status)) paymentFail(409, 'This booking is already closed.');
     await cancelBookingPayment(client, current);
     const updated = await client.query("UPDATE customer_bookings SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *", [current.id]);
-    await client.query(`UPDATE provider_availability AS a SET is_available = NOT EXISTS (
+    await client.query(`UPDATE provider_availability AS a SET is_available =
+      (a.repeat_id IS NULL OR EXISTS (SELECT 1 FROM provider_schedule_repeats r WHERE r.id=a.repeat_id AND r.is_active AND r.is_available))
+      AND NOT EXISTS (
       SELECT 1 FROM customer_bookings b WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
       AND b.scheduled_time = a.start_time AND b.status <> 'cancelled')
       WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time = $3`, [current.provider_id, current.scheduled_date, current.scheduled_time]);
@@ -3098,6 +3103,7 @@ app.patch('/api/provider/:id/location', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/providers/search', asyncRoute(async (req, res) => {
+  await ensureRepeats(db);
   const q = String(req.query.q || '').trim();
   const category = String(req.query.category || '').trim();
   const sort = String(req.query.sort || 'recommended');
@@ -3259,6 +3265,7 @@ app.get('/api/customer/search/providers', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
+  await ensureRepeats(db,req.params.id,req.query.date || undefined);
   const date = String(req.query.date || '').trim();
   const params = [req.params.id];
   const where = ['provider_id = $1', 'available_date >= CURRENT_DATE', 'is_available = TRUE'];
@@ -3438,6 +3445,7 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
 }));
 
 app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
+  await ensureRepeats(db,req.params.id);
   const providerId = req.params.id;
   const [provider, services, bookings, messages, reviews, availability, assessment] = await Promise.all([
     db.query('SELECT * FROM providers WHERE id = $1', [providerId]),
@@ -3667,6 +3675,11 @@ app.post('/api/provider/:id/availability-week', asyncRoute(async (req, res) => {
   res.status(201).json(await saveWeek(db, req.params.id, req.body));
 }));
 
+app.delete('/api/provider/:id/schedule-repeats/:repeatId', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
+  res.json(await stopRepeat(db,req.params.id,req.params.repeatId));
+}));
+
 app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'provider', req.params.id);
   requireFields(req.body, ['available_date', 'start_time', 'end_time']);
@@ -3674,7 +3687,7 @@ app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
     INSERT INTO provider_availability (provider_id, available_date, start_time, end_time, is_available)
     VALUES ($1, $2, $3, $4, COALESCE($5, TRUE))
     ON CONFLICT (provider_id, available_date, start_time)
-    DO UPDATE SET end_time = EXCLUDED.end_time, is_available = EXCLUDED.is_available
+    DO UPDATE SET end_time = EXCLUDED.end_time, is_available = EXCLUDED.is_available, repeat_id = NULL
     RETURNING *
   `, [req.params.id, req.body.available_date, req.body.start_time, req.body.end_time, req.body.is_available !== false]);
   res.status(201).json({ availability: result.rows[0] });
@@ -3685,6 +3698,7 @@ app.patch('/api/provider/:providerId/availability/:slotId', asyncRoute(async (re
   const result = await db.query(`
     UPDATE provider_availability
     SET available_date = COALESCE($3, available_date),
+        repeat_id = NULL,
         start_time = COALESCE($4, start_time),
         end_time = COALESCE($5, end_time),
         is_available = COALESCE($6, is_available)
@@ -4169,6 +4183,7 @@ ensureAdminSupportTables()
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'feedback-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'promotion-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'profile-photo-schema.sql'), 'utf8')))
+  .then(() => db.query(fs.readFileSync(path.join(__dirname, 'recurring-schedule-schema.sql'), 'utf8')))
   .then(() => {
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);
