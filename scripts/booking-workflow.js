@@ -1,5 +1,6 @@
 'use strict';
 const { cancelBookingPayment } = require('./booking-payments');
+const { unoccupiedSlot } = require('./availability');
 
 const transitions = {
  pending: ['upcoming', 'cancelled'],
@@ -49,15 +50,11 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
   if (status === 'cancelled') await cancelBookingPayment(client, booking);
   await client.query(`
    UPDATE provider_availability AS a
-   SET is_available =
+   SET is_available = $4::boolean AND
     (a.repeat_id IS NULL OR EXISTS (SELECT 1 FROM provider_schedule_repeats r WHERE r.id=a.repeat_id AND r.is_active AND r.is_available))
-    AND NOT EXISTS (
-    SELECT 1 FROM customer_bookings b
-    WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
-      AND b.scheduled_time = a.start_time AND b.status <> 'cancelled'
-   )
-   WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time = $3
-  `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time]);
+    AND ${unoccupiedSlot()}
+   WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time::time = $3::time
+  `, [booking.provider_id, booking.scheduled_date, booking.scheduled_time, status === 'cancelled']);
   await client.query('COMMIT');
   if (status === 'cancelled' && booking.deposit_required) result.rows[0].deposit_status = booking.deposit_paid_at || (booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id) ? 'refund_review' : 'cancelled';
   return result.rows[0];

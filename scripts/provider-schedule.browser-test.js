@@ -44,6 +44,7 @@ async function main() {
   await monday.getByRole('button',{name:'Close',exact:true}).click();
   await monday.getByRole('button',{name:'Reopen',exact:true}).waitFor();
   assert.equal((await f.request('/api/providers/81/availability?date=2099-10-05')).data.availability.length,0);
+  await f.createBooking({scheduled_date:'2099-10-05',scheduled_time:'09:00 AM',status:'completed'});
   await monday.getByRole('button',{name:'Reopen',exact:true}).click();
   await monday.getByRole('button',{name:'Close',exact:true}).waitFor();
   for (const width of [1440,1024,390,320]) {

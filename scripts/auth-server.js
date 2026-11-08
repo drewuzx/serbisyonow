@@ -30,6 +30,8 @@ const { registerAdminReports } = require('./admin-reports');
 const { registerProfilePhotos } = require('./profile-photos');
 const { loadWeek, saveWeek } = require('./provider-schedule');
 const { ensureRepeats, stopRepeat } = require('./recurring-schedule');
+const { bookableSlot, unoccupiedSlot, updateSlot } = require('./availability');
+const scheduleTime = require('../shared/js/time-format');
 const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
@@ -1648,8 +1650,8 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
     ),
     availability_counts AS (
       SELECT provider_id, COUNT(*)::int AS available_slots
-      FROM provider_availability
-      WHERE available_date >= CURRENT_DATE AND is_available = TRUE
+      FROM provider_availability a
+      WHERE ${bookableSlot()}
       GROUP BY provider_id
     )
     SELECT
@@ -2465,8 +2467,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
   const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
   if (availableOnly) {
     where.push(`EXISTS (SELECT 1 FROM provider_availability availability
-      WHERE availability.provider_id = p.id AND availability.available_date >= CURRENT_DATE
-        AND availability.is_available = TRUE)`);
+      WHERE availability.provider_id = p.id AND ${bookableSlot('availability')})`);
   }
   if (q) {
     params.push(`%${q}%`);
@@ -2499,7 +2500,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
     LEFT JOIN provider_services s ON s.provider_id = p.id AND s.is_active = TRUE
     LEFT JOIN customer_reviews r ON r.provider_id = p.id
     LEFT JOIN customer_bookings b ON b.provider_id = p.id
-    LEFT JOIN provider_availability av ON av.provider_id = p.id AND av.available_date >= CURRENT_DATE AND av.is_available = TRUE
+    LEFT JOIN provider_availability av ON av.provider_id = p.id AND ${bookableSlot('av')}
     LEFT JOIN LATERAL (
       SELECT score
       FROM provider_skill_assessments
@@ -2588,10 +2589,8 @@ app.patch('/api/customer/:id/bookings/:bookingId/cancel', asyncRoute(async (req,
     const updated = await client.query("UPDATE customer_bookings SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *", [current.id]);
     await client.query(`UPDATE provider_availability AS a SET is_available =
       (a.repeat_id IS NULL OR EXISTS (SELECT 1 FROM provider_schedule_repeats r WHERE r.id=a.repeat_id AND r.is_active AND r.is_available))
-      AND NOT EXISTS (
-      SELECT 1 FROM customer_bookings b WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
-      AND b.scheduled_time = a.start_time AND b.status <> 'cancelled')
-      WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time = $3`, [current.provider_id, current.scheduled_date, current.scheduled_time]);
+      AND ${unoccupiedSlot()}
+      WHERE a.provider_id = $1 AND a.available_date = $2 AND a.start_time::time = $3::time`, [current.provider_id, current.scheduled_date, current.scheduled_time]);
     return updated.rows[0];
   });
   await expireCancelledCheckout(db, paymongo, booking.id);
@@ -3140,8 +3139,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
       SELECT 1
       FROM provider_availability av
       WHERE av.provider_id = p.id
-        AND av.available_date >= CURRENT_DATE
-        AND av.is_available = TRUE
+        AND ${bookableSlot('av')}
     )`);
   }
 
@@ -3167,8 +3165,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
         SELECT COUNT(*)::int
         FROM provider_availability av
         WHERE av.provider_id = p.id
-          AND av.available_date >= CURRENT_DATE
-          AND av.is_available = TRUE
+          AND ${bookableSlot('av')}
       ) AS available_slots,
       COALESCE(psa.score, extract_score.score, 0)::int AS assessment_score,
       CASE
@@ -3188,8 +3185,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
           SELECT COUNT(*)::int
           FROM provider_availability av
           WHERE av.provider_id = p.id
-            AND av.available_date >= CURRENT_DATE
-            AND av.is_available = TRUE
+            AND ${bookableSlot('av')}
         ) * 3
         + CASE
           WHEN ${locationParam} <> '' AND lower(p.address) LIKE '%' || ${locationParam} || '%' THEN 20
@@ -3268,15 +3264,15 @@ app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
   await ensureRepeats(db,req.params.id,req.query.date || undefined);
   const date = String(req.query.date || '').trim();
   const params = [req.params.id];
-  const where = ['provider_id = $1', 'available_date >= CURRENT_DATE', 'is_available = TRUE'];
+  const where = ['a.provider_id = $1', bookableSlot()];
   if (date) {
     params.push(date);
     where.push(`available_date = $${params.length}`);
   }
 
   const result = await db.query(`
-    SELECT id, available_date, start_time, end_time, is_available
-    FROM provider_availability
+    SELECT id, to_char(available_date,'YYYY-MM-DD') AS available_date, start_time, end_time, is_available
+    FROM provider_availability a
     WHERE ${where.join(' AND ')}
     ORDER BY available_date ASC, start_time ASC
     LIMIT 12
@@ -3296,6 +3292,7 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
 ]), asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'customer', req.params.id);
   requireFields(req.body, ['provider_id', 'service', 'scheduled_date', 'scheduled_time', 'address']);
+  if (scheduleTime.minutes(req.body.scheduled_time) === null) paymentFail(400,'Choose a valid booking time.');
   const latitude = Number(req.body.latitude);
   const longitude = Number(req.body.longitude);
   const accuracy = Number(req.body.accuracy);
@@ -3353,6 +3350,8 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
   }
 
   const result = await transaction(db, async client => {
+  // Serialize schedule changes and bookings, including legacy equivalent time values.
+  await client.query('SELECT id FROM providers WHERE id=$1 FOR UPDATE', [req.body.provider_id]);
   // Lock the selected service so a concurrent switch-off cannot admit a new booking.
   const latest = await client.query('SELECT * FROM provider_services WHERE provider_id = $1 AND id = $2 FOR SHARE', [req.body.provider_id, selectedService.id]);
   if (!latest.rows[0]?.is_active || !serviceAcceptsPayment(latest.rows[0], paymentMethod)
@@ -3362,25 +3361,22 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     throw error;
   }
   const availability = await client.query(`
-    SELECT id FROM provider_availability AS a
+    SELECT id, start_time FROM provider_availability AS a
     WHERE provider_id = $1
       AND available_date = $2
-      AND start_time = $3
+      AND start_time::time = $3::time
       AND is_available = TRUE
-      AND NOT EXISTS (
-        SELECT 1 FROM customer_bookings b
-        WHERE b.provider_id = a.provider_id AND b.scheduled_date = a.available_date
-          AND b.scheduled_time = a.start_time AND b.status <> 'cancelled'
-      )
     LIMIT 1
     FOR UPDATE
   `, [req.body.provider_id, req.body.scheduled_date, req.body.scheduled_time]);
 
-  if (!availability.rowCount) {
+  const canBook = availability.rowCount && (await client.query(`SELECT id FROM provider_availability a
+    WHERE a.id=$1 AND ${bookableSlot()}`, [availability.rows[0].id])).rowCount;
+  if (!canBook) {
     const alternatives = await client.query(`
       SELECT available_date, start_time, end_time
-      FROM provider_availability
-      WHERE provider_id = $1 AND available_date >= CURRENT_DATE AND is_available = TRUE
+      FROM provider_availability a
+      WHERE provider_id = $1 AND ${bookableSlot()}
       ORDER BY available_date ASC, start_time ASC
       LIMIT 5
     `, [req.body.provider_id]);
@@ -3390,6 +3386,7 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     throw error;
   }
 
+  req.body.scheduled_time = availability.rows[0].start_time;
   const inserted = await client.query(`
     INSERT INTO customer_bookings (
       customer_id,
@@ -3695,25 +3692,7 @@ app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
 
 app.patch('/api/provider/:providerId/availability/:slotId', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'provider', req.params.providerId);
-  const result = await db.query(`
-    UPDATE provider_availability
-    SET available_date = COALESCE($3, available_date),
-        repeat_id = NULL,
-        start_time = COALESCE($4, start_time),
-        end_time = COALESCE($5, end_time),
-        is_available = COALESCE($6, is_available)
-    WHERE provider_id = $1 AND id = $2
-    RETURNING *
-  `, [
-    req.params.providerId,
-    req.params.slotId,
-    req.body.available_date || null,
-    req.body.start_time || null,
-    req.body.end_time || null,
-    typeof req.body.is_available === 'boolean' ? req.body.is_available : null,
-  ]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Availability slot not found.' });
-  res.json({ availability: result.rows[0] });
+  res.json({ availability: await updateSlot(db, req.params.providerId, req.params.slotId, req.body) });
 }));
 
 app.delete('/api/provider/:providerId/availability/:slotId', asyncRoute(async (req, res) => {

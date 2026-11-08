@@ -39,8 +39,8 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
    } else if (query.startsWith('UPDATE provider_availability AS a')) {
     if (failAvailability) throw new Error('Availability write failed');
     assert.match(query, /NOT EXISTS/);
-    assert.match(query, /b.status <> 'cancelled'/);
-    available = !bookings.some(row => row.provider_id === params[0] && row.scheduled_date === params[1] && row.scheduled_time === params[2] && row.status !== 'cancelled');
+    assert.match(query, /occupied.status NOT IN \('cancelled','completed'\)/);
+    available = params[3] && !bookings.some(row => row.provider_id === params[0] && row.scheduled_date === params[1] && row.scheduled_time === params[2] && !['cancelled','completed'].includes(row.status));
    } else if (query.startsWith('UPDATE customer_bookings SET provider_closed')) {
     if (booking && ['completed', 'cancelled'].includes(booking.status)) {
      booking.provider_closed = true;
