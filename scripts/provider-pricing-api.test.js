@@ -25,7 +25,7 @@ test('provider pricing persists, protects ownership and controls booking totals'
   const base=cleaning.assessment('general house cleaning',cleaning.defaults('general house cleaning'));
   const estimate=pricing.apply(base,service,{addons:[{id:'fridge',quantity:1}]});
   await f.db.query("INSERT INTO provider_availability (provider_id,available_date,start_time,end_time) VALUES (81,'2099-10-10','10:00 AM','12:00 PM')");
-  const body={provider_id:81,provider_service_id:id,service:service.title,scheduled_date:'2099-10-10',scheduled_time:'10:00 AM',address:'Test',amount:1,estimated_min:1,estimated_max:1,service_details:estimate.details};
+  const body={provider_id:81,provider_service_id:id,service:service.title,scheduled_date:'2099-10-10',scheduled_time:'10:00 AM',address:'Test',amount:1,estimated_min:1,estimated_max:1,service_details:estimate.details,latitude:15.145,longitude:120.59,location_confirmed:true};
   const stale=await f.request('/api/customer/61/bookings','POST',{...body,service_details:{...estimate.details,provider_pricing:{...estimate.details.provider_pricing,revision:'old'}}});
   assert.equal(stale.status,409);
   const wrong=await f.request('/api/customer/61/bookings','POST',{...body,provider_service_id:999999});

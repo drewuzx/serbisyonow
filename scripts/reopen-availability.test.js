@@ -7,7 +7,7 @@ test('reopened future slots can be booked again without completed history blocki
  const f=await startQrFixture();
  try {
   const service=(await f.db.query("INSERT INTO provider_services(provider_id,title,category,starting_price) VALUES(81,'Fixture work','Fixture',500) RETURNING id")).rows[0];
-  const body={provider_id:81,provider_service_id:service.id,service:'Fixture work',scheduled_date:'2099-10-10',scheduled_time:'10:00',address:'Test address',payment_method:'cash'};
+  const body={provider_id:81,provider_service_id:service.id,service:'Fixture work',scheduled_date:'2099-10-10',scheduled_time:'10:00',address:'Test address',payment_method:'cash',latitude:15.145,longitude:120.59,location_confirmed:true};
   const slot=(await f.db.query("INSERT INTO provider_availability(provider_id,available_date,start_time,end_time,is_available) VALUES(81,'2099-10-10','10:00 AM','12:00 PM',FALSE) RETURNING id")).rows[0];
   const route=`/api/provider/81/availability/${slot.id}`;
   const reopen=(token=f.providerToken)=>f.request(route,'PATCH',{is_available:true},token);
@@ -61,7 +61,7 @@ test('reopen rejects active appointment ranges and expired times, while closed h
   await f.db.query('UPDATE provider_availability SET is_available=TRUE WHERE id=$1',[expired.id]);
   assert.equal((await f.request('/api/providers/81/availability?date=2000-01-01')).data.availability.length,0);
   const service=(await f.db.query("INSERT INTO provider_services(provider_id,title,category,starting_price) VALUES(81,'Fixture work','Fixture',500) RETURNING id")).rows[0];
-  const pastBooking=await f.request('/api/customer/61/bookings','POST',{provider_id:81,provider_service_id:service.id,service:'Fixture work',scheduled_date:'2000-01-01',scheduled_time:'09:00',address:'Test'});
+  const pastBooking=await f.request('/api/customer/61/bookings','POST',{provider_id:81,provider_service_id:service.id,service:'Fixture work',scheduled_date:'2000-01-01',scheduled_time:'09:00',address:'Test',latitude:15.145,longitude:120.59,location_confirmed:true});
   assert.equal(pastBooking.status,409);
  } finally {await f.close();}
 });

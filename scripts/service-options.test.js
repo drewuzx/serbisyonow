@@ -18,7 +18,7 @@ test('service availability and Cash/QR options persist and gate new bookings', a
   const hidden = await f.request('/api/providers/search?q=Options%20Test');
   assert.equal(hidden.status, 200);
   assert.equal(hidden.data.providers.some(provider => provider.id === 81), false);
-  const booking = { provider_id: 81, provider_service_id: service.id, service: 'Options Test', scheduled_date: '2099-10-10', scheduled_time: '10:00 AM', address: 'Test', payment_method: 'cash' };
+  const booking = { provider_id: 81, provider_service_id: service.id, service: 'Options Test', scheduled_date: '2099-10-10', scheduled_time: '10:00 AM', address: 'Test', payment_method: 'cash', latitude:15.145, longitude:120.59, location_confirmed:true };
   const book = body => f.request('/api/customer/61/bookings', 'POST', { ...booking, ...body });
   assert.equal((await book({})).status, 400);
   assert.equal((await book({ provider_service_id: null })).status, 400, 'A disabled service cannot be booked by omitting its ID');

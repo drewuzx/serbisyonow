@@ -1,10 +1,11 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v96';
+const SW_VERSION = 'serbisyonow-pwa-v97';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
+  '/pages/customer/bookings/booking-location.js',
   '/vendor/leaflet/leaflet.js',
   '/vendor/leaflet/leaflet.css',
   '/shared/js/profile-photos.js',

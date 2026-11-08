@@ -1751,6 +1751,8 @@ function providerBookingRow(row) {
   const customerLng = bookingCoordinate(row.customer_longitude, 180);
   const hasBookingGps = Number.isFinite(bookingLat) && Number.isFinite(bookingLng);
   const hasCustomerGps = Number.isFinite(customerLat) && Number.isFinite(customerLng);
+  const bookingAccuracy = bookingCoordinate(row.booking_location_accuracy_m ?? row.location_accuracy_m, 99999999.99);
+  const customerAccuracy = bookingCoordinate(row.customer_location_accuracy_m, 99999999.99);
   const displayLat = hasBookingGps ? bookingLat : hasCustomerGps ? customerLat : null;
   const displayLng = hasBookingGps ? bookingLng : hasCustomerGps ? customerLng : null;
   const locationSource = hasBookingGps ? 'booking-gps' : hasCustomerGps ? 'customer-gps' : 'none';
@@ -1764,14 +1766,12 @@ function providerBookingRow(row) {
     customer_longitude: Number.isFinite(displayLng) ? displayLng : null,
     customer_location_source: locationSource,
     customer_location_estimate_source: null,
-    customer_location_accuracy_m: row.booking_location_accuracy_m === null || row.booking_location_accuracy_m === undefined
-      ? (row.customer_location_accuracy_m === null || row.customer_location_accuracy_m === undefined ? null : Number(row.customer_location_accuracy_m))
-      : Number(row.booking_location_accuracy_m),
-    customer_location_updated_at: row.booking_location_updated_at || row.customer_location_updated_at || null,
+    customer_location_accuracy_m: hasBookingGps ? bookingAccuracy : customerAccuracy,
+    customer_location_updated_at: hasBookingGps ? (row.booking_location_updated_at || row.location_updated_at || null) : (row.customer_location_updated_at || null),
     booking_latitude: bookingLat,
     booking_longitude: bookingLng,
-    booking_location_accuracy_m: row.booking_location_accuracy_m === null || row.booking_location_accuracy_m === undefined ? null : Number(row.booking_location_accuracy_m),
-    booking_location_updated_at: row.booking_location_updated_at || null,
+    booking_location_accuracy_m: bookingAccuracy,
+    booking_location_updated_at: row.booking_location_updated_at || row.location_updated_at || null,
     provider_closed: Boolean(row.provider_closed),
     provider_id: row.provider_id,
     service: row.service,
@@ -2371,6 +2371,7 @@ app.patch('/api/auth/customer/change-password', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'customer', req.params.id);
   const customerId = req.params.id;
   const [categories, providers, bookings, messages, favorites, reviews, recommendations] = await Promise.all([
     db.query(`
@@ -2562,6 +2563,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'customer', req.params.id);
   const result = await db.query(`
     SELECT
       b.*,
@@ -2672,6 +2674,7 @@ app.get('/api/directions', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/customer/:id/bookings/:bookingId/track', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'customer', req.params.id);
   const result = await db.query(`
     SELECT
       b.*,
@@ -3294,10 +3297,19 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
   await authenticateAccount(db, req, 'customer', req.params.id);
   requireFields(req.body, ['provider_id', 'service', 'scheduled_date', 'scheduled_time', 'address']);
   if (scheduleTime.minutes(req.body.scheduled_time) === null) paymentFail(400,'Choose a valid booking time.');
-  const latitude = Number(req.body.latitude);
-  const longitude = Number(req.body.longitude);
-  const accuracy = Number(req.body.accuracy);
-  const hasBookingGps = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const latitude = bookingCoordinate(req.body.latitude, 90);
+  const longitude = bookingCoordinate(req.body.longitude, 180);
+  const accuracy = req.body.accuracy == null || req.body.accuracy === '' ? null : bookingCoordinate(req.body.accuracy, 99999999.99);
+  const hasBookingGps = latitude !== null && longitude !== null;
+  if (!hasBookingGps || ![true, 'true'].includes(req.body.location_confirmed)) {
+    paymentFail(400, 'Confirm a valid service location pin before submitting your booking.');
+  }
+  if ((req.body.accuracy != null && req.body.accuracy !== '' && accuracy === null) || accuracy < 0) {
+    paymentFail(400, 'Location accuracy must be between 0 and 99999999.99 meters.');
+  }
+  if (req.body.landmark != null && (typeof req.body.landmark !== 'string' || req.body.landmark.length > 500)) {
+    paymentFail(400, 'Landmark / unit details must be at most 500 characters.');
+  }
   let serviceDetails = parseObjectField(req.body.service_details);
   const mediaFiles = bookingMediaFiles(req);
   if (mediaFiles.length) {
@@ -3349,6 +3361,8 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     estimatedMax = estimate.estimatedMax;
     bookingAmount = estimate.amount;
   }
+
+  serviceDetails.booking_location = { confirmed_at: new Date().toISOString(), landmark: (req.body.landmark || '').trim() };
 
   const result = await transaction(db, async client => {
   // Serialize schedule changes and bookings, including legacy equivalent time values.
@@ -3442,7 +3456,13 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
   res.status(201).json({ booking: customerBookingRow(result.rows[0]) });
 }));
 
+app.get('/api/providers/:id/services', asyncRoute(async (req, res) => {
+  const result = await db.query('SELECT * FROM provider_services WHERE provider_id = $1 AND is_active = TRUE ORDER BY created_at DESC', [req.params.id]);
+  res.json({ services: result.rows.map(providerServiceRow) });
+}));
+
 app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
   await ensureRepeats(db,req.params.id);
   const providerId = req.params.id;
   const [provider, services, bookings, messages, reviews, availability, assessment] = await Promise.all([

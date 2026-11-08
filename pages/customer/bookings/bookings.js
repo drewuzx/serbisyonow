@@ -7,7 +7,8 @@ function getCurrentCustomer() {
 }
 
 const BOOKING_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
-let bookingDeviceCoords = null;
+let bookingLocationPicker = null;
+let bookingSubmitting = false;
 let bookingProviderServices = [];
 let bookingProviderProfile = null;
 
@@ -910,6 +911,7 @@ async function showBookingDetails(booking) {
     ${item.deposit_livemode === false ? bookingDetailRow('Payment mode', 'Test payment only. No real funds received.') : ''}
     ${item.deposit_status === 'refund_review' ? bookingDetailRow('Refund', 'Review required. Not automatically refunded; contact support.') : ''}
     ${bookingDetailRow('Service address', item.address)}
+    ${bookingDetailRow('Landmark / unit', item.service_details?.booking_location?.landmark)}
     ${bookingDetailRow('Customer pin', customerPin)}
     ${bookingDetailRow('Provider GPS', providerLocation)}
     ${bookingServiceDetailRows(item.service_details)}
@@ -1236,7 +1238,7 @@ async function renderBookingRequestForm(customer) {
   console.warn(error.message || error);
  }
  try {
-  const data = await bookingFetch(`/api/provider/${providerId}/dashboard`);
+  const data = await bookingFetch(`/api/providers/${providerId}/services`);
   bookingProviderServices = (data.services || []).filter(service => service.is_active !== false);
  } catch (error) {
   bookingProviderServices = [];
@@ -1249,9 +1251,8 @@ async function renderBookingRequestForm(customer) {
   <div class="sn-booking-create-head">
    <div>
     <h3>Book ${bookingEsc(provider?.full_name || 'Service Provider')}</h3>
-    <p>Use your device location for the exact service pin the provider will see.</p>
    </div>
-   <span id="sn-booking-gps-status">GPS not saved yet</span>
+   <span id="sn-booking-gps-status">Location confirmation required</span>
   </div>
   <form id="sn-create-booking-form" class="sn-booking-create-grid">
    <label><span>Service</span><select id="sn-booking-service" name="service" required>${bookingServiceOptions(provider)}</select></label>
@@ -1268,13 +1269,20 @@ async function renderBookingRequestForm(customer) {
    <section class="sn-calculated-assessment full" id="sn-outdoor-assessment" hidden></section>
    <label><span>Service Amount</span><select id="sn-booking-amount-choice" name="amount_choice"></select></label>
    <label><span>Custom Amount</span><input id="sn-booking-custom-amount" name="amount" type="number" min="0" step="1" placeholder="Enter amount" /><small id="sn-booking-amount-hint" class="sn-booking-amount-hint"></small></label>
-   <label class="full"><span>Typed Address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>
+   <label class="full"><span>Service address</span><textarea name="address" required>${bookingEsc(customer.address || '')}</textarea></label>
+   <label class="full"><span>Landmark / unit details (optional)</span><input id="sn-booking-landmark" name="landmark" maxlength="500" placeholder="Building, floor, unit or nearby landmark" /></label>
    <div class="sn-booking-schedule-note full" id="sn-booking-schedule-note">Checking provider schedule...</div>
    <div class="sn-booking-alternatives full" id="sn-booking-alternatives" hidden></div>
-   <div class="sn-booking-location-row full">
-    <button class="sn-btn sn-btn-outline" id="sn-use-booking-gps" type="button">Use My Device Location</button>
-    <input id="sn-booking-gps-label" value="Device GPS not captured yet" readonly />
-   </div>
+   <section class="sn-booking-location full" aria-labelledby="sn-booking-location-title">
+    <h4 id="sn-booking-location-title">Service location <span>Required</span></h4>
+    <div class="sn-booking-location-actions">
+     <button class="sn-btn sn-btn-outline" id="sn-use-booking-gps" type="button">Use my current location</button>
+     <button class="sn-btn sn-btn-outline" id="sn-booking-pin-center" type="button">Pin map center</button>
+    </div>
+    <div id="sn-booking-location-map" role="region" aria-label="Select service location" tabindex="0"></div>
+    <p id="sn-booking-location-status" role="status" aria-live="polite">No service pin selected</p>
+    <button class="sn-btn sn-btn-primary" id="sn-confirm-booking-location" type="button" disabled>Confirm location</button>
+   </section>
    <button class="sn-btn sn-btn-primary full" type="submit">Submit Booking Request</button>
   </form>
  `;
@@ -1296,7 +1304,8 @@ async function renderBookingRequestForm(customer) {
   if (choice.value !== 'custom') custom.value = choice.value;
   if (choice.value === 'custom') custom.focus();
  });
- document.getElementById('sn-use-booking-gps')?.addEventListener('click', () => captureBookingGps(customer));
+ bookingLocationPicker?.dispose();
+ bookingLocationPicker = window.SNBookingLocation.create(customer);
  document.getElementById('sn-create-booking-form')?.addEventListener('submit', (event) => submitBookingRequest(event, customer, providerId));
  document.getElementById('sn-booking-date')?.addEventListener('change', () => loadProviderBookingSlots(providerId));
  await loadProviderBookingSlots(providerId);
@@ -1396,40 +1405,11 @@ function renderBookingAlternatives(slots, providerId) {
  });
 }
 
-function captureBookingGps(customer) {
- const gpsLabel = document.getElementById('sn-booking-gps-label');
- const gpsStatus = document.getElementById('sn-booking-gps-status');
- if (!navigator.geolocation) {
-  if (gpsLabel) gpsLabel.value = 'GPS is not available in this browser.';
-  return;
- }
- if (gpsLabel) gpsLabel.value = 'Requesting GPS permission...';
- navigator.geolocation.getCurrentPosition(async (position) => {
-  bookingDeviceCoords = {
-   latitude: position.coords.latitude,
-   longitude: position.coords.longitude,
-   accuracy: position.coords.accuracy,
-  };
-  if (gpsLabel) gpsLabel.value = `${bookingDeviceCoords.latitude.toFixed(6)}, ${bookingDeviceCoords.longitude.toFixed(6)} (+/- ${Math.round(bookingDeviceCoords.accuracy)}m)`;
-  if (gpsStatus) gpsStatus.textContent = 'Device GPS ready';
-  try {
-   const data = await bookingFetch(`/api/customer/${customer.id}/location`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(bookingDeviceCoords),
-   });
-   if (data.user) localStorage.setItem('sn_customer_user', JSON.stringify({ ...customer, ...data.user }));
-  } catch (error) {
-   console.warn(error.message || error);
-  }
- }, () => {
-  if (gpsLabel) gpsLabel.value = 'GPS permission was denied. Typed address will be used as backup.';
-  if (gpsStatus) gpsStatus.textContent = 'Address backup';
- }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
-}
-
 async function submitBookingRequest(event, customer, providerId) {
  event.preventDefault();
+ if (bookingSubmitting) return;
+ const location = bookingLocationPicker?.value();
+ if (!location) { bookingLocationPicker?.focus(); return; }
  const form = event.currentTarget;
  const submit = form.querySelector('[type="submit"]');
  const formData = new FormData(form);
@@ -1457,7 +1437,7 @@ async function submitBookingRequest(event, customer, providerId) {
  estimated_min: assessment?.estimatedMin ?? Number(formData.get('amount') || 0),
  estimated_max: assessment?.estimatedMax ?? Number(formData.get('amount') || 0),
  service_details: assessment?.details || {},
- ...(bookingDeviceCoords || {}),
+ ...location,
  };
 
  const selectedServiceOption = form.querySelector('#sn-booking-service')?.selectedOptions?.[0];
@@ -1479,6 +1459,8 @@ async function submitBookingRequest(event, customer, providerId) {
   return;
  }
 
+ bookingSubmitting = true;
+ form.inert = true;
  if (submit) submit.textContent = 'Submitting...';
  try {
   if (assessment?.mediaFiles?.length) {
@@ -1513,6 +1495,11 @@ async function submitBookingRequest(event, customer, providerId) {
    title: 'Booking Not Submitted',
    type: 'warning',
   });
+ } finally {
+  if (submit?.textContent !== 'Booking Submitted') {
+   bookingSubmitting = false;
+   form.inert = false;
+  }
  }
 }
 

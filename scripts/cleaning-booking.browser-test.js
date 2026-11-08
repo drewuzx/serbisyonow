@@ -46,6 +46,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
     data = { service: selected };
    } else if (url.pathname.includes('/auth/provider/status/')) data = { user: provider };
    else if (url.pathname.includes('/auth/customer/status/')) data = { user: customer };
+   else if (url.pathname.match(/^\/api\/providers\/\d+\/services$/)) data = { services };
    else if (url.pathname.includes('/provider/') && url.pathname.endsWith('/dashboard')) data = { provider, user: provider, services, bookings: [], messages: [], reviews: [], availability: [], assessment: { score: 100 } };
    else if (url.pathname.endsWith('/availability')) data = { availability: [{ id: 987030, available_date: new Date().toISOString().slice(0, 10), start_time: '09:00 AM', end_time: '05:00 PM', is_available: true }] };
    else if (url.pathname.includes('/customer/') && url.pathname.endsWith('/dashboard')) data = { customer, user: customer, bookings: [], favorites: [], reviews: [], messages: [] };
@@ -95,6 +96,8 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
    assert.equal(clipped, 0, `No clipped labels at ${width}px`);
    await page.locator('.sn-booking-create-panel').screenshot({ path: path.join(os.tmpdir(), `cleaning-mobile-${width}.png`) });
   }
+  await page.locator('#sn-booking-pin-center').click();
+  await page.locator('#sn-confirm-booking-location').click();
   await page.locator('#sn-create-booking-form [type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('#sn-create-booking-form [type="submit"]')?.textContent === 'Booking Submitted');
   assert.equal(submitted.amount, 950);
@@ -210,6 +213,8 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3001';
    await personalPage.evaluate(() => window.scrollTo(0, 0));
    await personalPage.screenshot({ path: path.join(os.tmpdir(), `personal-care-${width}.png`), fullPage: true, animations: 'disabled' });
   }
+  await personalPage.locator('#sn-booking-pin-center').click();
+  await personalPage.locator('#sn-confirm-booking-location').click();
   await personalPage.locator('#sn-create-booking-form [type="submit"]').click();
   await personalPage.waitForFunction(() => document.querySelector('#sn-create-booking-form [type="submit"]')?.textContent === 'Booking Submitted');
   assert.equal(submitted.amount, 3000);

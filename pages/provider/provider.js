@@ -1628,7 +1628,8 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
   const hasGps = Boolean(customerPoint);
   const hasProviderGps = Boolean(providerPoint);
   const isEstimatedCustomerPin = booking?.customer_location_source === 'estimated-address';
-  const accuracy = isEstimatedCustomerPin
+  const confirmedPin = Boolean(booking?.service_details?.booking_location?.confirmed_at);
+  const accuracy = confirmedPin ? 'Customer-confirmed service pin' : isEstimatedCustomerPin
     ? 'Estimated from booking address'
     : booking?.customer_location_accuracy_m
       ? `+/- ${Math.round(booking.customer_location_accuracy_m)}m`
@@ -1655,11 +1656,11 @@ function renderBookingCustomerMap(booking, provider = getProviderUser(), options
 
   if (caption) {
     caption.textContent = booking
-      ? `${booking.customer_name || 'Customer'} - ${booking.address || 'No typed address'}`
+      ? `${booking.customer_name || 'Customer'} - ${booking.address || 'No typed address'}${booking.service_details?.booking_location?.landmark ? ` - ${booking.service_details.booking_location.landmark}` : ''}`
       : 'No booking selected.';
   }
   if (status) status.textContent = distance === null
-    ? (hasGps ? (isEstimatedCustomerPin ? 'Address estimate' : 'Customer GPS') : 'Address only')
+    ? (hasGps ? (confirmedPin ? 'Confirmed service pin' : isEstimatedCustomerPin ? 'Address estimate' : 'Customer GPS') : 'Address only')
     : overlapping ? 'Pins overlap' : `${distance.toFixed(1)} km away`;
 
   if (!booking) {

@@ -41,7 +41,7 @@ function multipart(request) {
    { id: 71, title: 'Cleaning', category: 'Cleaning' }, { id: 72, title: 'Personal Care', category: 'Personal Care' },
    { id: 73, title: 'Appliance Maintenance', category: 'Appliance Maintenance' },
    { id: 74, title: 'Plumbing services', category: 'Repair Services' },
-  ].map(service => ({ category: 'Installation Services', ...service, is_active: true, starting_price: 500, max_price: 1500 }));
+  ].map(service => ({ category: 'Installation Services', ...service, is_active: true, accepts_cash: true, starting_price: 500, max_price: 1500 }));
   let submitted;
   let attachments = [];
   const bookings = [];
@@ -69,6 +69,7 @@ function multipart(request) {
     data = { booking };
    } else if (url.pathname.includes('/auth/provider/status/')) data = { user: provider };
    else if (url.pathname.includes('/auth/customer/status/')) data = { user: customer };
+   else if (url.pathname.match(/^\/api\/providers\/\d+\/services$/)) data = { services };
    else if (url.pathname.includes('/provider/') && url.pathname.endsWith('/dashboard')) data = { provider, services, bookings, history_bookings: bookings, messages: [], reviews: [], availability: [] };
    else if (url.pathname.endsWith('/availability')) data = { availability: [{ available_date: new Date().toISOString().slice(0, 10), start_time: '09:00 AM', end_time: '05:00 PM', is_available: true }] };
    else if (url.pathname.includes('/customer/') && url.pathname.endsWith('/dashboard')) data = { customer, bookings: [], messages: [], favorites: [], reviews: [] };
@@ -160,6 +161,8 @@ function multipart(request) {
   await input('floors').fill('2');
   assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 4,750/);
   await screenshots('cctv');
+  await page.locator('#sn-booking-pin-center').click();
+  await page.locator('#sn-confirm-booking-location').click();
   await page.locator('#sn-create-booking-form [type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('#sn-create-booking-form [type="submit"]')?.textContent === 'Booking Submitted');
   assert.equal(submitted.service, 'CCTV Installation');
@@ -206,6 +209,8 @@ function multipart(request) {
   await media.setInputFiles(photo);
   assert.equal(await media.evaluate(control => control.validity.valid), true);
   await screenshots('furniture');
+  await page.locator('#sn-booking-pin-center').click();
+  await page.locator('#sn-confirm-booking-location').click();
   await page.locator('#sn-create-booking-form [type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('#sn-create-booking-form [type="submit"]')?.textContent === 'Booking Submitted');
   assert.equal(submitted.service, 'Furniture Installation');

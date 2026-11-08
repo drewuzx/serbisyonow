@@ -55,8 +55,11 @@ test('category HTTP bookings validate prices, selections and provider settings',
     if (params[1]) rows = rows.filter(service => service.id === Number(params[1]));
    }
    else if (query.startsWith('INSERT INTO uploaded_files')) persistedUploads.push(params);
-   else if (query.startsWith('SELECT id FROM provider_availability')) {
+   else if (query.startsWith('SELECT id, start_time FROM provider_availability')) {
     assert.match(query, /FOR UPDATE/);
+    rows = [{ id: 91, start_time: '09:00 AM' }];
+   }
+   else if (query.startsWith('SELECT id FROM provider_availability')) {
     assert.match(query, /NOT EXISTS/);
     rows = [{ id: 91 }];
    }
@@ -112,6 +115,7 @@ test('category HTTP bookings validate prices, selections and provider settings',
   return { status: response.status, data: await response.json() };
  }
  const body = {
+  latitude: 15.145, longitude: 120.59, location_confirmed: true,
   provider_id: 81, provider_service_id: 71, service: 'Bathroom cleaning', scheduled_date: '2026-10-01', scheduled_time: '09:00 AM', address: 'Test address',
   amount: 1, estimated_min: 1, estimated_max: 1, pricing_type: 'free',
   service_details: { inputs: { ...pricing.defaults('bathroom cleaning'), bathrooms: 2, size: 'Large', cleaning_level: 'Deep cleaning' }, sample_rates: false },

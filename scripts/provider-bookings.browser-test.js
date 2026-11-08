@@ -21,6 +21,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
    { id: 103, status: 'cancelled', customer_latitude: 15.147, customer_longitude: 120.58 },
   ].map(booking => ({ ...booking, customer_id: 987001, customer_name: 'Test Customer', service: 'General House Cleaning', address: '109 Test Street, Angeles City', scheduled_date: '2026-10-01', scheduled_time: '10:30 AM', amount: estimate.amount, service_details: estimate.details, pricing_type: 'calculated' }));
   const actions = [];
+  bookings[0].service_details = { ...bookings[0].service_details, booking_location: { confirmed_at:'2026-11-09T00:00:00Z', landmark:'Unit 4, blue gate' } };
   let failNext = false;
   let conflictNext = false;
   let failDashboard = false;
@@ -83,6 +84,7 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
   await page.locator('#sn-booking-nav-eta').filter({ hasText: '6 min driving' }).waitFor();
   assert.match(await page.locator('#sn-booking-open-gmaps').getAttribute('href'), /destination=15.1443%2C120.5894/);
   assert.match(await page.locator('#sn-booking-open-waze').getAttribute('href'), /ll=15.1443,120.5894/);
+  assert.match(await page.locator('#sn-booking-map-caption').innerText(), /Unit 4, blue gate/);
   const leafletLoaded = await page.evaluate(() => Boolean(window.L));
   assert.equal(leafletLoaded, true, 'actual Leaflet library loads');
   assert.equal(await page.locator('.leaflet-marker-icon').count(), 2);

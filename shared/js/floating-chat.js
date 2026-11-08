@@ -86,7 +86,10 @@
   }
 
   async function fetchJSON(path, options) {
-    const response = await fetch(`${API_BASE}${path}`, options);
+    const headers = new Headers(options?.headers);
+    const token = currentContext()?.user?.auth_token;
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Request failed.');
     return data;
