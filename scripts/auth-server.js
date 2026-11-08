@@ -213,6 +213,7 @@ app.get('/healthz', (_req, res) => {
   res.json({ ok: true, app: 'SerbisyoNow' });
 });
 
+app.use('/vendor/leaflet', express.static(path.join(rootDir, 'node_modules', 'leaflet', 'dist')));
 app.use(express.static(rootDir));
 
 function asyncRoute(handler) {

@@ -185,6 +185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let selectedRouteProviderId = null;
   let routeRequestId = 0;
   let mapRequestId = 0;
+  let mapViewRevision = 0;
   if (topSearch) topSearch.value = currentQuery;
   if (pageSearch) pageSearch.value = currentQuery;
   if (topSearch && topSearch.closest('.sn-topbar-search')) {
@@ -334,9 +335,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const signature = JSON.stringify([String(params), data]);
       if (background && signature === mapSignature) return;
       mapSignature = signature;
-      renderLocationMap(data);
+      renderLocationMap(data, { preserveView: background });
     } catch (error) {
       if (background || requestId !== mapRequestId) return;
+      removeLocationMap();
       mapCanvas.innerHTML = `<div class="sn-map-grid"></div><p class="sn-search-empty">${esc(error.message || 'Map unavailable.')}</p>`;
     }
   }
@@ -378,7 +380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${minutes} min`;
   }
 
-  function renderLocationMap(data) {
+  function renderLocationMap(data, { preserveView = false } = {}) {
     const providers = [...(data.providers || [])].sort((a, b) => {
       const tierRank = { top: 3, skilled: 2, basic: 1 };
       if (currentSort === 'top') {
@@ -411,12 +413,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     if (!customer || !providers.length) {
+      removeLocationMap();
       mapCanvas.innerHTML = '<div class="sn-map-grid"></div><p class="sn-search-empty">No nearby providers to map.</p>';
       return;
     }
 
     if (window.L) {
-      renderLeafletMap(customer, providers);
+      renderLeafletMap(customer, providers, { preserveView });
       return;
     }
 
@@ -476,7 +479,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function renderLeafletMap(customer, providers) {
+  function removeLocationMap() {
+    ++routeRequestId;
+    searchMap?.remove();
+    searchMap = null;
+    searchMapLayer = null;
+    searchRouteLayer = null;
+  }
+
+  function renderLeafletMap(customer, providers, { preserveView = false } = {}) {
+    const previousView = preserveView && searchMap ? { center: searchMap.getCenter(), zoom: searchMap.getZoom() } : null;
+    removeLocationMap();
     const nearest = providers.slice(0, 8).filter((provider) => isValidMapPoint(getProviderPoint(provider)));
     const selectedProvider = nearest.find((provider) => String(provider.id) === String(selectedRouteProviderId)) || nearest[0];
     selectedRouteProviderId = selectedProvider?.id || null;
@@ -485,7 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <span>${customer.source === 'device-gps' ? 'Live GPS' : customer.source === 'saved-gps' ? 'Saved GPS' : 'Estimated address'}</span>
         <strong id="sn-route-summary">${selectedProvider ? `Route to ${esc(selectedProvider.full_name)}` : `${nearest.length} nearby`}</strong>
       </div>
-      <div class="sn-real-map" id="sn-real-map"></div>
+      <div class="sn-real-map" id="sn-real-map" role="region" aria-label="Nearby providers map"></div>
       <div class="sn-map-nearby-list sn-map-nearby-list--leaflet">
         ${nearest.slice(0, 4).map((provider, index) => `
           <button class="sn-map-nearby-item ${String(provider.id) === String(selectedRouteProviderId) ? 'is-selected' : ''}" type="button" data-route-provider="${esc(provider.id)}">
@@ -497,17 +510,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     `;
 
-    if (searchMap) {
-      searchMap.remove();
-      searchMap = null;
-      searchMapLayer = null;
-      searchRouteLayer = null;
-    }
-
     searchMap = window.L.map('sn-real-map', {
       zoomControl: false,
       scrollWheelZoom: true,
+      dragging: true,
+      touchZoom: true,
     }).setView([customer.lat, customer.lng], 14);
+    for (const event of ['pointerdown', 'touchstart', 'wheel', 'keydown']) {
+      searchMap.getContainer().addEventListener(event, () => { ++mapViewRevision; }, { passive: true });
+    }
 
     window.L.control.zoom({ position: 'bottomleft' }).addTo(searchMap);
     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -541,10 +552,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       item.addEventListener('click', () => selectRouteProvider(customer, nearest, item.dataset.routeProvider));
     });
 
-    drawRouteToProvider(customer, selectedProvider, nearest);
+    drawRouteToProvider(customer, selectedProvider, nearest, !previousView);
 
     const bounds = searchMapLayer.getBounds();
-    if (bounds.isValid()) searchMap.fitBounds(bounds.pad(0.24), { maxZoom: 15 });
+    if (previousView) searchMap.setView(previousView.center, previousView.zoom, { animate: false });
+    else if (bounds.isValid()) searchMap.fitBounds(bounds.pad(0.24), { maxZoom: 15 });
     setTimeout(() => searchMap?.invalidateSize(), 100);
   }
 
@@ -561,13 +573,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     drawRouteToProvider(customer, provider, providers);
   }
 
-  async function drawRouteToProvider(customer, provider, providers = []) {
+  async function drawRouteToProvider(customer, provider, providers = [], fitView = true) {
     if (!searchMap || !searchRouteLayer || !provider) return;
     const customerPoint = { lat: Number(customer.lat), lng: Number(customer.lng) };
     const providerPoint = getProviderPoint(provider);
     if (!isValidMapPoint(customerPoint) || !isValidMapPoint(providerPoint)) return;
 
     const currentRequestId = ++routeRequestId;
+    const viewRevision = mapViewRevision;
     const routeSummary = document.getElementById('sn-route-summary');
     if (routeSummary) routeSummary.textContent = `Finding road route to ${provider.full_name || 'provider'}...`;
     searchRouteLayer.clearLayers();
@@ -606,14 +619,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       }).addTo(searchRouteLayer);
 
       const routeBounds = window.L.featureGroup([searchMapLayer, routeLine]).getBounds();
-      if (routeBounds.isValid()) searchMap.fitBounds(routeBounds.pad(0.22), { maxZoom: 16 });
+      if (fitView && viewRevision === mapViewRevision && routeBounds.isValid()) searchMap.fitBounds(routeBounds.pad(0.22), { maxZoom: 16 });
       if (routeSummary) {
         routeSummary.textContent = `${routeDurationLabel(route.duration)} - ${routeDistanceLabel(route.distance)} to ${provider.full_name || 'provider'}`;
       }
     } catch {
       if (currentRequestId !== routeRequestId) return;
       const bounds = window.L.featureGroup([searchMapLayer, directRoute]).getBounds();
-      if (bounds.isValid()) searchMap.fitBounds(bounds.pad(0.22), { maxZoom: 15 });
+      if (fitView && viewRevision === mapViewRevision && bounds.isValid()) searchMap.fitBounds(bounds.pad(0.22), { maxZoom: 15 });
       if (routeSummary) {
         routeSummary.textContent = `${Number(provider.distance_km || 0).toFixed(1)} km straight-line estimate to ${provider.full_name || 'provider'}`;
       }

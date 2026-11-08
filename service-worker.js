@@ -1,10 +1,12 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v95';
+const SW_VERSION = 'serbisyonow-pwa-v96';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
+  '/vendor/leaflet/leaflet.js',
+  '/vendor/leaflet/leaflet.css',
   '/shared/js/profile-photos.js',
   '/shared/css/profile-photos.css',
   '/pages/admin/provider-verification/photo-reviews.js',
