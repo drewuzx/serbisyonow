@@ -24,6 +24,10 @@ function formatDate(dateStr) {
  } catch { return dateStr; }
 }
 
+function customerDateInputValue(date = new Date()) {
+ return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function showNotice(elId, message, type = 'success') {
  const el = document.getElementById(elId);
  if (!el) return;
@@ -84,7 +88,10 @@ function populatePage(user, { preserveDraft = false } = {}) {
  document.getElementById('edit-contact').value = user?.contact || '';
  document.getElementById('edit-address').value = user?.address || '';
  document.getElementById('edit-gender').value = user?.gender || '';
- document.getElementById('edit-dob').value = user?.dob? user.dob.split('T')[0]: '';
+ const dobField = document.getElementById('edit-dob');
+ dobField.min = '1900-01-01';
+ dobField.max = customerDateInputValue();
+ dobField.value = user?.dob? user.dob.split('T')[0]: '';
 }
 
 function renderCustomerLocation(user) {

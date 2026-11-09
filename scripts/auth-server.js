@@ -2170,6 +2170,7 @@ app.post('/api/auth/customer/register', upload.fields([
   requireFields(req.body, [
     'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
   ]);
+  profilePersonalFields({ dob: req.body.dob });
 
   const email = String(req.body.email || '').trim().toLowerCase();
   const googleSub = String(req.body.googleSub || '').trim();
@@ -2309,6 +2310,7 @@ app.patch('/api/customer/:id/location', asyncRoute(async (req, res) => {
 app.patch('/api/auth/customer/update', asyncRoute(async (req, res) => {
   requireFields(req.body, ['id', 'full_name', 'contact', 'address', 'gender', 'dob']);
   await authenticateAccount(db, req, 'customer', req.body.id);
+  profilePersonalFields({ dob: req.body.dob });
   if (typeof req.body.address !== 'string' || !req.body.address.trim()) {
     return res.status(400).json({ message: 'Address is required.' });
   }
@@ -2806,6 +2808,7 @@ app.post('/api/auth/provider/register', upload.fields([
     'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
     'category', 'service', 'experience', 'experienceYears', 'experienceCertification',
   ]);
+  profilePersonalFields({ dob: req.body.dob });
   if (!hasAssessmentSubmission(req.body.experience)) {
     return res.status(400).json({ message: 'Please complete the provider skill assessment before submitting.' });
   }

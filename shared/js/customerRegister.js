@@ -403,6 +403,12 @@ function applyGooglePrefill() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const dobField = document.getElementById('dob');
+  const now = new Date();
+  if (dobField) {
+    dobField.min = '1900-01-01';
+    dobField.max = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
   applyGooglePrefill();
   const contactField = document.getElementById('contact');
   contactField?.addEventListener('input', () => {
