@@ -262,23 +262,24 @@
 }
 
 .sn-badge-count {
+  box-sizing: border-box;
+  width: max-content;
   position: absolute;
   top: -6px;
   right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 3px;
   border: 2px solid var(--white);
   border-radius: 999px;
   background: var(--danger);
   color: var(--white);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
   font-size: 0.68rem;
   font-weight: 800;
-  line-height: 1;
+  line-height: 20px;
+  text-align: center;
   pointer-events: none;
 }
 
