@@ -17,6 +17,7 @@ const appliancePricing = require('../shared/js/appliancePricing');
 const installationPricing = require('../shared/js/installationPricing');
 const outdoorPricing = require('../shared/js/outdoorPricing');
 const { changeProviderBookingStatus } = require('./booking-workflow');
+const { registerBookingTracking, clearBookingTracking } = require('./booking-tracking');
 const { issueSession, authenticateAccount, requestSessionToken, rememberSession, revokeSession } = require('./account-sessions');
 const { createPayMongo } = require('./paymongo');
 const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheckout, settleBookingPayment, expireCancelledCheckout, cancelBookingPayment, fail: paymentFail } = require('./booking-payments');
@@ -1875,6 +1876,12 @@ app.get('/api/auth/:role/session', asyncRoute(async (req, res) => {
 app.post('/api/auth/:role/logout', asyncRoute(async (req, res) => {
   const role = req.params.role;
   if (!['customer', 'provider'].includes(role)) return res.status(404).json({ message: 'Account role not found.' });
+  if (role === 'provider') {
+    let actor;
+    try { actor = await authenticateAccount(db, req, role); }
+    catch (error) { if (![401,403].includes(error.statusCode)) throw error; }
+    if (actor) await db.query('UPDATE booking_live_locations SET active=FALSE,latitude=NULL,longitude=NULL,accuracy_m=NULL,observed_at=NULL WHERE provider_id=$1', [actor.id]);
+  }
   await revokeSession(db, req, res, role);
   res.sendStatus(204);
 }));
@@ -2590,6 +2597,7 @@ app.patch('/api/customer/:id/bookings/:bookingId/cancel', asyncRoute(async (req,
     if (!['pending', 'upcoming', 'ongoing'].includes(current.status)) paymentFail(409, 'This booking is already closed.');
     await cancelBookingPayment(client, current);
     const updated = await client.query("UPDATE customer_bookings SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *", [current.id]);
+    await clearBookingTracking(client, current.id);
     await client.query(`UPDATE provider_availability AS a SET is_available =
       (a.repeat_id IS NULL OR EXISTS (SELECT 1 FROM provider_schedule_repeats r WHERE r.id=a.repeat_id AND r.is_active AND r.is_available))
       AND ${unoccupiedSlot()}
@@ -2673,62 +2681,7 @@ app.get('/api/directions', asyncRoute(async (req, res) => {
   }
 }));
 
-app.get('/api/customer/:id/bookings/:bookingId/track', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'customer', req.params.id);
-  const result = await db.query(`
-    SELECT
-      b.*,
-      p.full_name AS provider_name,
-      p.category AS provider_category,
-      p.contact AS provider_contact,
-      p.latitude AS provider_latitude,
-      p.longitude AS provider_longitude,
-      p.location_accuracy_m AS provider_location_accuracy_m,
-      p.location_updated_at AS provider_location_updated_at
-    FROM customer_bookings b
-    LEFT JOIN providers p ON p.id = b.provider_id
-    WHERE b.id = $1 AND b.customer_id = $2
-  `, [req.params.bookingId, req.params.id]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Booking not found.' });
-
-  const booking = customerBookingRow(result.rows[0]);
-  const trackingEnabled = isLiveTrackableStatus(booking.status);
-  const customerLat = Number(booking.latitude);
-  const customerLng = Number(booking.longitude);
-  const providerLat = Number(booking.provider_latitude);
-  const providerLng = Number(booking.provider_longitude);
-  const hasCustomerPin = Number.isFinite(customerLat) && Number.isFinite(customerLng);
-  const hasProviderGps = Number.isFinite(providerLat) && Number.isFinite(providerLng);
-  const wantDirections = ['1', 'true', 'yes'].includes(String(req.query.directions || '').toLowerCase());
-  let directions = null;
-  if (wantDirections && trackingEnabled && hasCustomerPin && hasProviderGps) {
-    try {
-      directions = await fetchDrivingDirections(
-        { lat: providerLat, lng: providerLng },
-        { lat: customerLat, lng: customerLng },
-      );
-    } catch (error) {
-      directions = { error: error.message || 'Directions unavailable.' };
-    }
-  }
-
-  res.json({
-    booking,
-    tracking_enabled: trackingEnabled,
-    customer_pin: hasCustomerPin ? { lat: customerLat, lng: customerLng, address: booking.address } : null,
-    provider_location: hasProviderGps ? {
-      lat: providerLat,
-      lng: providerLng,
-      accuracy_m: booking.provider_location_accuracy_m,
-      updated_at: booking.provider_location_updated_at,
-      name: booking.provider_name,
-    } : null,
-    directions,
-    message: trackingEnabled
-      ? (hasProviderGps ? 'Live provider location is available.' : 'Waiting for the service provider to share live GPS.')
-      : 'Live tracking starts after the provider accepts the booking.',
-  });
-}));
+registerBookingTracking(app, db, asyncRoute, customerBookingRow);
 
 app.get('/api/customer/:id/messages', asyncRoute(async (req, res) => {
   const result = await db.query(`
@@ -4184,6 +4137,7 @@ ensureAdminSupportTables()
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'promotion-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'profile-photo-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'recurring-schedule-schema.sql'), 'utf8')))
+  .then(() => db.query(fs.readFileSync(path.join(__dirname, 'booking-tracking-schema.sql'), 'utf8')))
   .then(() => {
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);

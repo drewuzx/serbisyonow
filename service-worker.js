@@ -1,10 +1,12 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v97';
+const SW_VERSION = 'serbisyonow-pwa-v98';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
 const APP_SHELL_URLS = [
+  '/pages/provider/booking-tracking.js',
+  '/pages/customer/bookings/live-tracking.js',
   '/pages/customer/bookings/booking-location.js',
   '/vendor/leaflet/leaflet.js',
   '/vendor/leaflet/leaflet.css',

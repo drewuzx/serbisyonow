@@ -1,0 +1,61 @@
+'use strict';
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {startQrFixture}=require('./provider-qr-test-fixture');
+test('private booking tracking validates ownership, GPS freshness, session order and stop lifecycle',async()=>{
+ const f=await startQrFixture();
+ try {
+  const b=await f.createBooking({status:'upcoming',deposit_required:false,latitude:15.145,longitude:120.59});
+  const url=`/api/provider/81/bookings/${b.id}/tracking`,track=`/api/customer/61/bookings/${b.id}/track`;
+  const start=(token=f.providerToken)=>f.request(url,'POST',{},token);
+  const read=()=>f.request(track);
+  assert.equal((await start(f.otherProviderToken)).status,403);
+  assert.equal((await start(f.customerToken)).status,403);
+  assert.equal((await start('')).status,401);
+  assert.equal((await f.request(track,'GET',undefined,f.otherCustomerToken)).status,403);
+  await f.db.query('UPDATE providers SET latitude=16,longitude=121 WHERE id=81');
+  assert.equal((await read()).data.provider_location,null,'Profile GPS is never passed off as live movement');
+  const session=(await start()).data.session_id;
+  const point={session_id:session,sequence:1,latitude:15.15,longitude:120.6,accuracy:8,observed_at:new Date().toISOString()};
+  for(const changes of [{latitude:null},{latitude:91},{longitude:'120.6'},{accuracy:-1},{sequence:0},{observed_at:new Date(Date.now()-90000).toISOString()}]) {
+   assert.equal((await f.request(url,'PATCH',{...point,...changes},f.providerToken)).status,400);
+  }
+  assert.equal((await f.request(url,'PATCH',point,f.providerToken)).status,200);
+  const live=await read();assert.equal(live.data.tracking_state,'live');assert.equal(live.data.provider_location.lat,15.15);
+  assert.match(live.headers.get('cache-control'),/no-store/);
+  assert.equal((await f.request(url,'PATCH',point,f.providerToken)).status,409);
+  assert.equal((await f.request(url,'PATCH',{...point,sequence:2,latitude:15.16},f.providerToken)).status,200);
+  assert.equal((await read()).data.provider_location.lat,15.16);
+  assert.equal(Number((await f.db.query('SELECT latitude FROM providers WHERE id=81')).rows[0].latitude),16);
+  await f.db.query("UPDATE booking_live_locations SET observed_at=NOW()-INTERVAL '40 seconds' WHERE booking_id=$1",[b.id]);
+  assert.equal((await read()).data.tracking_state,'stale');assert.equal((await read()).data.provider_location,null);
+  const restarted=(await start()).data.session_id;
+  await f.request(url+'/stop','POST',{session_id:session},f.providerToken);
+  assert.equal((await f.request(url,'PATCH',{...point,session_id:session,sequence:3},f.providerToken)).status,409);
+  assert.equal((await f.request(url,'PATCH',{...point,session_id:restarted,sequence:1},f.providerToken)).status,200);
+  assert.equal((await read()).data.tracking_state,'live','Old stop cannot end a new sharing session');
+  const other=await f.createBooking({customer_id:62,status:'upcoming',deposit_required:false});
+  assert.equal((await f.request(`/api/customer/61/bookings/${other.id}/track`)).status,404);
+  const alien=await f.createBooking({provider_id:82,status:'upcoming',deposit_required:false});
+  assert.equal((await f.request(`/api/provider/81/bookings/${alien.id}/tracking`,'POST',{},f.providerToken)).status,404);
+  const otherUrl=`/api/provider/81/bookings/${other.id}/tracking`;
+  assert.equal((await f.request(otherUrl,'POST',{},f.providerToken)).status,200);
+  assert.equal((await read()).data.provider_location,null,'Only one booking is shared at a time');
+  const pending=await f.createBooking();
+  assert.equal((await f.request(`/api/provider/81/bookings/${pending.id}/tracking`,'POST',{},f.providerToken)).status,409);
+  const current=(await start()).data.session_id;
+  await f.request(url,'PATCH',{...point,session_id:current,sequence:1},f.providerToken);
+  await f.request(`/api/provider/81/bookings/${b.id}/status`,'PATCH',{status:'ongoing',expected_status:'upcoming'},f.providerToken);
+  assert.equal((await read()).data.tracking_state,'live');
+  await f.request(`/api/provider/81/bookings/${b.id}/status`,'PATCH',{status:'completed',expected_status:'ongoing'},f.providerToken);
+  assert.equal((await read()).data.tracking_state,'ended');assert.equal((await read()).data.provider_location,null);
+  assert.equal((await f.db.query('SELECT latitude FROM booking_live_locations WHERE booking_id=$1',[b.id])).rows[0].latitude,null);
+  assert.equal((await f.request(url,'PATCH',{...point,session_id:current,sequence:2},f.providerToken)).status,409);
+  await f.request(`/api/customer/62/bookings/${other.id}/cancel`,'PATCH',{},f.otherCustomerToken);
+  assert.equal((await f.db.query('SELECT active FROM booking_live_locations WHERE booking_id=$1',[other.id])).rows[0].active,false);
+  const logoutBooking=await f.createBooking({status:'upcoming',deposit_required:false});
+  await f.request(`/api/provider/81/bookings/${logoutBooking.id}/tracking`,'POST',{},f.providerToken);
+  assert.equal((await f.request('/api/auth/provider/logout','POST',{},f.providerToken)).status,204);
+  assert.equal((await f.db.query('SELECT active FROM booking_live_locations WHERE booking_id=$1',[logoutBooking.id])).rows[0].active,false);
+ } finally {await f.close();}
+});

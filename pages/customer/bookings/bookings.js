@@ -873,6 +873,7 @@ function bookingServiceDetailRows(details = {}) {
 }
 
 function closeBookingModal(modal) {
+ modal?.trackingDispose?.();
  modal?.remove();
  document.body.classList.remove('sn-modal-open');
 }
@@ -882,9 +883,6 @@ async function showBookingDetails(booking) {
  const detail = await getBookingDetails(booking);
  const item = detail.booking || booking;
  const trackingMessage = detail.message || (item.provider_location_updated_at ? 'Provider GPS has been shared.' : 'Tracking details will appear when available.');
- const providerLocation = detail.provider_location
-  ? `${Number(detail.provider_location.lat).toFixed(5)}, ${Number(detail.provider_location.lng).toFixed(5)}`
-  : 'Not shared yet';
  const customerPin = detail.customer_pin
   ? `${Number(detail.customer_pin.lat).toFixed(5)}, ${Number(detail.customer_pin.lng).toFixed(5)}`
   : item.address || '-';
@@ -900,7 +898,7 @@ async function showBookingDetails(booking) {
    <h3 class="sn-modal-title">${bookingEsc(item.service || 'Booking Details')}</h3>
    <p class="sn-modal-body">${bookingEsc(item.provider_name || 'Provider')} - ${bookingEsc(item.provider_category || 'Service Booking')}</p>
    <div class="sn-booking-detail-grid">
-    ${bookingDetailRow('Status', item.status)}
+    <div class="sn-booking-detail-item"><span>Status</span><strong data-live-booking-status>${bookingEsc(item.status)}</strong></div>
     ${bookingDetailRow('Date', bookingDisplayDate(item.scheduled_date))}
     ${bookingDetailRow('Time', SNTime.format(item.scheduled_time))}
     ${bookingDetailRow('Amount / estimate', bookingEstimateLabel(item))}
@@ -913,10 +911,14 @@ async function showBookingDetails(booking) {
     ${bookingDetailRow('Service address', item.address)}
     ${bookingDetailRow('Landmark / unit', item.service_details?.booking_location?.landmark)}
     ${bookingDetailRow('Customer pin', customerPin)}
-    ${bookingDetailRow('Provider GPS', providerLocation)}
     ${bookingServiceDetailRows(item.service_details)}
    </div>
-   <div class="sn-booking-track-note">${bookingEsc(trackingMessage)}</div>
+   <section class="sn-booking-live-section" aria-label="Live provider tracking">
+    <div class="sn-tracking-heading"><h4>Provider location</h4><button type="button" class="btn btn-outline" data-live-center>Center map</button></div>
+    <p data-live-status role="status">${bookingEsc(trackingMessage)}</p>
+    <div data-live-map role="region" aria-label="Live provider and service location map"></div>
+    <p data-live-eta></p>
+   </section>
    <div class="sn-modal-actions">
     ${item.provider_id ? `<a class="btn btn-outline" href="../inbox/inbox.html?provider_id=${bookingEsc(item.provider_id)}">Message</a>` : ''}
     <button class="btn btn-primary" type="button">Done</button>
@@ -925,6 +927,10 @@ async function showBookingDetails(booking) {
  `;
  document.body.appendChild(modal);
  document.body.classList.add('sn-modal-open');
+ if(item.id && booking.source !== 'static') modal.trackingDispose=window.SNCustomerTracking?.mount(modal,item);
+ modal.tabIndex=-1;
+ modal.focus();
+ modal.addEventListener('keydown',event=>{if(event.key==='Escape') closeBookingModal(modal);});
  modal.querySelector('.sn-modal-close')?.addEventListener('click', () => closeBookingModal(modal));
  modal.querySelector('.btn-primary')?.addEventListener('click', () => closeBookingModal(modal));
  modal.addEventListener('click', (event) => {

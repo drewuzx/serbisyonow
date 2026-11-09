@@ -1,6 +1,7 @@
 'use strict';
 const { cancelBookingPayment } = require('./booking-payments');
 const { unoccupiedSlot } = require('./availability');
+const { clearBookingTracking } = require('./booking-tracking');
 
 const transitions = {
  pending: ['upcoming', 'cancelled'],
@@ -48,6 +49,7 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
    WHERE provider_id = $1 AND id = $2 RETURNING *
   `, [providerId, bookingId, status]);
   if (status === 'cancelled') await cancelBookingPayment(client, booking);
+  if (['completed', 'cancelled'].includes(status)) await clearBookingTracking(client, bookingId);
   await client.query(`
    UPDATE provider_availability AS a
    SET is_available = $4::boolean AND

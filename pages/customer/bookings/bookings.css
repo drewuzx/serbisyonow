@@ -379,6 +379,13 @@
 }
 
 .sn-booking-location { min-width: 0; border-top: 1px solid var(--border); padding-top: 20px; }
+.sn-booking-live-section { min-width: 0; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.sn-tracking-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.sn-tracking-heading h4 { margin: 0; font-size: 18px; color: var(--blue-dark); }
+[data-live-status], [data-live-eta] { font-size: 14px; overflow-wrap: anywhere; }
+[data-live-map] { height: 340px; width: 100%; border-radius: 8px; touch-action: none; z-index: 0; }
+[data-live-map] .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.sn-tracking-marker span { display: grid; place-items: center; width: 36px; height: 36px; border: 3px solid white; border-radius: 50%; color: white; font: 700 16px Arial,sans-serif; box-shadow: 0 2px 6px #0005; }
 .sn-booking-location h4 { margin: 0 0 16px; color: var(--blue-dark); font-size: 20px; }
 .sn-booking-location h4 span { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
 .sn-booking-location-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
@@ -601,6 +608,9 @@
 
 .sn-booking-detail-modal .sn-modal-card {
   width: min(680px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sn-booking-downpayment-terms { border-left: 3px solid #17815d; padding: 8px 12px; font-size: 13px; color: #3b5368; margin: 0; }
