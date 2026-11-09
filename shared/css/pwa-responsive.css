@@ -934,6 +934,28 @@ button {
   }
 }
 
+@media (max-width: 940px) {
+  .sn-shell:not(.sn-shell--provider) .sn-sidebar {
+    inset: 0 auto 0 0;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+
+  .sn-shell:not(.sn-shell--provider) .sn-nav {
+    min-height: 0;
+    flex: 1 1 0%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
+
 @media (max-height: 560px) and (orientation: landscape) {
   .hero {
     min-height: 320px;
