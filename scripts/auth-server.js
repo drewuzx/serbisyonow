@@ -1261,7 +1261,9 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS location_accuracy_m NUMERIC(10,2),
       ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password',
-      ADD COLUMN IF NOT EXISTS google_sub TEXT;
+      ADD COLUMN IF NOT EXISTS google_sub TEXT,
+      ADD COLUMN IF NOT EXISTS id_verification_consent_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS id_verification_consent_version TEXT;
 
     ALTER TABLE providers
       ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '',
@@ -2167,6 +2169,9 @@ app.post('/api/auth/customer/register', upload.fields([
   { name: 'idBack', maxCount: 1 },
 ]), asyncRoute(async (req, res) => {
   const isGoogleAuth = req.body.authProvider === 'google';
+  if (req.body.idVerificationConsent !== 'true') {
+    return res.status(400).json({ message: 'Please accept the ID verification consent before submitting.' });
+  }
   requireFields(req.body, [
     'fullName', 'address', 'gender', 'contact', 'dob', 'email', 'password',
   ]);
@@ -2225,6 +2230,8 @@ app.post('/api/auth/customer/register', upload.fields([
            id_back_file = COALESCE($12, id_back_file),
            auth_provider = $13,
            google_sub = COALESCE($14, google_sub),
+           id_verification_consent_at = NOW(),
+           id_verification_consent_version = 'customer-id-verification-v1',
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
@@ -2236,8 +2243,8 @@ app.post('/api/auth/customer/register', upload.fields([
 
   const result = await db.query(
     `INSERT INTO customers
-      (full_name, address, gender, contact, dob, email, password_hash, id_type, id_address, id_front_file, id_back_file, auth_provider, google_sub)
-     VALUES ($1, $2, $3, $4, $5, lower($6), $7, $8, $9, $10, $11, $12, $13)
+      (full_name, address, gender, contact, dob, email, password_hash, id_type, id_address, id_front_file, id_back_file, auth_provider, google_sub, id_verification_consent_at, id_verification_consent_version)
+     VALUES ($1, $2, $3, $4, $5, lower($6), $7, $8, $9, $10, $11, $12, $13, NOW(), 'customer-id-verification-v1')
      RETURNING *`,
     [
       ...customerValues,

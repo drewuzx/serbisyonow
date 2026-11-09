@@ -13,6 +13,9 @@
     @media (max-width: 920px) { .hero-login { grid-template-columns: 1fr; gap: 24px; } .hero-login-left { text-align: center; } .hero-login-left p { margin: 0 auto; } }
     @media (max-width: 768px) { .hero { padding-top: 12px; } .hero-login { margin-top: 20px; } .hero-login-left .hero-title { font-size: clamp(1.6rem, 7vw, 2.1rem); } .hero-login-left .hero-sub { letter-spacing: 0.08em; font-size: 0.82rem; } .sn-topbar-inner { flex-wrap: wrap; gap: 10px; } .sn-topbar-actions .btn { width: 100%; } }
     @media (max-width: 480px) { .hero-login { gap: 16px; margin-top: 12px; } .hero .container { padding-inline: 12px; } .hero-login-left p { font-size: 0.92rem; line-height: 1.55; } }
+    .id-consent { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
+    .id-consent input { flex: 0 0 auto; width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--blue-main); }
+    .id-consent a { color: var(--blue-main); font-weight: 600; text-decoration: underline; }
   </style>
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
@@ -81,6 +84,7 @@
                 <div class="form-group form-full"><label>Upload Front of ID</label><label class="upload-box" id="upload-front-label"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="front-label-text">Upload Front of ID</span><input type="file" id="id-front" accept="image/*,.pdf" required onchange="handleUpload(this,'front-label-text','upload-front-label')"/></label></div>
                 <div class="form-group form-full"><label>Upload Back of ID</label><label class="upload-box" id="upload-back-label"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="back-label-text">Upload Back of ID</span><input type="file" id="id-back" accept="image/*,.pdf" required onchange="handleUpload(this,'back-label-text','upload-back-label')"/></label></div>
               </div>
+              <label class="id-consent" for="id-verification-consent"><input type="checkbox" id="id-verification-consent" required/><span>I consent to SerbisyoNow collecting and processing my ID and submitted details to verify my customer account. Authorized admins may review these documents. My information will be handled under the <a href="../legal/privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>. This consent is required to submit my registration.</span></label>
               <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" id="submit-btn" onclick="submitRegister(event)">Submit</button></div>
             </div>
             <p class="auth-footer">Already a member? <a href="customerLogin.html">Login</a></p>

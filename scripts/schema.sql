@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS customers (
   id_address TEXT,
   id_front_file TEXT,
   id_back_file TEXT,
+  id_verification_consent_at TIMESTAMPTZ,
+  id_verification_consent_version TEXT,
   latitude NUMERIC(10,7),
   longitude NUMERIC(10,7),
   location_accuracy_m NUMERIC(10,2),

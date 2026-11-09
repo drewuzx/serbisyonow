@@ -112,8 +112,12 @@ function validateForm(form, messages = {}) {
   clearFormErrors(form);
   let valid = true;
   form.querySelectorAll('[required]').forEach(field => {
-    const value = field.type === 'file' ? (field.files.length ? field.files[0].name : '') : field.value.trim();
-    if (!value) {
+    const hasValue = field.type === 'checkbox'
+      ? field.checked
+      : field.type === 'file'
+        ? Boolean(field.files.length)
+        : Boolean(field.value.trim());
+    if (!hasValue) {
       valid = false;
       const message = messages[field.id] || 'Please fill out this field.';
       showFieldError(field, message);
@@ -177,7 +181,8 @@ function validateStep2() {
     'id-type': 'Select your ID type.',
     'id-address': 'Enter your address.',
     'id-front': 'Upload the front of your ID.',
-    'id-back': 'Upload the back of your ID.'
+    'id-back': 'Upload the back of your ID.',
+    'id-verification-consent': 'Please review and accept the ID verification consent.'
   };
 
   if (!validateForm(form, messages)) {
@@ -319,6 +324,7 @@ function submitRegister(e) {
   }
   payload.append('idType', document.getElementById('id-type').value);
   payload.append('idAddress', address);
+  payload.append('idVerificationConsent', String(document.getElementById('id-verification-consent').checked));
 
   const idFront = document.getElementById('id-front');
   const idBack = document.getElementById('id-back');
