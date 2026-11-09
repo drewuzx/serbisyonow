@@ -268,6 +268,9 @@ function handleUpload(input, labelId, boxId) {
     document.getElementById(labelId).textContent = '✓ ' + input.files[0].name;
     document.getElementById(boxId).classList.add('uploaded');
     clearFieldError(input);
+    if (input.id === 'id-front' || input.id === 'id-back') {
+      document.getElementById('open-id-consent')?.click();
+    }
   }
 }
 
