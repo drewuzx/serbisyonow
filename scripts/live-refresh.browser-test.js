@@ -216,6 +216,11 @@ function fixture() {
       assert.equal(await page.locator('.sn-provider-chart-day').count(), 7);
       assert.equal(await page.locator('.sn-provider-chart-day[data-day]:not([data-day=""])').count(), 7);
       assert.equal(await page.locator('.sn-provider-chart-day[aria-label$="1 completed jobs"]').count(), 1);
+      await page.locator('#sn-hamburger-top').click();
+      assert.equal(await page.evaluate(() => localStorage.getItem('sn.provider.sidebarState')), 'collapsed');
+      await page.reload();
+      await page.waitForFunction(() => Boolean(window.snLiveRefresh));
+      assert.equal(await page.locator('.sn-shell').evaluate(shell => shell.classList.contains('sidebar-collapsed')), true, 'Provider sidebar state persists after refresh');
     });
     await scenario('provider/dashboard/dashboard.html', '.sn-float-root', async (page, data, tick) => {
       await page.evaluate(() => window.snFloatingChat.open(61));

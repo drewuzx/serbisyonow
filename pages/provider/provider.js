@@ -537,6 +537,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const userStatus = document.getElementById('sn-user-status');
   const shell = document.querySelector('.sn-shell');
   const overlay = document.getElementById('sn-overlay');
+  const sidebarStorageKey = 'sn.provider.sidebarState';
 
   function escapeAttr(value) {
     return String(value)
@@ -605,16 +606,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     return window.matchMedia('(max-width: 940px)').matches;
   }
 
+  function storedSidebarState() {
+    try {
+      return localStorage.getItem(sidebarStorageKey);
+    } catch {
+      return null;
+    }
+  }
+
+  function storeSidebarState(state) {
+    if (isMobile()) return;
+    try {
+      localStorage.setItem(sidebarStorageKey, state);
+    } catch {
+      // Storage is optional.
+    }
+  }
+
   function closeSidebar() {
     shell?.classList.remove('sidebar-open');
     shell?.classList.add('sidebar-collapsed');
     document.body.style.overflow = '';
+    storeSidebarState('collapsed');
   }
 
   function openSidebar() {
     shell?.classList.remove('sidebar-collapsed');
     shell?.classList.add('sidebar-open');
     if (isMobile()) document.body.style.overflow = 'hidden';
+    storeSidebarState('open');
   }
 
   function toggleSidebar() {
@@ -627,14 +647,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   overlay?.addEventListener('click', closeSidebar);
   window.addEventListener('resize', () => {
     if (isMobile()) closeSidebar();
+    else if (storedSidebarState() === 'collapsed') closeSidebar();
+    else if (storedSidebarState() === 'open') openSidebar();
   });
 
   document.getElementById('sn-logout')?.addEventListener('click', () => {
     localStorage.removeItem('sn_provider_user');
+    localStorage.removeItem(sidebarStorageKey);
     window.location.href = '../../auth/providerLogin.html';
   });
 
   if (isMobile()) closeSidebar();
+  else if (storedSidebarState() === 'collapsed') closeSidebar();
+  else if (storedSidebarState() === 'open') openSidebar();
 
   attachProviderTopbarRealtime(provider);
   loadProviderDatabase();
