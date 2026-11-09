@@ -64,6 +64,16 @@
   box-shadow: 0 0 0 3px rgba(43, 85, 204, .12);
 }
 
+.sn-search-autocomplete {
+  position: relative;
+  z-index: 3;
+}
+
+.sn-page-search-results {
+  top: calc(100% + 8px);
+  max-height: min(420px, 55dvh);
+}
+
 #sn-results-count { scroll-margin-top: 110px; }
 
 .sn-page-search input::placeholder {

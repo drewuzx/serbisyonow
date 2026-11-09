@@ -146,7 +146,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     searchWrapper.replaceWith(searchForm);
     pageSearch.placeholder = 'Search providers, services, or categories';
     pageSearch.setAttribute('aria-label', 'Search providers, services, or categories');
-    pageSearch.setAttribute('aria-controls', 'sn-results-list');
+    pageSearch.maxLength = 120;
+    pageSearch.autocomplete = 'off';
+    pageSearch.setAttribute('aria-controls', 'sn-page-search-results');
+    pageSearch.setAttribute('aria-expanded', 'false');
     pageSearch.setAttribute('enterkeyhint', 'search');
   }
   countEl?.setAttribute('role', 'status');
@@ -188,6 +191,144 @@ document.addEventListener('DOMContentLoaded', async () => {
   let mapViewRevision = 0;
   if (topSearch) topSearch.value = currentQuery;
   if (pageSearch) pageSearch.value = currentQuery;
+
+  let autocompleteTimer;
+  let autocompleteController;
+  let autocompleteVersion = 0;
+  let autocompleteQuery = '';
+  let closeAutocomplete = () => {};
+  if (searchForm && pageSearch) {
+    searchForm.classList.add('sn-search-autocomplete');
+    const panel = document.createElement('div');
+    panel.id = 'sn-page-search-results';
+    panel.className = 'sn-home-search-results sn-page-search-results';
+    panel.hidden = true;
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Search matches');
+    const status = document.createElement('p');
+    status.className = 'sn-home-search-status';
+    status.setAttribute('role', 'status');
+    const list = document.createElement('ul');
+    list.className = 'sn-home-search-list';
+    const all = document.createElement('a');
+    all.className = 'sn-home-search-all';
+    all.textContent = 'View all results';
+    all.hidden = true;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'sn-home-search-retry';
+    retry.textContent = 'Retry';
+    retry.hidden = true;
+    panel.append(status, list, all, retry);
+    searchForm.append(panel);
+
+    const searchUrl = value => `./search.html?${new URLSearchParams({ q: value })}`;
+    const show = () => { panel.hidden = false; pageSearch.setAttribute('aria-expanded', 'true'); };
+    closeAutocomplete = () => {
+      window.clearTimeout(autocompleteTimer);
+      autocompleteController?.abort();
+      autocompleteVersion++;
+      panel.hidden = true;
+      pageSearch.setAttribute('aria-expanded', 'false');
+    };
+    async function loadSuggestions(value = pageSearch.value) {
+      autocompleteQuery = value.trim();
+      autocompleteController?.abort();
+      const requestVersion = ++autocompleteVersion;
+      list.replaceChildren();
+      all.hidden = retry.hidden = true;
+      if (!autocompleteQuery) { closeAutocomplete(); return; }
+      show();
+      status.textContent = 'Searching...';
+      const controller = new AbortController();
+      autocompleteController = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 10000);
+      try {
+        const params = new URLSearchParams({ q: autocompleteQuery, customerId: String(currentCustomer.id || '') });
+        const response = await fetch(`${API_BASE}/api/providers/search?${params}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('Search unavailable');
+        const data = await response.json();
+        if (!Array.isArray(data.providers)) throw new Error('Invalid search response');
+        if (requestVersion !== autocompleteVersion) return;
+        const providers = data.providers.slice(0, 5);
+        status.textContent = providers.length
+          ? 'Matching providers'
+          : 'No available services or providers match your search.';
+        for (const provider of providers) {
+          const item = document.createElement('li');
+          const link = document.createElement('a');
+          link.href = `../provider-profile/provider-profile.html?id=${encodeURIComponent(provider.id)}`;
+          const name = document.createElement('strong');
+          name.textContent = provider.full_name || 'Service provider';
+          const details = document.createElement('span');
+          details.textContent = (provider.matched_services || [provider.service || provider.category]).filter(Boolean).join(' / ');
+          const rate = document.createElement('small');
+          rate.textContent = Number(provider.starting_price) > 0
+            ? `Starts at PHP ${Number(provider.starting_price).toLocaleString('en-PH')}`
+            : 'Price not set';
+          link.append(name, details, rate);
+          item.append(link);
+          list.append(item);
+        }
+        all.href = searchUrl(autocompleteQuery);
+        all.hidden = !providers.length;
+      } catch {
+        if (requestVersion !== autocompleteVersion) return;
+        status.textContent = 'Search is unavailable right now. Please try again.';
+        retry.hidden = false;
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+    function queueSuggestions() {
+      window.clearTimeout(autocompleteTimer);
+      autocompleteController?.abort();
+      autocompleteVersion++;
+      list.replaceChildren();
+      all.hidden = retry.hidden = true;
+      if (!pageSearch.value.trim()) { closeAutocomplete(); return; }
+      show();
+      status.textContent = 'Searching...';
+      autocompleteTimer = window.setTimeout(() => loadSuggestions(), 250);
+    }
+
+    pageSearch.addEventListener('input', event => { if (!event.isComposing) queueSuggestions(); });
+    pageSearch.addEventListener('compositionend', queueSuggestions);
+    pageSearch.addEventListener('focus', () => {
+      if (pageSearch.value.trim() && panel.hidden) queueSuggestions();
+    });
+    pageSearch.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' && !panel.hidden) {
+        event.preventDefault();
+        panel.querySelector('li a')?.focus();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeAutocomplete();
+      }
+    });
+    panel.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { pageSearch.focus(); closeAutocomplete(); return; }
+      if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+      const links = [...panel.querySelectorAll('li a')];
+      const index = links.indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const next = index + (event.key === 'ArrowDown' ? 1 : -1);
+      if (next < 0) pageSearch.focus();
+      else links[Math.min(next, links.length - 1)]?.focus();
+    });
+    document.addEventListener('pointerdown', event => {
+      if (!searchForm.contains(event.target)) closeAutocomplete();
+    });
+    searchForm.addEventListener('focusout', () => window.setTimeout(() => {
+      if (!searchForm.contains(document.activeElement)) closeAutocomplete();
+    }, 0));
+    retry.addEventListener('click', () => { pageSearch.focus(); loadSuggestions(); });
+    window.addEventListener('pagehide', closeAutocomplete);
+  }
   if (topSearch && topSearch.closest('.sn-topbar-search')) {
     topSearch.closest('.sn-topbar-search').style.display = 'none';
   }
@@ -727,6 +868,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function submitSearch(event) {
     event.preventDefault();
+    closeAutocomplete();
     applySearchQuery(pageSearch || topSearch, { immediate: true });
     countEl?.scrollIntoView({ block: 'start', behavior: 'instant' });
   }
