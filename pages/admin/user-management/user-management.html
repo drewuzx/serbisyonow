@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../../../shared/css/variables.css" />
   <link rel="stylesheet" href="../../../shared/css/modals.css" />
   <link rel="stylesheet" href="../admin-module.css" />
+  <link rel="stylesheet" href="./user-management.css" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -115,7 +116,21 @@
     </div>
   </div>
 
+  <div id="delete-account-modal" class="sn-modal sn-modal--danger" hidden>
+    <div class="sn-modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+      <button type="button" class="sn-modal-close" id="delete-account-close" aria-label="Close">✕</button>
+      <div class="sn-modal-icon sn-modal-icon--danger">!</div>
+      <h3 class="sn-modal-title" id="delete-account-title">Delete account?</h3>
+      <p class="sn-modal-body" id="delete-account-message"></p>
+      <div class="sn-modal-actions">
+        <button type="button" id="delete-account-cancel" class="btn btn-outline">Cancel</button>
+        <button type="button" id="delete-account-confirm" class="btn btn-danger">Delete account</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../../../shared/js/app.js"></script>
+  <script src="../admin-data.js"></script>
   <script src="user-management.js"></script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>

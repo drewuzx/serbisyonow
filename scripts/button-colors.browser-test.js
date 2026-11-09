@@ -89,6 +89,17 @@ async function main() {
   assert.equal(retained.status,409);
   assert.match(retained.data.message,/payment records/);
   assert.equal((await f.db.query('SELECT id FROM providers WHERE id=82')).rowCount,1);
+  assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,null)).status,401);
+  assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,f.customerToken)).status,403);
+  await f.db.query("INSERT INTO uploaded_files(folder,filename,original_name,mime_type,size_bytes,content,owner_role,owner_id) VALUES('customer-ids','fixture-customer-id.png','Customer ID','image/png',$1,$2,'customer',62)",[f.image.length,f.image]);
+  await f.db.query('INSERT INTO profile_photos(customer_id,content) VALUES(62,$1)',[f.image]);
+  const deletion = await f.request('/api/admin/users/customer/62','DELETE',undefined,admin.auth_token);
+  assert.equal(deletion.status,200);
+  assert.equal(deletion.data.uploaded_images_retained,true);
+  assert.equal((await f.db.query('SELECT id FROM customers WHERE id=62')).rowCount,0);
+  assert.equal((await f.db.query("SELECT id FROM uploaded_files WHERE filename='fixture-customer-id.png' AND owner_role IS NULL AND owner_id IS NULL")).rowCount,1);
+  assert.equal((await f.db.query("SELECT id FROM uploaded_files WHERE original_name='customer profile photo' AND owner_role IS NULL AND owner_id IS NULL")).rowCount,1);
+  assert.equal((await f.db.query("SELECT token_hash FROM account_sessions WHERE account_role='customer' AND account_id=62")).rowCount,0);
   assert.deepEqual(errors,[]);
   console.log('Button colors passed across admin/provider/customer/auth/promotions, including hover/disabled states. Verified decline, verify, cancel deletion, admin-only deletion, and desktop/mobile layouts.');
  } finally { if(browser) await browser.close(); await f.close(); }

@@ -132,6 +132,19 @@ td a:hover { text-decoration: underline; }
 .decline-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .decline-btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
 
+.delete-account-btn {
+  margin-top: 6px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-full);
+  padding: 7px 14px;
+  background: #fff;
+  color: #b91c1c;
+  font: 700 var(--text-xs) var(--font-body);
+  cursor: pointer;
+}
+.delete-account-btn:hover { background: #fef2f2; }
+.delete-account-btn:disabled { opacity: .55; cursor: wait; }
+
 /* Status badges — matches landing .badge system */
 .status-badge {
   display: inline-flex; align-items: center;

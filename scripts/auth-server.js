@@ -3788,6 +3788,7 @@ app.get('/api/admin/customers', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/admin/users', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
   const status = String(req.query.status || 'all');
   const params = [];
   let where = '';
@@ -3807,6 +3808,52 @@ app.get('/api/admin/users', asyncRoute(async (req, res) => {
   ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   res.json({ users });
+}));
+
+app.delete('/api/admin/users/:role/:id', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
+  const role = req.params.role;
+  if (!['customer', 'provider'].includes(role)) return res.status(400).json({ message: 'Choose a valid account type.' });
+  if (!/^[1-9]\d{0,9}$/.test(req.params.id) || Number(req.params.id) > 2147483647) {
+    return res.status(400).json({ message: 'Choose a valid account.' });
+  }
+  const accountId = Number(req.params.id);
+  const table = role === 'customer' ? 'customers' : 'providers';
+  try {
+    await transaction(db, async client => {
+      const account = await client.query(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [accountId]);
+      if (!account.rowCount) paymentFail(404, 'Account not found.');
+
+      // Keep uploaded ID, credential, and profile-photo bytes after removing their account.
+      await client.query(`UPDATE uploaded_files SET owner_role = NULL, owner_id = NULL
+        WHERE owner_role = $1 AND owner_id = $2`, [role, accountId]);
+      const photoColumn = role === 'customer' ? 'customer_id' : 'provider_id';
+      const profilePhoto = await client.query(`SELECT content FROM profile_photos WHERE ${photoColumn} = $1`, [accountId]);
+      for (const [index, photo] of profilePhoto.rows.entries()) {
+        const filename = `archived-${role}-${accountId}-profile-${index + 1}-${crypto.randomUUID()}.jpg`;
+        await client.query(`INSERT INTO uploaded_files (folder, filename, original_name, mime_type, size_bytes, content)
+          VALUES ($1, $2, $3, 'image/jpeg', $4, $5)`, [role === 'customer' ? 'customer-ids' : 'provider-docs', filename,
+          `${role} profile photo`, photo.content.length, photo.content]);
+      }
+      if (role === 'provider') {
+        const review = await client.query(`SELECT selfie, id_front, id_back FROM provider_photo_reviews WHERE provider_id = $1`, [accountId]);
+        const reviewImages = [
+          ['selfie', review.rows[0]?.selfie], ['front', review.rows[0]?.id_front], ['back', review.rows[0]?.id_back],
+        ].filter(([, content]) => content);
+        for (const [kind, content] of reviewImages) {
+          const filename = `archived-provider-${accountId}-verification-${kind}-${crypto.randomUUID()}.jpg`;
+          await client.query(`INSERT INTO uploaded_files (folder, filename, original_name, mime_type, size_bytes, content)
+            VALUES ('provider-docs', $1, $2, 'image/jpeg', $3, $4)`, [filename, `provider verification ${kind}`, content.length, content]);
+        }
+      }
+      await client.query('DELETE FROM account_sessions WHERE account_role = $1 AND account_id = $2', [role, accountId]);
+      await client.query(`DELETE FROM ${table} WHERE id = $1`, [accountId]);
+    });
+  } catch (error) {
+    if (error.code === '23503') return res.status(409).json({ message: 'This account has financial or booking records that must be retained. The account cannot be deleted.' });
+    throw error;
+  }
+  res.json({ ok: true, uploaded_images_retained: true });
 }));
 
 app.get('/api/admin/dashboard', asyncRoute(async (_req, res) => {
@@ -3982,6 +4029,7 @@ app.get('/api/admin/feedback', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/customers/:id/verify', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE customers
      SET is_verified = TRUE, verification_status = 'verified', updated_at = NOW()
@@ -3994,6 +4042,7 @@ app.patch('/api/admin/customers/:id/verify', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/customers/:id/reject', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE customers
      SET is_verified = FALSE, verification_status = 'rejected', updated_at = NOW()
