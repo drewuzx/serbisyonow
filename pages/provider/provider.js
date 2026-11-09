@@ -728,15 +728,15 @@ function completedBookingDay(booking) {
   return '';
 }
 
-function lastThirtyLiveDays() {
+function lastSevenLiveDays() {
   const days = [];
-  for (let offset = 29; offset >= 0; offset -= 1) {
+  for (let offset = 6; offset >= 0; offset -= 1) {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
     date.setDate(date.getDate() - offset);
     days.push({
       key: date.toDateString(),
-      label: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
+      label: date.toLocaleDateString('en-PH', { weekday: 'short' }),
       date,
     });
   }
@@ -805,7 +805,7 @@ function renderProviderRealtimeChart(bookings) {
   const chart = document.querySelector('.sn-provider-chart');
   if (!chart) return;
 
-  const days = lastThirtyLiveDays();
+  const days = lastSevenLiveDays();
   const completedByDay = Object.fromEntries(days.map((day) => [day.key, 0]));
 
   (bookings || []).forEach((booking) => {
@@ -828,26 +828,23 @@ function renderProviderRealtimeChart(bookings) {
     <div class="sn-provider-chart-head">
       <div>
         <h3>Activity History</h3>
-        <p>Completed jobs in the past 30 days.</p>
+        <p>Completed jobs in the past 7 days.</p>
       </div>
       <span class="sn-live-pill">Live ${liveClockLabel()}</span>
     </div>
     <div class="sn-provider-chart-plot">
       <div class="sn-provider-chart-bars">
-        ${days.map((day, index) => {
+        ${days.map((day) => {
           const completed = completedByDay[day.key];
-          const showDateLabel = index % 5 === 0 || index === days.length - 1;
-          const axisLabel = showDateLabel ? day.label : '';
-          const mobileLabel = showDateLabel ? day.date.getDate() : '';
           const jobHeight = completed ? Math.max(10, Math.round((completed / maxCount) * 150)) : 0;
           return `
-            <div class="sn-provider-chart-day" data-day="${axisLabel}" data-mobile-label="${mobileLabel}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
+            <div class="sn-provider-chart-day" data-day="${day.label}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
               <div class="sn-bar jobs ${completed ? 'is-filled' : ''}" style="height:${jobHeight}px"></div>
             </div>
           `;
         }).join('')}
       </div>
-      ${recentCompleted ? '' : '<p class="sn-provider-chart-empty" role="status">No jobs were completed in the past 30 days. New completions will appear here.</p>'}
+      ${recentCompleted ? '' : '<p class="sn-provider-chart-empty" role="status">No jobs were completed in the past 7 days. New completions will appear here.</p>'}
     </div>
     <div class="sn-provider-chart-legend">
       <span><i class="jobs"></i>Completed Jobs</span>

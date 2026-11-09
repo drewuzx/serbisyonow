@@ -205,15 +205,15 @@ function fixture() {
       assert.equal(await page.locator('.sn-history-item').count(), 4);
     });
     await scenario('provider/dashboard/dashboard.html', '.stats-grid', async (page, data, tick, requests) => {
-      data.bookings[1].updated_at = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      data.bookings[1].updated_at = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
       await tick();
-      assert.match(await page.locator('.sn-provider-chart-empty').textContent(), /No jobs were completed in the past 30 days/);
+      assert.match(await page.locator('.sn-provider-chart-empty').textContent(), /No jobs were completed in the past 7 days/);
       const beforeNewCompletion = requests.filter(url => url === '/api/provider/81/dashboard').length;
       data.bookings.push({ ...booking, id: 4, status: 'completed', updated_at: new Date().toISOString() }); await tick();
       assert.equal(requests.filter(url => url === '/api/provider/81/dashboard').length - beforeNewCompletion, 1, 'Single provider data poll');
       assert.match(await page.locator('.stats-grid').textContent(), /Completed Jobs/);
       assert.equal(await page.locator('.sn-provider-chart-empty').count(), 0);
-      assert.equal(await page.locator('.sn-provider-chart-day').count(), 30);
+      assert.equal(await page.locator('.sn-provider-chart-day').count(), 7);
       assert.equal(await page.locator('.sn-provider-chart-day[data-day]:not([data-day=""])').count(), 7);
       assert.equal(await page.locator('.sn-provider-chart-day[aria-label$="1 completed jobs"]').count(), 1);
     });
