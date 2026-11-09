@@ -3,7 +3,6 @@
 const AUTH_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
 let allUsers = [];
 let declineResolver = null;
-let pendingDeleteUser = null;
 
 function getStatus(user) {
   if (user.verification_status) return user.verification_status;
@@ -114,8 +113,6 @@ function renderRows(users) {
         </div>`;
     }
 
-    actionContent += `<button class="delete-account-btn" data-id="${user.id}" data-role="${role}" data-name="${encodeURIComponent(user.full_name || user.email || 'this account')}" type="button">Delete</button>`;
-
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td data-label="ID">${user.id}</td>
@@ -215,36 +212,6 @@ async function rejectUser(userId, role, button) {
   }
 }
 
-async function deleteUser(userId, role, name, button) {
-  const modal = document.getElementById('delete-account-modal');
-  const confirmBtn = document.getElementById('delete-account-confirm');
-  const message = document.getElementById('delete-account-message');
-  if (!modal || !confirmBtn || !message) return;
-  pendingDeleteUser = { userId, role, button };
-  message.textContent = `Permanently delete ${role} account “${name}”? Uploaded ID/document images will be retained, but account activity may be removed. This cannot be undone.`;
-  modal.hidden = false;
-  confirmBtn.focus();
-}
-
-async function confirmDeleteUser() {
-  const pending = pendingDeleteUser;
-  if (!pending) return;
-  const { userId, role, button } = pending;
-  pendingDeleteUser = null;
-  document.getElementById('delete-account-modal').hidden = true;
-  button.disabled = true;
-  button.textContent = 'Deleting...';
-  try {
-    await adminSend(`/api/admin/users/${role}/${userId}`, { method: 'DELETE' });
-    SN.toast.success(`${role === 'provider' ? 'Provider' : 'Customer'} account deleted. Uploaded documents were retained.`);
-    await loadUsers();
-  } catch (error) {
-    SN.toast.error(error.message || 'Failed to delete account.');
-    button.disabled = false;
-    button.textContent = 'Delete';
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   const tableBody = document.getElementById('pending-table-body');
   const refreshBtn = document.getElementById('refresh-btn');
@@ -255,26 +222,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const cancelBtn = document.getElementById('decline-cancel-btn');
   const closeBtn = document.getElementById('decline-close-btn');
   const confirmBtn = document.getElementById('decline-confirm-btn');
-  const deleteModal = document.getElementById('delete-account-modal');
-  const deleteConfirmBtn = document.getElementById('delete-account-confirm');
-  const closeDeleteModal = () => {
-    deleteModal.hidden = true;
-    pendingDeleteUser = null;
-  };
-
   cancelBtn?.addEventListener('click', () => closeDeclineModal(false));
   closeBtn?.addEventListener('click', () => closeDeclineModal(false));
   confirmBtn?.addEventListener('click', () => closeDeclineModal(true));
   modal?.addEventListener('click', (event) => {
     if (event.target === modal) closeDeclineModal(false);
   });
-  document.getElementById('delete-account-cancel')?.addEventListener('click', closeDeleteModal);
-  document.getElementById('delete-account-close')?.addEventListener('click', closeDeleteModal);
-  deleteModal?.addEventListener('click', (event) => {
-    if (event.target === deleteModal) closeDeleteModal();
-  });
-  deleteConfirmBtn?.addEventListener('click', confirmDeleteUser);
-
   loadUsers().catch((error) => {
     SN.toast.error(error.message || 'Failed to load users.');
   });
@@ -295,11 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
   roleFilter?.addEventListener('change', applyFilters);
 
   tableBody?.addEventListener('click', (event) => {
-    const deleteBtn = event.target.closest('.delete-account-btn');
-    if (deleteBtn) {
-      deleteUser(deleteBtn.dataset.id, deleteBtn.dataset.role, decodeURIComponent(deleteBtn.dataset.name), deleteBtn);
-      return;
-    }
     const btn = event.target.closest('.verify-btn');
     if (btn) {
       verifyUser(btn.dataset.id, btn.dataset.role, btn);

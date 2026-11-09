@@ -11,10 +11,8 @@ async function main() {
  try {
   const admin = (await f.db.query("INSERT INTO admins(username,password_hash) VALUES('color-test-admin','fixture') RETURNING id,username")).rows[0];
   admin.auth_token = await issueSession(f.db,'admin',admin.id);
-  assert.equal((await f.request('/api/admin/providers/81','DELETE',undefined,null)).status,401);
-  assert.equal((await f.request('/api/admin/providers/81','DELETE',undefined,f.customerToken)).status,403);
-  assert.equal((await f.request('/api/admin/providers/81','DELETE',undefined,f.providerToken)).status,403);
-  assert.equal((await f.request('/api/admin/providers/81','DELETE',undefined,admin.auth_token)).status,400);
+  assert.equal((await f.request('/api/admin/providers/81','DELETE',undefined,admin.auth_token)).status,404);
+  assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,admin.auth_token)).status,404);
   await f.db.query("UPDATE providers SET is_verified=FALSE,verification_status=CASE WHEN id=81 THEN 'rejected' ELSE 'pending' END");
   await f.db.query("INSERT INTO provider_skill_assessments(provider_id,category,score,badge) VALUES(82,'Cleaning Services',90,'Skilled Verified')");
   const provider = (await f.request('/api/auth/provider/session','GET',undefined,f.otherProviderToken)).data.user;
@@ -31,9 +29,8 @@ async function main() {
   page.on('pageerror',e=>errors.push(e.message));
   const color = locator => locator.evaluate(el=>getComputedStyle(el).backgroundColor);
   await page.goto(f.base+'/pages/admin/provider-verification/provider-verification.html');
-  await page.locator('[data-delete-provider="81"]').waitFor();
+  assert.equal(await page.locator('[data-delete-provider]').count(),0);
   assert.equal(await color(page.locator('[data-verify-provider="81"]')),'rgb(21, 128, 61)');
-  assert.equal(await color(page.locator('[data-delete-provider="81"]')),'rgb(185, 28, 28)');
   assert.equal(await color(page.locator('[data-reject-provider="82"]')),'rgb(229, 231, 235)');
   assert.equal(await page.locator('.status-badge.rejected').textContent(),'Declined');
   assert.equal(await color(page.locator('.status-badge.rejected')),'rgb(229, 231, 235)');
@@ -43,18 +40,10 @@ async function main() {
    await page.screenshot({path:path.join(os.tmpdir(),`verification-colors-${width}.png`),fullPage:true});
   }
   await page.locator('[data-reject-provider="82"]').click();
-  await page.locator('[data-delete-provider="82"]').waitFor();
+  assert.equal(await page.locator('[data-delete-provider]').count(),0);
   await page.locator('[data-verify-provider="82"]').click();
   await page.locator('.status-badge.verified').waitFor();
   assert.equal((await f.db.query('SELECT verification_status FROM providers WHERE id=82')).rows[0].verification_status,'verified');
-  await page.locator('[data-delete-provider="81"]').click();
-  await page.locator('#delete-provider-cancel').click();
-  assert.equal((await f.db.query('SELECT id FROM providers WHERE id=81')).rowCount,1);
-  await page.locator('[data-delete-provider="81"]').click();
-  await page.locator('#delete-provider-confirm').click();
-  await page.getByText('Declined provider submission deleted.',{exact:true}).waitFor();
-  assert.equal((await f.db.query('SELECT id FROM providers WHERE id=81')).rowCount,0);
-
   // Test the same button contracts with each role's real stylesheets and overrides.
   const pages = [
    '/pages/admin/user-management/user-management.html',
@@ -65,6 +54,10 @@ async function main() {
   ];
   for (const route of pages) {
    await page.goto(f.base+route);
+   if (route.includes('/pages/admin/user-management/')) {
+    assert.equal(await page.locator('.delete-account-btn').count(),0);
+    assert.equal(await page.locator('#delete-account-modal').count(),0);
+   }
    await page.addStyleTag({url:f.base+'/pages/provider/services/pricing-editor.css'});
    await page.addStyleTag({url:f.base+'/shared/css/promotions.css'});
    await page.evaluate(()=>{
@@ -82,28 +75,8 @@ async function main() {
    await disabled.hover({force:true});
    assert.equal(await color(disabled),'rgb(229, 231, 235)');
   }
-  await f.db.query(`INSERT INTO promotion_orders(provider_id,plan_id,request_id,plan_name,description,duration_days,amount_centavos,status,wallet,account_name,account_number,qr_content,qr_mime)
-   SELECT 82,id,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name,description,14,10000,'paid','GCash','Test Platform','09123456789',$1,'image/png' FROM promotion_plans LIMIT 1`,[f.image]);
-  const retainedBooking = (await f.db.query("INSERT INTO customer_bookings(customer_id,provider_id,service) VALUES(61,82,'Cleaning') RETURNING id")).rows[0];
-  await f.db.query("INSERT INTO provider_direct_payment_receipts(booking_id,provider_id,reference_number,amount_centavos,price_version,mime_type,content) VALUES($1,82,'RETAINED-RECEIPT',10000,0,'image/png',$2)",[retainedBooking.id,f.image]);
-  await f.db.query("UPDATE providers SET verification_status='rejected',is_verified=FALSE WHERE id=82");
-  const retained = await f.request('/api/admin/providers/82','DELETE',undefined,admin.auth_token);
-  assert.equal(retained.status,409);
-  assert.match(retained.data.message,/payment or booking receipt records/);
-  assert.equal((await f.db.query('SELECT id FROM providers WHERE id=82')).rowCount,1);
-  assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,null)).status,401);
-  assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,f.customerToken)).status,403);
-  await f.db.query("INSERT INTO uploaded_files(folder,filename,original_name,mime_type,size_bytes,content,owner_role,owner_id) VALUES('customer-ids','fixture-customer-id.png','Customer ID','image/png',$1,$2,'customer',62)",[f.image.length,f.image]);
-  await f.db.query('INSERT INTO profile_photos(customer_id,content) VALUES(62,$1)',[f.image]);
-  const deletion = await f.request('/api/admin/users/customer/62','DELETE',undefined,admin.auth_token);
-  assert.equal(deletion.status,200);
-  assert.equal(deletion.data.uploaded_images_retained,true);
-  assert.equal((await f.db.query('SELECT id FROM customers WHERE id=62')).rowCount,0);
-  assert.equal((await f.db.query("SELECT id FROM uploaded_files WHERE filename='fixture-customer-id.png' AND owner_role IS NULL AND owner_id IS NULL")).rowCount,1);
-  assert.equal((await f.db.query("SELECT id FROM uploaded_files WHERE original_name='customer profile photo' AND owner_role IS NULL AND owner_id IS NULL")).rowCount,1);
-  assert.equal((await f.db.query("SELECT token_hash FROM account_sessions WHERE account_role='customer' AND account_id=62")).rowCount,0);
   assert.deepEqual(errors,[]);
-  console.log('Button colors passed across admin/provider/customer/auth/promotions, including hover/disabled states. Verified decline, verify, cancel deletion, admin-only deletion, and desktop/mobile layouts.');
+  console.log('Button colors passed across admin/provider/customer/auth/promotions, including hover/disabled states. Verified decline, verify, removed admin delete controls/routes, and desktop/mobile layouts.');
  } finally { if(browser) await browser.close(); await f.close(); }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
