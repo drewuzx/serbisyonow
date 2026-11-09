@@ -89,10 +89,10 @@ function renderRows(users) {
     const roleLabel = getRoleLabel(user);
     const uploadFolder = 'customer-ids';
     const frontLink = user.id_front_file
-      ? `<a href="${AUTH_API_BASE}/uploads/${uploadFolder}/${user.id_front_file}" target="_blank" rel="noopener noreferrer">Front ID</a>`
+      ? `<button type="button" class="admin-file-link" data-private-file="${AUTH_API_BASE}/uploads/${uploadFolder}/${encodeURIComponent(user.id_front_file)}"><span>Identity upload</span><strong>Front ID</strong></button>`
       : 'No file';
     const backLink = user.id_back_file
-      ? `<a href="${AUTH_API_BASE}/uploads/${uploadFolder}/${user.id_back_file}" target="_blank" rel="noopener noreferrer">Back ID</a>`
+      ? `<button type="button" class="admin-file-link" data-private-file="${AUTH_API_BASE}/uploads/${uploadFolder}/${encodeURIComponent(user.id_back_file)}"><span>Identity upload</span><strong>Back ID</strong></button>`
       : 'No file';
 
     const status = getStatus(user);
@@ -248,6 +248,11 @@ document.addEventListener('DOMContentLoaded', () => {
   roleFilter?.addEventListener('change', applyFilters);
 
   tableBody?.addEventListener('click', (event) => {
+    const fileButton = event.target.closest('[data-private-file]');
+    if (fileButton) {
+      adminViewPrivateFile(fileButton.dataset.privateFile);
+      return;
+    }
     const btn = event.target.closest('.verify-btn');
     if (btn) {
       verifyUser(btn.dataset.id, btn.dataset.role, btn);

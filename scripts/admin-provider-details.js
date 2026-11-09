@@ -6,7 +6,7 @@ const { fail } = require('./booking-payments');
 
 function registerAdminProviderDetails(app, db, providerView, uploadDir) {
  const guard = fn => (req,res,next) => Promise.resolve().then(async () => {
-  await authenticateAccount(db,req,'admin');
+  req.adminAccount = await authenticateAccount(db,req,'admin');
   if (!/^[1-9]\d*$/.test(req.params.id) || Number(req.params.id)>2147483647) fail(400,'Invalid provider.');
   res.set('Cache-Control','private, no-store');
   return fn(req,res);
@@ -33,11 +33,15 @@ function registerAdminProviderDetails(app, db, providerView, uploadDir) {
   const stored=(await db.query('SELECT content,original_name,mime_type FROM uploaded_files WHERE folder=$1 AND filename=$2',[folder,filename])).rows[0];
   res.set('X-Content-Type-Options','nosniff');
   if(stored) {
+   await db.query(`INSERT INTO admin_activity_log (admin_id,action_key,target_role,target_id,metadata)
+    VALUES ($1,'document.view','provider',$2,$3::jsonb)`,[req.adminAccount.id,req.params.id,JSON.stringify({document_type:kind==='credential'?'provider_credential':'identity_document'})]);
    res.attachment(stored.original_name || filename);
    res.type(stored.mime_type || 'application/octet-stream').send(stored.content);
   } else {
    const location=path.join(uploadDir,folder,filename);
    try { await fs.access(location); } catch { fail(404,'This uploaded file is no longer available. Ask the provider to upload it again.'); }
+   await db.query(`INSERT INTO admin_activity_log (admin_id,action_key,target_role,target_id,metadata)
+    VALUES ($1,'document.view','provider',$2,$3::jsonb)`,[req.adminAccount.id,req.params.id,JSON.stringify({document_type:kind==='credential'?'provider_credential':'identity_document'})]);
    res.download(location,filename);
   }
  }));

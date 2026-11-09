@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
   link.textContent = 'Revenue & Promotions';
   nav.appendChild(link);
  }
+ if (nav && !nav.querySelector('[href*="/activity/"]')) {
+  const link = document.createElement('a');
+  link.href = '../activity/activity.html';
+  link.textContent = 'Admin Activity';
+  if (window.location.pathname.includes('/activity/')) link.className = 'active';
+  nav.appendChild(link);
+ }
 });
 
 function adminCanRefresh() {
@@ -56,6 +63,24 @@ function adminAuthHeaders() {
     const token = JSON.parse(localStorage.getItem('sn_admin_user') || 'null')?.auth_token;
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch { return {}; }
+}
+
+async function adminViewPrivateFile(url) {
+  const tab = window.open('about:blank', '_blank');
+  try {
+    const response = await fetch(url, { credentials: 'same-origin', headers: adminAuthHeaders(), cache: 'no-store' });
+    if (!response.ok) throw new Error('Unable to open this private document. Please sign in again.');
+    const objectUrl = URL.createObjectURL(await response.blob());
+    if (tab) tab.location.href = objectUrl;
+    else {
+      const link = document.createElement('a'); link.href = objectUrl; link.download = 'verification-document'; link.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+  } catch (error) {
+    tab?.close();
+    window.SN?.toast?.error(error.message);
+    if (!window.SN?.toast) alert(error.message);
+  }
 }
 
 function adminFormatDate(value) {

@@ -52,10 +52,10 @@
     function providerFileLink(folder, filename, label) {
       if (!filename) return '';
       return `
-        <a class="admin-file-link" href="${providerUploadUrl(folder, filename)}" target="_blank" rel="noopener noreferrer">
+        <button class="admin-file-link" type="button" data-private-file="${providerUploadUrl(folder, filename)}">
           <span>${adminEscape(label)}</span>
           <strong>${adminEscape(providerFileName(filename))}</strong>
-        </a>
+        </button>
       `;
     }
 
@@ -107,6 +107,8 @@
     }
 
     document.getElementById('provider-list').addEventListener('click', async (event) => {
+      const fileButton = event.target.closest('[data-private-file]');
+      if (fileButton) { adminViewPrivateFile(fileButton.dataset.privateFile); return; }
       if (providerMutationPending) return;
       const verifyBtn = event.target.closest('[data-verify-provider]');
       const rejectBtn = event.target.closest('[data-reject-provider]');

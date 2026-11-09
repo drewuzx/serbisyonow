@@ -32,11 +32,11 @@ async function image(file, portrait = false) {
  }
 }
 
-function registerProfilePhotos(app, db) {
+function registerProfilePhotos(app, db, recordAdminActivity = async () => {}) {
  const route = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
  // Authentication must finish before multipart parsing allocates upload buffers.
  const authenticate = role => (req, res, next) => authenticateAccount(db, req, role).then(account => {
-  req.photoAccount = account; res.set('Cache-Control', 'private, no-store'); next();
+  req.photoAccount = account; if (role === 'admin') req.adminAccount = account; res.set('Cache-Control', 'private, no-store'); next();
  }).catch(next);
  const id = req => {
   if (!/^[1-9]\d{0,9}$/.test(req.params.id) || Number(req.params.id) > 2147483647) fail(400, 'Invalid account.');
@@ -94,6 +94,7 @@ function registerProfilePhotos(app, db) {
   if (!field || !/^[a-f0-9-]{36}$/.test(req.params.revision)) fail(404, 'Image not found.');
   const row = (await db.query(`SELECT ${field} AS content FROM provider_photo_reviews WHERE provider_id=$1 AND revision::text=$2 AND status='pending'`, [id(req), req.params.revision])).rows[0];
   if (!row?.content) fail(404, 'Image is unavailable or this submission has already been reviewed.');
+  await recordAdminActivity(req.adminAccount.id, 'provider_photo.image_view', 'provider', id(req), { image_type: req.params.kind });
   jpeg(res, row.content);
  }));
  app.post('/api/admin/profile-photo-reviews/:id', authenticate('admin'), route(async (req, res) => {
@@ -111,6 +112,7 @@ function registerProfilePhotos(app, db) {
    await client.query(`UPDATE provider_photo_reviews SET status=$2,reason=$3,reviewed_at=NOW(),reviewed_by=$4,
     selfie=NULL,id_front=NULL,id_back=NULL WHERE provider_id=$1`, [providerId, decision, decision === 'declined' ? reason : '', req.photoAccount.id]);
   });
+  await recordAdminActivity(req.adminAccount.id, `provider_photo.${decision}`, 'provider', providerId);
   res.json({ message: decision === 'approved' ? 'Profile photo approved.' : 'Photo declined. The provider can submit again.' });
  }));
 }

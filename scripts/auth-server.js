@@ -160,7 +160,7 @@ registerPromotionRoutes(app, db, paymentImageUpload, { gateway:paymongo,
   returnBase:configuredFrontendBaseUrl || configuredApiBaseUrl, channel:process.env.PROMOTION_PAYMENT_CHANNEL || 'manual' });
 registerAdminProviderDetails(app, db, providerView, uploadDir);
 registerAdminReports(app, db, adminCategoryAliases);
-registerProfilePhotos(app, db);
+registerProfilePhotos(app, db, recordAdminActivity);
 
 app.get('/api/payment-receipts/:receiptId/image', asyncRoute(async (req, res) => {
   const role = req.query.role;
@@ -174,7 +174,8 @@ app.get('/api/payment-receipts/:receiptId/image', asyncRoute(async (req, res) =>
   res.set('X-Content-Type-Options', 'nosniff');
   res.type(receipt.mime_type).send(receipt.content);
 }));
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads/booking-media', express.static(path.join(uploadDir, 'booking-media')));
+app.use('/uploads/provider-payment-qrs', express.static(path.join(uploadDir, 'provider-payment-qrs')));
 
 app.get('/uploads/:folder/:filename', asyncRoute(async (req, res) => {
   const folder = String(req.params.folder || '').trim();
@@ -184,7 +185,7 @@ app.get('/uploads/:folder/:filename', asyncRoute(async (req, res) => {
   }
 
   const result = await db.query(
-    `SELECT original_name, mime_type, size_bytes, content
+    `SELECT original_name, mime_type, size_bytes, content, owner_role, owner_id
      FROM uploaded_files
      WHERE folder = $1 AND filename = $2
      LIMIT 1`,
@@ -198,9 +199,17 @@ app.get('/uploads/:folder/:filename', asyncRoute(async (req, res) => {
     );
   }
 
+  const account = ['customer-ids', 'provider-docs'].includes(folder)
+    ? await authenticatePrivateUploadViewer(req, file, folder)
+    : null;
+  if (account?.role === 'admin') {
+    const owner = file.owner_id ? { role: file.owner_role, id: file.owner_id } : await findUploadedFileOwner(folder, filename);
+    await recordAdminActivity(account.id, 'document.view', owner?.role || file.owner_role || 'unknown', owner?.id || file.owner_id, { document_type: folder === 'customer-ids' ? 'identity_document' : 'provider_credential' });
+  }
+
   res.type(file.mime_type || 'application/octet-stream');
   res.set('X-Content-Type-Options', 'nosniff');
-  res.set('Cache-Control', 'private, max-age=3600');
+  res.set('Cache-Control', 'private, no-store');
   res.set('Content-Disposition', `inline; filename="${String(file.original_name || filename).replace(/["\r\n]/g, '')}"`);
   if (file.size_bytes) res.set('Content-Length', String(file.size_bytes));
   res.send(file.content);
@@ -1218,6 +1227,19 @@ async function ensureAdminSupportTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS admin_activity_log (
+      id BIGSERIAL PRIMARY KEY,
+      admin_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+      action_key TEXT NOT NULL,
+      target_role TEXT,
+      target_id INTEGER,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_activity_log_created
+      ON admin_activity_log (created_at DESC, id DESC);
+
     CREATE TABLE IF NOT EXISTS customer_bookings (
       id SERIAL PRIMARY KEY,
       customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
@@ -1424,6 +1446,34 @@ async function ensureAdminSupportTables() {
 
   await backfillUploadedFilesFromDisk();
   await backfillProviderProfileData();
+}
+
+async function recordAdminActivity(adminId, actionKey, targetRole = null, targetId = null, metadata = {}) {
+  await db.query(`INSERT INTO admin_activity_log (admin_id, action_key, target_role, target_id, metadata)
+    VALUES ($1, $2, $3, $4, $5::jsonb)`, [adminId, actionKey, targetRole, targetId, JSON.stringify(metadata)]);
+}
+
+async function findUploadedFileOwner(folder, filename) {
+  const result = await db.query(`SELECT 'customer' AS role,id FROM customers WHERE id_front_file=$1 OR id_back_file=$1
+    UNION ALL
+    SELECT 'provider' AS role,id FROM providers WHERE id_front_file=$1 OR id_back_file=$1 OR $2='provider-docs' AND $1=ANY(documents_files)
+    LIMIT 1`, [filename, folder]);
+  return result.rows[0] || null;
+}
+
+async function authenticatePrivateUploadViewer(req, file, folder) {
+  try {
+    const admin = await authenticateAccount(db, req, 'admin');
+    req.adminAccount = admin;
+    return admin;
+  } catch (adminError) {
+    if (adminError.statusCode !== 401 && adminError.statusCode !== 403) throw adminError;
+  }
+  const role = file.owner_role;
+  if (!['customer', 'provider'].includes(role) || !file.owner_id) paymentFail(401, 'Sign in to view this private document.');
+  const actor = await authenticateAccount(db, req, role);
+  if (String(actor.id) !== String(file.owner_id)) paymentFail(403, 'This document belongs to another account.');
+  return actor;
 }
 
 async function backfillProviderProfileData() {
@@ -3772,6 +3822,7 @@ async function requireFeedbackAdmin(req) {
   }
   const result = await db.query('SELECT id FROM admins WHERE id = $1', [actor.id]);
   if (!result.rowCount) paymentFail(403, 'An admin account is required.');
+  return actor;
 }
 
 app.get('/api/admin/customers', asyncRoute(async (req, res) => {
@@ -3880,6 +3931,20 @@ app.get('/api/admin/dashboard', asyncRoute(async (_req, res) => {
   });
 }));
 
+app.get('/api/admin/activity', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'admin');
+  res.set('Cache-Control', 'private, no-store');
+  const result = await db.query(`SELECT l.id,l.action_key,l.target_role,l.target_id,l.metadata,l.created_at,
+      a.username AS admin_username,
+      COALESCE(c.full_name,p.full_name,CASE WHEN l.target_role IN ('customer','provider') AND l.target_id IS NOT NULL THEN 'Account #' || l.target_id::text END) AS target_name
+    FROM admin_activity_log l
+    LEFT JOIN admins a ON a.id=l.admin_id
+    LEFT JOIN customers c ON l.target_role='customer' AND c.id=l.target_id
+    LEFT JOIN providers p ON l.target_role='provider' AND p.id=l.target_id
+    ORDER BY l.created_at DESC,l.id DESC LIMIT 200`);
+  res.json({ activity: result.rows });
+}));
+
 app.get('/api/admin/providers', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'admin');
   res.set('Cache-Control', 'private, no-store');
@@ -3983,7 +4048,7 @@ app.get('/api/admin/feedback', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/customers/:id/verify', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'admin');
+  const admin = await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE customers
      SET is_verified = TRUE, verification_status = 'verified', updated_at = NOW()
@@ -3992,11 +4057,12 @@ app.patch('/api/admin/customers/:id/verify', asyncRoute(async (req, res) => {
     [req.params.id]
   );
   if (!result.rowCount) return res.status(404).json({ message: 'Customer not found.' });
+  await recordAdminActivity(admin.id, 'account.verified', 'customer', Number(req.params.id));
   res.json({ customer: customerRow(result.rows[0]) });
 }));
 
 app.patch('/api/admin/customers/:id/reject', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'admin');
+  const admin = await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE customers
      SET is_verified = FALSE, verification_status = 'rejected', updated_at = NOW()
@@ -4005,11 +4071,12 @@ app.patch('/api/admin/customers/:id/reject', asyncRoute(async (req, res) => {
     [req.params.id]
   );
   if (!result.rowCount) return res.status(404).json({ message: 'Customer not found.' });
+  await recordAdminActivity(admin.id, 'account.declined', 'customer', Number(req.params.id));
   res.json({ customer: customerRow(result.rows[0]) });
 }));
 
 app.patch('/api/admin/providers/:id/verify', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'admin');
+  const admin = await authenticateAccount(db, req, 'admin');
   const providerLookup = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   if (!providerLookup.rowCount) return res.status(404).json({ message: 'Provider not found.' });
 
@@ -4043,6 +4110,7 @@ app.patch('/api/admin/providers/:id/verify', asyncRoute(async (req, res) => {
     SELECT $1, $2, $3, $4
     WHERE NOT EXISTS (SELECT 1 FROM provider_skill_assessments WHERE provider_id = $1)
   `, [req.params.id, result.rows[0].category || 'General', assessmentScore, badge]);
+  await recordAdminActivity(admin.id, 'account.verified', 'provider', Number(req.params.id));
   res.json({
     provider: await providerView({
       ...result.rows[0],
@@ -4074,7 +4142,7 @@ app.post('/api/admin/feedback', asyncRoute(async (req, res) => {
 }));
 
 app.patch('/api/admin/feedback/:id/status', asyncRoute(async (req, res) => {
-  await requireFeedbackAdmin(req);
+  const admin = await requireFeedbackAdmin(req);
   requireFields(req.body, ['status']);
   if (!['open', 'review', 'resolved', 'logged'].includes(req.body.status)) paymentFail(400, 'Choose a valid feedback status.');
   const result = await db.query(`
@@ -4084,11 +4152,12 @@ app.patch('/api/admin/feedback/:id/status', asyncRoute(async (req, res) => {
     RETURNING *
   `, [req.params.id, req.body.status]);
   if (!result.rowCount) return res.status(404).json({ message: 'Feedback not found.' });
+  await recordAdminActivity(admin.id, 'feedback.status_changed', 'feedback', Number(req.params.id), { status: req.body.status });
   res.json({ feedback: feedbackRow(result.rows[0]) });
 }));
 
 app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'admin');
+  const admin = await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE providers
      SET is_verified = FALSE, verification_status = 'rejected', updated_at = NOW()
@@ -4097,6 +4166,7 @@ app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
     [req.params.id]
   );
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
+  await recordAdminActivity(admin.id, 'account.declined', 'provider', Number(req.params.id));
   res.json({ provider: await providerView(result.rows[0]) });
 }));
 

@@ -137,7 +137,9 @@ test('profile and credentials API: ownership, persistence, review, validation an
     assert.equal(stored.owner_id, 81);
     assert.equal(stored.owner_role, 'provider');
     assert.deepEqual(stored.content, f.image);
-    const download = await f.request(`/uploads/provider-docs/${filename}`);
+    assert.equal((await f.request(`/uploads/provider-docs/${filename}`, 'GET', undefined, null)).status, 401);
+    assert.equal((await f.request(`/uploads/provider-docs/${filename}`, 'GET', undefined, f.customerToken)).status, 403);
+    const download = await f.request(`/uploads/provider-docs/${filename}`, 'GET', undefined, f.providerToken);
     assert.equal(download.status, 200);
     assert.equal(download.headers.get('x-content-type-options'), 'nosniff');
     assert.deepEqual(download.data, f.image);
@@ -145,7 +147,15 @@ test('profile and credentials API: ownership, persistence, review, validation an
     const current = (await f.request('/api/provider/81/dashboard', 'GET', undefined, f.providerToken)).data.provider;
     assert.equal(current.id_front_file, first.data.user.id_front_file);
     assert.equal(current.documents_files.length, 2);
-    const adminToken = await issueSession(f.db, 'admin', 1);
+    const admin = (await f.db.query("INSERT INTO admins (username,password_hash) VALUES ('provider-doc-audit-admin','fixture') RETURNING id")).rows[0];
+    const adminToken = await issueSession(f.db, 'admin', admin.id);
+    const adminDownload = await f.request(`/uploads/provider-docs/${filename}`, 'GET', undefined, adminToken);
+    assert.equal(adminDownload.status, 200);
+    const audit = await f.db.query(`SELECT action_key,target_role,target_id,metadata FROM admin_activity_log WHERE admin_id=$1 ORDER BY id DESC LIMIT 1`, [admin.id]);
+    assert.equal(audit.rows[0].action_key, 'document.view');
+    assert.equal(audit.rows[0].target_role, 'provider');
+    assert.equal(Number(audit.rows[0].target_id), 81);
+    assert.equal(audit.rows[0].metadata.document_type, 'provider_credential');
     const adminList = await f.request('/api/admin/providers?status=all', 'GET', undefined, adminToken);
     assert.ok(adminList.data.providers.find(provider => provider.id === 81).documents_files.includes(filename));
 
