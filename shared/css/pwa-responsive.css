@@ -956,6 +956,66 @@ button {
   }
 }
 
+@media (max-width: 720px) {
+  .sn-shell--provider .sn-schedule-create-panel {
+    padding: 16px;
+  }
+
+  .sn-shell--provider .sn-schedule-form {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .sn-shell--provider .sn-schedule-form > .sn-time-field {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sn-shell--provider .sn-time-field legend {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .sn-shell--provider .sn-time-controls {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 4px;
+  }
+
+  .sn-shell--provider .sn-time-controls select {
+    padding-inline: 8px;
+  }
+
+  .sn-shell--provider .sn-schedule-days {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+    gap: 4px 10px;
+  }
+
+  .sn-shell--provider .sn-schedule-days label {
+    justify-content: flex-start;
+    white-space: nowrap;
+  }
+
+  .sn-shell--provider .sn-schedule-check {
+    width: 100%;
+    min-height: 40px;
+    align-self: start;
+    line-height: 1.35;
+  }
+
+  .sn-shell--provider .sn-schedule-form .sn-actions-row {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .sn-shell--provider .sn-schedule-form button[type="submit"] {
+    width: 100%;
+  }
+}
+
 @media (max-height: 560px) and (orientation: landscape) {
   .hero {
     min-height: 320px;
