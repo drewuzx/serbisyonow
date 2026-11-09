@@ -40,9 +40,11 @@
     }
 
     .legal-content {
-      max-width: 900px;
-      padding: var(--space-10) var(--space-6) var(--space-14);
+      max-width: var(--container-max);
+      padding: var(--space-10) 0 var(--space-14);
     }
+
+    .legal-section > :is(h2, p, ul) { max-width: 1000px; }
 
     .legal-section {
       padding: var(--space-6) 0;

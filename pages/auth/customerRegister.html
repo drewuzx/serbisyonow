@@ -15,7 +15,30 @@
     @media (max-width: 480px) { .hero-login { gap: 16px; margin-top: 12px; } .hero .container { padding-inline: 12px; } .hero-login-left p { font-size: 0.92rem; line-height: 1.55; } }
     .id-consent { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-input); color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
     .id-consent input { flex: 0 0 auto; width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--blue-main); }
-    .id-consent a { color: var(--blue-main); font-weight: 600; text-decoration: underline; }
+    .id-consent-copy { display: grid; gap: 4px; }
+    .id-consent-copy strong { color: var(--blue-dark); }
+    .id-consent-copy button { justify-self: start; padding: 0; border: 0; background: none; color: var(--blue-main); font: inherit; font-weight: 700; text-decoration: underline; }
+    .id-consent-status { color: var(--text-muted); font-size: var(--text-xs); }
+    .id-consent-dialog { width: min(680px, calc(100vw - 28px)); max-width: none; max-height: min(88dvh, 780px); padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--white); color: var(--text-primary); box-shadow: 0 24px 80px rgba(17, 34, 70, .28); }
+    .id-consent-dialog::backdrop { background: rgba(12, 24, 48, .58); backdrop-filter: blur(5px); }
+    .id-consent-dialog-inner { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: min(88dvh, 780px); }
+    .id-consent-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-top: 5px solid var(--blue-main); border-bottom: 1px solid var(--border); }
+    .id-consent-header h2 { margin: 0; color: var(--blue-dark); font: 800 1.25rem/1.3 var(--font-heading); }
+    .id-consent-close { width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-input); color: var(--blue-dark); font-size: 1.5rem; line-height: 1; }
+    .id-consent-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 22px; }
+    .id-consent-callout { margin: 0 0 16px; padding: 14px 16px; border: 1px solid #f0d98b; border-radius: 12px; background: #fff9e8; color: #70511b; line-height: 1.55; }
+    .id-consent-topic { margin: 0 0 14px; padding: 16px; border: 1px solid #dce8e4; border-radius: 12px; background: #f8fbfa; }
+    .id-consent-topic h3 { margin: 0 0 8px; color: #174c3b; font: 700 1.05rem/1.4 var(--font-heading); }
+    .id-consent-topic p, .id-consent-topic li { margin: 0; color: var(--text-secondary); line-height: 1.65; }
+    .id-consent-topic ul { margin: 8px 0 0; padding-left: 20px; }
+    .id-consent-footer { display: grid; gap: 12px; padding: 16px 22px 20px; border-top: 1px solid var(--border); background: var(--white); }
+    .id-consent-footer p { margin: 0; color: var(--text-muted); text-align: center; }
+    .id-consent-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .id-consent-actions button { min-height: 50px; border-radius: 10px; font: 700 1rem var(--font-body); }
+    .id-consent-agree { border: 0; background: var(--blue-main); color: #fff; }
+    .id-consent-agree:disabled { background: #aab5b1; cursor: not-allowed; }
+    .id-consent-cancel { border: 1px solid var(--border); background: #fff; color: var(--text-primary); }
+    @media (max-width: 480px) { .id-consent-dialog { border-radius: 16px; } .id-consent-header, .id-consent-scroll { padding-inline: 16px; } .id-consent-footer { padding: 14px 16px 16px; } .id-consent-actions { grid-template-columns: 1fr; } }
   </style>
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
@@ -84,7 +107,26 @@
                 <div class="form-group form-full"><label>Upload Front of ID</label><label class="upload-box" id="upload-front-label"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="front-label-text">Upload Front of ID</span><input type="file" id="id-front" accept="image/*,.pdf" required onchange="handleUpload(this,'front-label-text','upload-front-label')"/></label></div>
                 <div class="form-group form-full"><label>Upload Back of ID</label><label class="upload-box" id="upload-back-label"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span id="back-label-text">Upload Back of ID</span><input type="file" id="id-back" accept="image/*,.pdf" required onchange="handleUpload(this,'back-label-text','upload-back-label')"/></label></div>
               </div>
-              <label class="id-consent" for="id-verification-consent"><input type="checkbox" id="id-verification-consent" required/><span>I consent to SerbisyoNow collecting and processing my ID and submitted details to verify my customer account. Authorized admins may review these documents. My information will be handled under the <a href="../legal/privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>. This consent is required to submit my registration.</span></label>
+              <div class="form-group">
+                <div class="id-consent">
+                  <input type="checkbox" id="id-verification-consent" required aria-describedby="id-consent-status"/>
+                  <div class="id-consent-copy"><strong>ID verification consent</strong><span>Review how your ID will be used. Agreement is required to submit your registration.</span><button type="button" id="open-id-consent">Read privacy notice</button><span class="id-consent-status" id="id-consent-status" aria-live="polite">Not yet agreed</span></div>
+                </div>
+              </div>
+              <dialog class="id-consent-dialog" id="id-consent-dialog" aria-labelledby="id-consent-title">
+                <div class="id-consent-dialog-inner">
+                  <header class="id-consent-header"><h2 id="id-consent-title">Privacy Notice &amp; ID Verification</h2><button type="button" class="id-consent-close" id="close-id-consent" aria-label="Close notice">&times;</button></header>
+                  <div class="id-consent-scroll" id="id-consent-scroll" tabindex="0">
+                    <p class="id-consent-callout">Please read this notice before agreeing to submit your ID for customer verification.</p>
+                    <section class="id-consent-topic"><h3>1. Information collected</h3><p>SerbisyoNow collects the ID type, address details, and the front and back images of the ID you submit, together with the account details you provide during registration.</p></section>
+                    <section class="id-consent-topic"><h3>2. Why it is used</h3><p>Your ID and account details are used to verify your customer account and help protect the marketplace from false or impersonated accounts. They are not used as public profile content.</p></section>
+                    <section class="id-consent-topic"><h3>3. Who may review it</h3><p>Authorized SerbisyoNow administrators may access the submitted documents for verification and administrative review. Other customers and providers cannot view your ID images on your public profile.</p></section>
+                    <section class="id-consent-topic"><h3>4. Your choice</h3><p>Submitting this consent is required to complete customer registration. You may cancel now and return to the form without submitting. For privacy questions or data requests, use the support channel listed in the Privacy Policy.</p></section>
+                    <section class="id-consent-topic"><h3>5. Full Privacy Policy</h3><p>Read the <a href="../legal/privacy-policy.html" target="_blank" rel="noopener">full Privacy Policy</a> for more information about account data, uploaded documents, and location information.</p></section>
+                  </div>
+                  <footer class="id-consent-footer"><p id="id-consent-scroll-hint" aria-live="polite">Scroll to the end of this notice to continue.</p><div class="id-consent-actions"><button type="button" class="id-consent-agree" id="accept-id-consent" disabled>I agree &amp; continue</button><button type="button" class="id-consent-cancel" id="cancel-id-consent">Cancel</button></div></footer>
+                </div>
+              </dialog>
               <div class="flow-actions"><button type="button" class="btn btn-primary btn-lg" id="submit-btn" onclick="submitRegister(event)">Submit</button></div>
             </div>
             <p class="auth-footer">Already a member? <a href="customerLogin.html">Login</a></p>

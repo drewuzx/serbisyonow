@@ -411,6 +411,50 @@ function applyGooglePrefill() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const consent = document.getElementById('id-verification-consent');
+  const consentStatus = document.getElementById('id-consent-status');
+  const consentDialog = document.getElementById('id-consent-dialog');
+  const consentScroll = document.getElementById('id-consent-scroll');
+  const acceptConsent = document.getElementById('accept-id-consent');
+  let consentGranted = false;
+  const updateConsentProgress = () => {
+    if (!consentScroll || !acceptConsent) return;
+    const atEnd = consentScroll.scrollHeight <= consentScroll.clientHeight + 1
+      || consentScroll.scrollTop + consentScroll.clientHeight >= consentScroll.scrollHeight - 8;
+    acceptConsent.disabled = !atEnd;
+    const hint = document.getElementById('id-consent-scroll-hint');
+    if (hint) hint.textContent = atEnd ? 'You have reached the end of the notice.' : 'Scroll to the end of this notice to continue.';
+  };
+  const openConsent = () => {
+    if (!consentDialog?.open) {
+      consentDialog?.showModal();
+      requestAnimationFrame(updateConsentProgress);
+    }
+  };
+  document.getElementById('open-id-consent')?.addEventListener('click', openConsent);
+  document.getElementById('close-id-consent')?.addEventListener('click', () => consentDialog?.close());
+  document.getElementById('cancel-id-consent')?.addEventListener('click', () => consentDialog?.close());
+  consentScroll?.addEventListener('scroll', updateConsentProgress, { passive: true });
+  consent?.addEventListener('change', () => {
+    if (consent.checked && !consentGranted) {
+      consent.checked = false;
+      openConsent();
+      return;
+    }
+    if (!consent.checked) {
+      consentGranted = false;
+      if (consentStatus) consentStatus.textContent = 'Not yet agreed';
+    }
+  });
+  acceptConsent?.addEventListener('click', () => {
+    if (acceptConsent.disabled || !consent) return;
+    consentGranted = true;
+    consent.checked = true;
+    if (consentStatus) consentStatus.textContent = 'Agreed; saved when registration is submitted.';
+    clearFieldError(consent);
+    consentDialog.close();
+  });
+
   const dobField = document.getElementById('dob');
   const now = new Date();
   if (dobField) {
