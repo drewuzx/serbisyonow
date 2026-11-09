@@ -3850,7 +3850,9 @@ app.delete('/api/admin/users/:role/:id', asyncRoute(async (req, res) => {
       await client.query(`DELETE FROM ${table} WHERE id = $1`, [accountId]);
     });
   } catch (error) {
-    if (error.code === '23503') return res.status(409).json({ message: 'This account has financial or booking records that must be retained. The account cannot be deleted.' });
+    if (['23503', '23001'].includes(error.code)) {
+      return res.status(409).json({ message: 'This account has payment or booking receipt records that must be retained. The account cannot be deleted.' });
+    }
     throw error;
   }
   res.json({ ok: true, uploaded_images_retained: true });
@@ -4157,7 +4159,7 @@ app.delete('/api/admin/providers/:id', asyncRoute(async (req, res) => {
       [req.params.id]
     );
   } catch (error) {
-    if (error.code === '23503') return res.status(409).json({ message: 'This provider has payment records that must be retained. The account cannot be deleted.' });
+    if (['23503', '23001'].includes(error.code)) return res.status(409).json({ message: 'This provider has payment records that must be retained. The account cannot be deleted.' });
     throw error;
   }
   if (!result.rowCount) {

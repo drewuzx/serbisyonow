@@ -84,10 +84,12 @@ async function main() {
   }
   await f.db.query(`INSERT INTO promotion_orders(provider_id,plan_id,request_id,plan_name,description,duration_days,amount_centavos,status,wallet,account_name,account_number,qr_content,qr_mime)
    SELECT 82,id,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name,description,14,10000,'paid','GCash','Test Platform','09123456789',$1,'image/png' FROM promotion_plans LIMIT 1`,[f.image]);
+  const retainedBooking = (await f.db.query("INSERT INTO customer_bookings(customer_id,provider_id,service) VALUES(61,82,'Cleaning') RETURNING id")).rows[0];
+  await f.db.query("INSERT INTO provider_direct_payment_receipts(booking_id,provider_id,reference_number,amount_centavos,price_version,mime_type,content) VALUES($1,82,'RETAINED-RECEIPT',10000,0,'image/png',$2)",[retainedBooking.id,f.image]);
   await f.db.query("UPDATE providers SET verification_status='rejected',is_verified=FALSE WHERE id=82");
   const retained = await f.request('/api/admin/providers/82','DELETE',undefined,admin.auth_token);
   assert.equal(retained.status,409);
-  assert.match(retained.data.message,/payment records/);
+  assert.match(retained.data.message,/payment or booking receipt records/);
   assert.equal((await f.db.query('SELECT id FROM providers WHERE id=82')).rowCount,1);
   assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,null)).status,401);
   assert.equal((await f.request('/api/admin/users/customer/62','DELETE',undefined,f.customerToken)).status,403);
