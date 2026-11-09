@@ -2,7 +2,6 @@
 'use strict';
 
 const AUTH_API_BASE = SN.utils.apiBase();
-const CUSTOMER_REGISTER_SUCCESS_KEY = 'sn_customer_register_success';
 const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
 
 function isAllowedCustomerRedirect(target) {
@@ -196,7 +195,6 @@ function validateStep2() {
 function goStep(e, step) {
   e.preventDefault();
   if (step === 2 && !validateStep1()) return;
-  sessionStorage.removeItem(CUSTOMER_REGISTER_SUCCESS_KEY);
   document.body.classList.remove('is-application-submitted');
   document.querySelector('.provider-flow-card')?.classList.remove('is-success-card');
   const step1 = document.getElementById('step-1');
@@ -218,7 +216,6 @@ function goStep(e, step) {
 }
 
 function goBack(step) {
-  sessionStorage.removeItem(CUSTOMER_REGISTER_SUCCESS_KEY);
   document.body.classList.remove('is-application-submitted');
   document.querySelector('.provider-flow-card')?.classList.remove('is-success-card');
   const step1 = document.getElementById('step-1');
@@ -240,7 +237,6 @@ function goBack(step) {
 }
 
 function showCustomerSuccess() {
-  sessionStorage.setItem(CUSTOMER_REGISTER_SUCCESS_KEY, '1');
   document.body.classList.add('is-application-submitted');
   document.querySelector('.provider-flow-card')?.classList.add('is-success-card');
   const step1 = document.getElementById('step-1');
@@ -339,7 +335,6 @@ function submitRegister(e) {
       localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
       localStorage.setItem('sn_last_account_role', 'customer');
       localStorage.removeItem('sn_google_prefill_customer');
-      sessionStorage.setItem(CUSTOMER_REGISTER_SUCCESS_KEY, '1');
       showCustomerSuccess();
       SN.toast.success('Application submitted! Awaiting admin verification.');
     })
@@ -470,9 +465,6 @@ document.addEventListener('DOMContentLoaded', () => {
     normalizeContactField(contactField);
     clearFieldError(contactField);
   });
-  if (sessionStorage.getItem(CUSTOMER_REGISTER_SUCCESS_KEY) === '1') {
-    showCustomerSuccess();
-  }
 });
 
 Object.assign(window, {
