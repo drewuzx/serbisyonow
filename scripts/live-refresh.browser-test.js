@@ -213,6 +213,8 @@ function fixture() {
       assert.equal(requests.filter(url => url === '/api/provider/81/dashboard').length - beforeNewCompletion, 1, 'Single provider data poll');
       assert.match(await page.locator('.stats-grid').textContent(), /Completed Jobs/);
       assert.equal(await page.locator('.sn-provider-chart-empty').count(), 0);
+      assert.equal(await page.locator('.sn-provider-chart-day').count(), 30);
+      assert.equal(await page.locator('.sn-provider-chart-day[data-day]:not([data-day=""])').count(), 7);
       assert.equal(await page.locator('.sn-provider-chart-day[aria-label$="1 completed jobs"]').count(), 1);
     });
     await scenario('provider/dashboard/dashboard.html', '.sn-float-root', async (page, data, tick) => {

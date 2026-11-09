@@ -1596,6 +1596,8 @@ body {
   white-space: nowrap;
 }
 
+.sn-provider-chart-day[data-day=""]::after { content: none; }
+
 .sn-bar {
   border-radius: 5px 5px 0 0;
   min-height: 0;
