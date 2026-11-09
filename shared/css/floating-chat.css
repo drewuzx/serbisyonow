@@ -363,13 +363,14 @@
   }
 
   .sn-float-root {
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: calc(72px + env(safe-area-inset-bottom));
-    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--border, #d4ddeb);
-    background: var(--white, #fff);
+    right: 14px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: auto;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
     justify-content: flex-end;
   }
 
@@ -390,6 +391,14 @@
 
   .sn-float-chat.is-open + .sn-float-list.is-open {
     display: none;
+  }
+}
+
+@media (max-width: 940px) {
+  body:has(.sn-shell.sidebar-open) .sn-float-root,
+  body:has(.sn-shell.sidebar-open) .sn-feedback-root {
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 
