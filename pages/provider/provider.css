@@ -1547,6 +1547,10 @@ body {
   box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.14);
 }
 
+.sn-provider-chart-plot {
+  position: relative;
+}
+
 .sn-provider-chart-bars {
   min-height: 220px;
   display: grid;
@@ -1556,6 +1560,18 @@ body {
   padding: 16px 8px 28px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 44px;
+}
+
+.sn-provider-chart-empty {
+  position: absolute;
+  inset: 0 12px 28px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  pointer-events: none;
 }
 
 .sn-provider-chart-day {

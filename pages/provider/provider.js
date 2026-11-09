@@ -720,6 +720,14 @@ function bookingDayStamp(value) {
   return date.toDateString();
 }
 
+function completedBookingDay(booking) {
+  for (const value of [booking.updated_at, booking.scheduled_date, booking.created_at]) {
+    const day = bookingDayStamp(value);
+    if (day) return day;
+  }
+  return '';
+}
+
 function lastSevenLiveDays() {
   const days = [];
   for (let offset = 6; offset >= 0; offset -= 1) {
@@ -801,13 +809,15 @@ function renderProviderRealtimeChart(bookings) {
   const completedByDay = Object.fromEntries(days.map((day) => [day.key, 0]));
 
   (bookings || []).forEach((booking) => {
-    if (String(booking.status || '').toLowerCase() === 'completed') {
-      const completedKey = bookingDayStamp(booking.updated_at || booking.scheduled_date || booking.created_at);
+    if (String(booking.status || '').trim().toLowerCase() === 'completed') {
+      const completedKey = completedBookingDay(booking);
       if (completedByDay[completedKey] !== undefined) {
         completedByDay[completedKey] += 1;
       }
     }
   });
+
+  const recentCompleted = days.reduce((total, day) => total + completedByDay[day.key], 0);
 
   const maxCount = Math.max(
     1,
@@ -822,16 +832,19 @@ function renderProviderRealtimeChart(bookings) {
       </div>
       <span class="sn-live-pill">Live ${liveClockLabel()}</span>
     </div>
-    <div class="sn-provider-chart-bars">
-      ${days.map((day) => {
-        const completed = completedByDay[day.key];
-        const jobHeight = completed ? Math.max(10, Math.round((completed / maxCount) * 150)) : 0;
-        return `
-          <div class="sn-provider-chart-day" data-day="${day.label}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
-            <div class="sn-bar jobs ${completed ? 'is-filled' : ''}" style="height:${jobHeight}px"></div>
-          </div>
-        `;
-      }).join('')}
+    <div class="sn-provider-chart-plot">
+      <div class="sn-provider-chart-bars">
+        ${days.map((day) => {
+          const completed = completedByDay[day.key];
+          const jobHeight = completed ? Math.max(10, Math.round((completed / maxCount) * 150)) : 0;
+          return `
+            <div class="sn-provider-chart-day" data-day="${day.label}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
+              <div class="sn-bar jobs ${completed ? 'is-filled' : ''}" style="height:${jobHeight}px"></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      ${recentCompleted ? '' : '<p class="sn-provider-chart-empty" role="status">No jobs were completed in the last 7 days. New completions will appear here.</p>'}
     </div>
     <div class="sn-provider-chart-legend">
       <span><i class="jobs"></i>Completed Jobs</span>
