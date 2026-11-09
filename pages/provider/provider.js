@@ -834,11 +834,12 @@ function renderProviderRealtimeChart(bookings) {
     </div>
     <div class="sn-provider-chart-plot">
       <div class="sn-provider-chart-bars">
-        ${days.map((day) => {
+        ${days.map((day, index) => {
           const completed = completedByDay[day.key];
+          const mobileLabel = index % 5 === 0 || index === days.length - 1 ? day.date.getDate() : '';
           const jobHeight = completed ? Math.max(10, Math.round((completed / maxCount) * 150)) : 0;
           return `
-            <div class="sn-provider-chart-day" data-day="${day.label}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
+            <div class="sn-provider-chart-day" data-day="${day.label}" data-mobile-label="${mobileLabel}" role="img" aria-label="${day.label}: ${completed} completed jobs" title="${day.label}: ${completed} completed jobs">
               <div class="sn-bar jobs ${completed ? 'is-filled' : ''}" style="height:${jobHeight}px"></div>
             </div>
           `;
