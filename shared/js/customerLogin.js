@@ -159,6 +159,7 @@ function handleLogin(e) {
   apiRequest('/api/auth/customer/login', { email, password: pass })
     .then((data) => {
       localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
+      localStorage.setItem('sn_last_account_role', 'customer');
       if (data.user?.is_verified) SN.toast.success('Login successful! Redirecting...');
       else SN.toast.warning('Account pending verification. Limited dashboard access only.');
       const redirect = consumePendingCustomerRedirect();

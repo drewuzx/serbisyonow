@@ -45,6 +45,7 @@
    if (data.user?.id && data.user.auth_token && (!current?.id || String(current.id) === String(data.user.id))) {
     const user = { ...current, ...data.user };
     localStorage.setItem(storageKey, JSON.stringify(user));
+    localStorage.setItem('sn_last_account_role', role);
     return user;
    }
   } catch {

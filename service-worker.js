@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v99';
+const SW_VERSION = 'serbisyonow-pwa-v100';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
@@ -37,6 +37,7 @@ const APP_SHELL_URLS = [
   '/shared/css/pwa-responsive.css',
   '/shared/js/app.js',
   '/shared/js/account-session.js',
+  '/shared/js/return-session.js',
   '/shared/js/live-refresh.js',
   '/shared/js/system-feedback.js',
   '/shared/css/system-feedback.css',

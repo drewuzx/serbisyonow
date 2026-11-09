@@ -290,6 +290,7 @@ async function redirectExistingGoogleCustomer(profile) {
   if (data.action === 'login' && data.user && data.redirect) {
     localStorage.removeItem('sn_google_prefill_customer');
     localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
+    localStorage.setItem('sn_last_account_role', 'customer');
     window.location.replace(consumePendingCustomerRedirect() || data.redirect);
   }
 }
@@ -327,6 +328,7 @@ function submitRegister(e) {
   apiRequest('/api/auth/customer/register', payload)
     .then((data) => {
       localStorage.setItem('sn_customer_user', JSON.stringify(data.user));
+      localStorage.setItem('sn_last_account_role', 'customer');
       localStorage.removeItem('sn_google_prefill_customer');
       sessionStorage.setItem(CUSTOMER_REGISTER_SUCCESS_KEY, '1');
       showCustomerSuccess();

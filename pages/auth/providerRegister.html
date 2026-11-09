@@ -468,6 +468,7 @@
       };
       localStorage.setItem('sn_provider_application', JSON.stringify(application));
       localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+      localStorage.setItem('sn_last_account_role', 'provider');
     }
 
     function handleUpload(input, labelId, boxId) {
@@ -502,6 +503,7 @@
       if (data.action === 'login' && data.user && data.redirect) {
         localStorage.removeItem('sn_google_prefill_provider');
         localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+        localStorage.setItem('sn_last_account_role', 'provider');
         window.location.replace(data.redirect);
       }
     }

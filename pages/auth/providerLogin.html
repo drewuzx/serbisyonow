@@ -112,6 +112,7 @@
     </div>
   </footer>
   <script src="../../shared/js/app.js?v=20260915-api"></script>
+  <script src="/shared/js/return-session.js"></script>
   <script>
     const AUTH_API_BASE = SN.utils.apiBase();
 
@@ -210,6 +211,7 @@
       providerApiRequest('/api/auth/provider/login', { email, password })
         .then((data) => {
           localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
+          localStorage.setItem('sn_last_account_role', 'provider');
           SN.toast.success('Provider login successful!');
           setTimeout(() => window.location.href = '../provider/dashboard/dashboard.html', 700);
         })

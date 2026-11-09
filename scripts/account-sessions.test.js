@@ -214,6 +214,11 @@ test('customer and provider pages remember login on refresh, PWA update and rest
    await remembered(`${base}/pages/provider/requests/requests.html`);
   }
   await remembered();
+  await page.evaluate(key => localStorage.removeItem(key), `sn_${role}_user`);
+  await page.goto(`${base}/pages/landing/index.html`);
+  await page.waitForURL(`${base}/pages/${role}/dashboard/dashboard.html`);
+  await page.locator('#sn-user-name').filter({ hasText: account.full_name }).waitFor({ state: 'attached' });
+  assert.equal(await page.evaluate(key => JSON.parse(localStorage.getItem(key)).auth_token, `sn_${role}_user`), user.auth_token);
   refreshUnavailable = true;
   await remembered();
   refreshUnavailable = false;

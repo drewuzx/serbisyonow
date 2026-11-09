@@ -201,6 +201,7 @@
         const loginRole = data.role === 'provider' ? 'provider' : 'customer';
         localStorage.removeItem(`sn_google_prefill_${loginRole}`);
         localStorage.setItem(loginRole === 'provider' ? 'sn_provider_user' : 'sn_customer_user', JSON.stringify(data.user));
+        localStorage.setItem('sn_last_account_role', loginRole);
         const pendingCustomerRedirect = loginRole === 'customer' ? consumePendingCustomerRedirect() : '';
         window.location.href = pendingCustomerRedirect || `../..${data.redirect}`;
         return;
