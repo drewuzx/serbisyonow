@@ -285,6 +285,7 @@ function markProviderNoticesSeen(providerId, items) {
 function setProviderCountBadge(target, count, label = 'new notifications') {
   if (!target) return;
   target.classList.add('sn-has-count-badge');
+  target.style.position = 'relative';
   target.querySelector('.sn-dot')?.setAttribute('hidden', '');
   let badge = target.querySelector('.sn-badge-count');
   if (count <= 0) {
