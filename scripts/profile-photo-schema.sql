@@ -14,9 +14,15 @@ CREATE TABLE IF NOT EXISTS provider_photo_reviews (
  selfie BYTEA,
  id_front BYTEA,
  id_back BYTEA,
+ consented_at TIMESTAMPTZ,
+ consent_version TEXT,
  reason TEXT NOT NULL DEFAULT '',
  submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  reviewed_at TIMESTAMPTZ,
  reviewed_by INTEGER,
  CHECK (status <> 'pending' OR (selfie IS NOT NULL AND id_front IS NOT NULL))
 );
+
+ALTER TABLE provider_photo_reviews
+ ADD COLUMN IF NOT EXISTS consented_at TIMESTAMPTZ,
+ ADD COLUMN IF NOT EXISTS consent_version TEXT;

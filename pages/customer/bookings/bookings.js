@@ -237,6 +237,9 @@ function isRepairSelection(selection) {
 function repairServiceKeyFromSelection(selection) {
  const direct = normalizeBookingText(selection?.title);
  if (REPAIR_SERVICE_CONFIGS[direct]) return direct;
+ const selectedWork = normalizeBookingText(document.getElementById('sn-repair-specific-service')?.value);
+ const matchedWork = Object.entries(REPAIR_SERVICE_CONFIGS).find(([key, config]) => key === selectedWork || normalizeBookingText(config.title) === selectedWork);
+ if (matchedWork) return matchedWork[0];
  const fallback = normalizeBookingText(bookingProviderProfile?.service);
  if (REPAIR_SERVICE_CONFIGS[fallback]) return fallback;
  return document.getElementById('sn-repair-specific-service')?.value || 'plumbing services';
@@ -353,11 +356,11 @@ function updateRepairEstimateDisplay() {
  const amountInput = document.getElementById('sn-booking-custom-amount');
  if (amountInput) amountInput.value = estimate.amount;
  if (summary) {
-  const priceText = estimate.pricingType === 'calculated' || estimate.min === estimate.max
-   ? `Calculated estimated price: ${bookingMoney(estimate.amount)}`
-   : `Estimated service range: ${bookingMoney(estimate.min)} - ${bookingMoney(estimate.max)}`;
+  const priceText = estimate.pricingType === 'calculated'
+   ? `Calculated estimate: ${bookingMoney(estimate.amount)}`
+   : `${estimate.details?.provider_pricing ? 'Provider' : 'Sample'} estimated range: ${bookingMoney(estimate.min)} - ${bookingMoney(estimate.max)}`;
   summary.innerHTML = `
-   <strong>${bookingEsc(priceText)}</strong>
+   <span class="sn-repair-estimate-label">Live estimate</span><strong>${bookingEsc(priceText)}</strong>
    <span>${bookingEsc(estimate.details?.note || config.note)}</span>
   `;
  }
@@ -421,6 +424,9 @@ function calculatedQuestionField(field, defaults, category) {
   : field.type === 'textarea'
    ? `<textarea id="${id}" name="${name}"${length}${placeholder}${required}>${bookingEsc(defaults[field.key])}</textarea>`
    : `<input id="${id}" name="${name}" type="${field.type}" value="${bookingEsc(defaults[field.key])}"${field.type === 'number' ? ` min="${field.min}" max="${field.max}" step="${field.step}"` : length}${placeholder}${required} />`;
+ if (field.key === 'appliance_type') {
+  return `<label class="sn-appliance-autocomplete" ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span><input id="${id}" name="${bookingEsc(name)}" type="search" placeholder="${bookingEsc(field.placeholder || '')}" required autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sn-repair-appliance-suggestions" /><div class="sn-appliance-suggestions" id="sn-repair-appliance-suggestions" role="listbox" hidden></div></label>`;
+ }
  return `<label${field.type === 'textarea' ? ' class="full"' : ''} ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span>${control}</label>`;
 }
 
@@ -552,22 +558,82 @@ function renderRepairAssessment() {
   <div class="sn-repair-assessment-head">
    <div>
     <h4>Repair Services Assessment</h4>
-    <p>Select the specific work and answer the service questions. The system will prepare the estimate for the provider.</p>
+    <p>Search for the repair type, describe the job, and review the live estimate before sending your request.</p>
    </div>
    <span>${bookingEsc(config.pricingType === 'calculated' ? 'Calculated Price' : 'Assessment / Quote')}</span>
   </div>
+  <div class="sn-repair-price-summary" id="sn-repair-price-summary" aria-live="polite"></div>
   <div class="sn-repair-assessment-grid">
    ${needsSpecific ? `
-    <label><span>Specific repair work</span><select id="sn-repair-specific-service">
-     ${Object.entries(REPAIR_SERVICE_CONFIGS).map(([key, item]) => `<option value="${bookingEsc(key)}"${key === selectedKey ? ' selected' : ''}>${bookingEsc(item.title)}</option>`).join('')}
-    </select></label>
+    <label class="full"><span>Search specific repair work</span><input id="sn-repair-specific-service" type="search" list="sn-repair-service-suggestions" value="${bookingEsc(config.title)}" placeholder="Try plumbing, electrical, carpentry..." autocomplete="off" required /><datalist id="sn-repair-service-suggestions">${Object.entries(REPAIR_SERVICE_CONFIGS).map(([key, item]) => `<option value="${bookingEsc(item.title)}" label="${bookingEsc(key)}"></option>`).join('')}</datalist></label>
    ` : ''}
    ${config.fields.map(repairQuestionField).join('')}
    <label class="full"><span>Photo/video (optional)</span><input id="sn-repair-media" name="assessmentMedia" type="file" accept="image/*,video/*" multiple /><small>Upload up to 3 files if it helps the provider inspect the problem.</small></label>
   </div>
-  <div class="sn-repair-price-summary" id="sn-repair-price-summary"></div>
  `;
- document.getElementById('sn-repair-specific-service')?.addEventListener('change', () => renderRepairAssessment());
+ const serviceSearch = document.getElementById('sn-repair-specific-service');
+ serviceSearch?.addEventListener('input', () => serviceSearch.setCustomValidity(''));
+ serviceSearch?.addEventListener('change', () => {
+  const value = normalizeBookingText(serviceSearch.value);
+  const match = Object.entries(REPAIR_SERVICE_CONFIGS).find(([key, item]) => key === value || normalizeBookingText(item.title) === value);
+  if (!match) {
+   serviceSearch.setCustomValidity('Choose a repair type from the suggestions.');
+   serviceSearch.reportValidity();
+   return;
+  }
+  serviceSearch.setCustomValidity('');
+  serviceSearch.value = REPAIR_SERVICE_CONFIGS[match[0]].title;
+  renderRepairAssessment();
+ });
+ const applianceSearch = host.querySelector('[name="repair_appliance_type"]');
+ const applianceSuggestions = host.querySelector('#sn-repair-appliance-suggestions');
+ const applianceCatalog = [
+  { name: 'Air conditioner', aliases: ['aircon', 'air con', 'ac', 'a/c', 'air conditioner', 'air conditioning'] },
+  { name: 'Refrigerator', aliases: ['fridge', 'refrigerator', 'ref', 'freezer'] },
+  { name: 'Washing machine', aliases: ['washer', 'washing machine', 'washing', 'laundry machine'] },
+  { name: 'Television', aliases: ['tv', 't.v.', 'television', 'smart tv'] },
+  { name: 'Rice cooker', aliases: ['rice cooker', 'ricecooker'] },
+  { name: 'Electric fan', aliases: ['fan', 'electric fan', 'stand fan', 'ceiling fan'] },
+  { name: 'Microwave', aliases: ['microwave', 'microwave oven'] },
+  { name: 'Water dispenser', aliases: ['water dispenser', 'dispenser'] },
+  { name: 'Other appliance', aliases: ['other appliance', 'other'] },
+ ];
+ const normalizeSearch = value => normalizeBookingText(value).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+ function updateApplianceSuggestions() {
+  if (!applianceSearch || !applianceSuggestions) return;
+  const query = normalizeSearch(applianceSearch.value);
+  const matches = query ? applianceCatalog.filter(item => item.aliases.some(alias => {
+   const normalizedAlias = normalizeSearch(alias);
+   return normalizedAlias.includes(query) || query.includes(normalizedAlias);
+  })).slice(0, 5) : [];
+  applianceSuggestions.innerHTML = matches.map((item, index) => `<button type="button" role="option" aria-selected="false" data-appliance-suggestion="${index}">${bookingEsc(item.name)}</button>`).join('');
+  applianceSuggestions.hidden = matches.length === 0;
+  applianceSearch.setAttribute('aria-expanded', String(matches.length > 0));
+  applianceSuggestions.querySelectorAll('[data-appliance-suggestion]').forEach((button, index) => {
+   button.addEventListener('mousedown', event => event.preventDefault());
+   button.addEventListener('click', () => {
+    applianceSearch.value = matches[index].name;
+    applianceSuggestions.hidden = true;
+    applianceSearch.setAttribute('aria-expanded', 'false');
+    updateRepairEstimateDisplay();
+   });
+  });
+ }
+ applianceSearch?.addEventListener('input', updateApplianceSuggestions);
+ applianceSearch?.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && applianceSuggestions && !applianceSuggestions.hidden) {
+   applianceSuggestions.hidden = true;
+   applianceSearch.setAttribute('aria-expanded', 'false');
+  } else if (event.key === 'ArrowDown' && applianceSuggestions && !applianceSuggestions.hidden) {
+   event.preventDefault(); applianceSuggestions.querySelector('button')?.focus();
+  }
+ });
+ applianceSuggestions?.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { applianceSuggestions.hidden = true; applianceSearch?.focus(); applianceSearch?.setAttribute('aria-expanded', 'false'); }
+ });
+ applianceSearch?.addEventListener('blur', () => {
+  window.setTimeout(() => { if (applianceSuggestions) applianceSuggestions.hidden = true; applianceSearch?.setAttribute('aria-expanded', 'false'); }, 120);
+ });
  host.querySelectorAll('input, select, textarea').forEach((field) => {
   if (field.id !== 'sn-repair-specific-service') {
    field.addEventListener('input', updateRepairEstimateDisplay);

@@ -120,7 +120,7 @@
   save.onclick = () => persist(false); remove.onclick = () => persist(true);
  }
  async function openProvider(options = {}) {
-  const { dialog, body, notice } = modal('Provider Photo Verification');
+  const { dialog, body, notice } = modal('Privacy Notice & Provider ID Verification');
   let stream, source, exportPhoto, busy = false, front = options.front, back = options.back;
   const stop = () => { stream?.getTracks().forEach(track => track.stop()); stream = null; };
   dialog.querySelector('.sn-photo-close').addEventListener('click', stop);
@@ -129,9 +129,32 @@
   document.addEventListener('visibilitychange', hide);
   window.addEventListener('pagehide', stop);
   dialog.addEventListener('close', () => { stop(); source?.close?.(); document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', stop); });
+  function showPrivacyNotice() {
+   body.innerHTML = `<p class="sn-photo-privacy-intro">Please read this notice before submitting your photo ID and selfie for provider profile verification.</p>
+    <div class="sn-photo-privacy-scroll" data-privacy-scroll tabindex="0">
+     <section><h3>1. Information collected</h3><p>SerbisyoNow collects the front of your photo ID, an optional back image, and the selfie you take in this verification flow. The selfie is cropped for your profile. Your existing provider account and skill-verification information are handled separately.</p></section>
+     <section><h3>2. How it is used</h3><p>An authorized administrator manually reviews the ID and selfie to check that the profile photo belongs to the provider. This is not automated face recognition. The ID and unapproved selfie are not shown on your public profile.</p></section>
+     <section><h3>3. Who can access it and retention</h3><p>Only authorized administrators can access the submitted ID and selfie for this review. Private review copies are deleted after an administrator makes a decision. If approved, the cropped selfie is published as your provider profile photo; your ID is not published.</p></section>
+     <section><h3>4. Your choice</h3><p>Submitting is optional, but a profile photo cannot be verified through this process without your consent. You may close or cancel before submission. For privacy questions or data requests, use the support channel listed in the Privacy Policy.</p></section>
+     <section><h3>5. Full Privacy Policy</h3><p>Read the <a href="/pages/legal/privacy-policy.html" target="_blank" rel="noopener">full Privacy Policy</a> for more about account data and uploaded documents.</p></section>
+    </div><p data-privacy-hint aria-live="polite">Scroll to the end of this notice to continue.</p>
+    <div class="sn-photo-actions"><button class="sn-photo-button secondary" data-privacy-cancel type="button">Cancel</button><button class="sn-photo-button" data-privacy-agree type="button" disabled>I agree &amp; continue</button></div>`;
+   const scroll = body.querySelector('[data-privacy-scroll]');
+   const agree = body.querySelector('[data-privacy-agree]');
+   const hint = body.querySelector('[data-privacy-hint]');
+   const update = () => {
+    const atEnd = scroll.scrollHeight <= scroll.clientHeight + 1 || scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 8;
+    agree.disabled = !atEnd;
+    hint.textContent = atEnd ? 'You have reached the end of the notice.' : 'Scroll to the end of this notice to continue.';
+   };
+   scroll.addEventListener('scroll', update, { passive: true });
+   body.querySelector('[data-privacy-cancel]').onclick = () => dialog.close();
+   agree.onclick = () => { if (!agree.disabled) showId(); };
+   requestAnimationFrame(update);
+  }
   function showId() {
    stop(); notice('');
-   body.innerHTML = `<p>An admin will review your photo ID and camera selfie. This is manual review, not automatic face matching. Only the approved selfie becomes your public profile photo. Review copies are deleted after the decision.</p>
+   body.innerHTML = `<p>An authorized SerbisyoNow administrator will review your photo ID and camera selfie. This is a manual identity and photo review, not automatic face recognition. Your ID and selfie stay private; only the selfie approved by an administrator becomes your public profile photo. ID and selfie review copies are deleted after the decision. You can cancel before submitting.</p>
     <label class="sn-photo-field">Front of photo ID<input type="file" data-front accept="image/jpeg,image/png,image/webp"></label><p data-front-name></p>
     <label class="sn-photo-field">Back of ID (optional)<input type="file" data-back accept="image/jpeg,image/png,image/webp"></label><p data-back-name></p>
     <div class="sn-photo-actions"><button class="sn-photo-button" data-next type="button">Next: Take Selfie</button></div>`;
@@ -171,7 +194,7 @@
    };
   }
   function showReview() {
-   body.innerHTML = `<div data-crop-host></div><label class="sn-photo-consent"><input type="checkbox" data-consent><span>I agree to admin review of my ID and selfie and to publishing the approved selfie as my profile photo.</span></label>
+   body.innerHTML = `<div data-crop-host></div><label class="sn-photo-consent"><input type="checkbox" data-consent><span>I agree to admin review of my ID and selfie and understand that only the approved selfie will be displayed as my profile photo.</span></label>
     <div class="sn-photo-actions"><button class="sn-photo-button secondary" data-retake type="button">Retake</button><button class="sn-photo-button" data-submit type="button">Submit for Review</button></div>`;
    exportPhoto = cropper(body.querySelector('[data-crop-host]'), source);
    body.querySelector('[data-consent]').onchange = () => notice('');
@@ -188,7 +211,7 @@
     finally { busy = false; event.target.disabled = false; const retake = body.querySelector('[data-retake]'); if (retake) retake.disabled = false; }
    };
   }
-  showId();
+  showPrivacyNotice();
  }
  function statusNotice(message) {
   const node = document.querySelector('#sn-photo-status'); if (node) node.textContent = message;

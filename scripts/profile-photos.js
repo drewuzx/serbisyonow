@@ -77,9 +77,9 @@ function registerProfilePhotos(app, db) {
    await client.query('SELECT id FROM providers WHERE id=$1 FOR UPDATE', [req.photoAccount.id]);
    const pending = await client.query("SELECT status FROM provider_photo_reviews WHERE provider_id=$1 AND status='pending'", [req.photoAccount.id]);
    if (pending.rows.length) fail(409, 'Your selfie is already awaiting admin review.');
-   await client.query(`INSERT INTO provider_photo_reviews(provider_id,revision,status,selfie,id_front,id_back)
-    VALUES($1,$2,'pending',$3,$4,$5) ON CONFLICT(provider_id) DO UPDATE SET revision=$2,status='pending',
-    selfie=$3,id_front=$4,id_back=$5,reason='',submitted_at=NOW(),reviewed_at=NULL,reviewed_by=NULL`,
+  await client.query(`INSERT INTO provider_photo_reviews(provider_id,revision,status,selfie,id_front,id_back,consented_at,consent_version)
+    VALUES($1,$2,'pending',$3,$4,$5,NOW(),'provider-photo-verification-v1') ON CONFLICT(provider_id) DO UPDATE SET revision=$2,status='pending',
+    selfie=$3,id_front=$4,id_back=$5,consented_at=NOW(),consent_version='provider-photo-verification-v1',reason='',submitted_at=NOW(),reviewed_at=NULL,reviewed_by=NULL`,
    [req.photoAccount.id, revision, selfie, front, back]);
   });
   res.status(201).json({ message: 'Selfie submitted for admin review. Your current account verification is unchanged.', revision });

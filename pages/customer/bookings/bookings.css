@@ -311,16 +311,25 @@
   font-weight: 600;
 }
 
+.sn-appliance-autocomplete { position: relative; }
+.sn-appliance-suggestions { position: absolute; z-index: 20; inset: calc(100% - 2px) 0 auto; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 0 0 10px 10px; background: var(--white); box-shadow: 0 8px 20px rgba(20, 43, 85, .14); }
+.sn-appliance-suggestions[hidden] { display: none; }
+.sn-appliance-suggestions button { display: block; width: 100%; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--border); background: var(--white); color: var(--blue-dark); text-align: left; font: inherit; cursor: pointer; }
+.sn-appliance-suggestions button:last-child { border-bottom: 0; }
+.sn-appliance-suggestions button:hover, .sn-appliance-suggestions button:focus-visible { background: var(--blue-pale); outline: none; }
+
 .sn-repair-price-summary {
   display: grid;
-  gap: 4px;
-  margin-top: 14px;
-  border-radius: 14px;
+  gap: 5px;
+  margin: 0 0 14px;
+  border-radius: 10px;
   background: var(--white);
   border: 1.5px solid #c8d8f6;
+  border-left: 4px solid var(--orange);
   padding: 12px 14px;
 }
 
+.sn-repair-price-summary .sn-repair-estimate-label { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 800; text-transform: uppercase; }
 .sn-repair-price-summary strong {
   color: var(--blue-dark);
   font-family: var(--font-heading);

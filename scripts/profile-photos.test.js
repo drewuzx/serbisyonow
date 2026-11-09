@@ -39,6 +39,8 @@ test('profile photos enforce ownership, private review, revision checks, and pre
   assert.equal((await f.request('/api/profile-photos/provider/81')).status, 404);
   const review = (await f.request('/api/provider/profile-photo', 'GET', null, f.providerToken)).data.review;
   assert.equal(review.status, 'pending'); assert.equal(review.selfie, undefined);
+  const consent = (await f.db.query('SELECT consented_at,consent_version FROM provider_photo_reviews WHERE provider_id=81')).rows[0];
+  assert.ok(consent.consented_at); assert.equal(consent.consent_version, 'provider-photo-verification-v1');
   assert.equal((await f.request('/api/provider/profile-photo', 'GET', null, f.otherProviderToken)).data.review, null);
   assert.equal((await f.request('/api/admin/profile-photo-reviews')).status, 403);
   const queue = await f.request('/api/admin/profile-photo-reviews', 'GET', null, admin);

@@ -26,6 +26,12 @@
 .sn-photo-field input[type=range] { width: 100%; accent-color: #2b50ce; }
 .sn-photo-consent { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.6; }
 .sn-photo-consent input { flex: 0 0 20px; width: 20px; height: 20px; accent-color: #2b50ce; }
+.sn-photo-privacy-intro { padding: 14px 16px; border: 1px solid #f0d98b; border-radius: 10px; background: #fff9e8; color: #70511b !important; }
+.sn-photo-privacy-scroll { max-height: min(48dvh, 460px); overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 2px 0; }
+.sn-photo-privacy-scroll section { margin: 12px 0; padding: 14px 16px; border: 1px solid #dce8e4; border-radius: 10px; background: #f8fbfa; }
+.sn-photo-privacy-scroll h3 { margin: 0 0 6px; color: #174c3b; }
+.sn-photo-privacy-scroll p { margin: 0; }
+.sn-photo-button:disabled { background: #aab5b1; border-color: #aab5b1; color: #fff; }
 .sn-photo-crop, .sn-photo-video { display: block; width: min(100%, 320px); aspect-ratio: 1; height: auto; margin: 16px auto; border-radius: 8px; background: #edf2fb; object-fit: cover; }
 .sn-photo-video { transform: scaleX(-1); }
 .sn-photo-notice { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
