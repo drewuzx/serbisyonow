@@ -413,9 +413,9 @@ body {
 .sn-shell--provider .sn-topbar-notification-btn .sn-badge-count {
   top: 3px;
   right: 3px;
-  min-width: 17px;
-  height: 17px;
-  font-size: 0.62rem;
+  min-width: 22px;
+  height: 22px;
+  font-size: 0.7rem;
 }
 
 .sn-shell--provider .sn-topbar-notification-btn .sn-dot {
