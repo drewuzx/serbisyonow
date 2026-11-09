@@ -129,7 +129,7 @@ body {
   flex-direction: column; gap: 4px; cursor: pointer; margin-left: auto;
 }
 .sn-hamburger--top { display: none; }
-.sn-hamburger span { width: 16px; height: 2px; background: var(--blue-dark); border-radius: 999px; transition: transform var(--transition-fast), opacity var(--transition-fast); }
+.sn-hamburger > span:nth-child(-n+3) { width: 16px; height: 2px; background: var(--blue-dark); border-radius: 999px; transition: transform var(--transition-fast), opacity var(--transition-fast); }
 .sn-shell.sidebar-open .sn-hamburger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
 .sn-shell.sidebar-open .sn-hamburger span:nth-child(2) { opacity: 0; }
 .sn-shell.sidebar-open .sn-hamburger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
