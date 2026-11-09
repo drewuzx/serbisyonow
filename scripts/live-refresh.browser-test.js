@@ -207,7 +207,7 @@ function fixture() {
     await scenario('provider/dashboard/dashboard.html', '.stats-grid', async (page, data, tick, requests) => {
       data.bookings[1].updated_at = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
       await tick();
-      assert.match(await page.locator('.sn-provider-chart-empty').textContent(), /No jobs were completed in the last 7 days/);
+      assert.match(await page.locator('.sn-provider-chart-empty').textContent(), /No jobs were completed in the past 30 days/);
       const beforeNewCompletion = requests.filter(url => url === '/api/provider/81/dashboard').length;
       data.bookings.push({ ...booking, id: 4, status: 'completed', updated_at: new Date().toISOString() }); await tick();
       assert.equal(requests.filter(url => url === '/api/provider/81/dashboard').length - beforeNewCompletion, 1, 'Single provider data poll');

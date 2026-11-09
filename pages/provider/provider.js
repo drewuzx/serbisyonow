@@ -728,15 +728,15 @@ function completedBookingDay(booking) {
   return '';
 }
 
-function lastSevenLiveDays() {
+function lastThirtyLiveDays() {
   const days = [];
-  for (let offset = 6; offset >= 0; offset -= 1) {
+  for (let offset = 29; offset >= 0; offset -= 1) {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
     date.setDate(date.getDate() - offset);
     days.push({
       key: date.toDateString(),
-      label: date.toLocaleDateString('en-PH', { weekday: 'short' }),
+      label: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
       date,
     });
   }
@@ -805,7 +805,7 @@ function renderProviderRealtimeChart(bookings) {
   const chart = document.querySelector('.sn-provider-chart');
   if (!chart) return;
 
-  const days = lastSevenLiveDays();
+  const days = lastThirtyLiveDays();
   const completedByDay = Object.fromEntries(days.map((day) => [day.key, 0]));
 
   (bookings || []).forEach((booking) => {
@@ -828,7 +828,7 @@ function renderProviderRealtimeChart(bookings) {
     <div class="sn-provider-chart-head">
       <div>
         <h3>Activity History</h3>
-        <p>Completed jobs in the last 7 days.</p>
+        <p>Completed jobs in the past 30 days.</p>
       </div>
       <span class="sn-live-pill">Live ${liveClockLabel()}</span>
     </div>
@@ -844,7 +844,7 @@ function renderProviderRealtimeChart(bookings) {
           `;
         }).join('')}
       </div>
-      ${recentCompleted ? '' : '<p class="sn-provider-chart-empty" role="status">No jobs were completed in the last 7 days. New completions will appear here.</p>'}
+      ${recentCompleted ? '' : '<p class="sn-provider-chart-empty" role="status">No jobs were completed in the past 30 days. New completions will appear here.</p>'}
     </div>
     <div class="sn-provider-chart-legend">
       <span><i class="jobs"></i>Completed Jobs</span>
