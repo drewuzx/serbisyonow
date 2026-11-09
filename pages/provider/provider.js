@@ -312,6 +312,11 @@ function updateProviderNotificationBadges(data, notificationCountOverride = null
     || document.querySelector('.sn-topbar-right [title*="Notification"], .sn-topbar-right [title*="notification"]');
   setProviderCountBadge(messageButton, unreadMessages, 'unread messages');
   setProviderCountBadge(notificationButton, notificationCount, 'new notifications');
+  const hamburgerTop = document.getElementById('sn-hamburger-top');
+  setProviderCountBadge(hamburgerTop, pendingBookings, 'pending bookings');
+  if (hamburgerTop) hamburgerTop.setAttribute('aria-label', pendingBookings > 0
+    ? `Open menu, ${pendingBookings} pending bookings`
+    : 'Open menu');
   setProviderCountBadge(document.querySelector('.sn-nav-item[href*="inbox"]'), unreadMessages, 'unread messages');
   setProviderCountBadge(document.querySelector('.sn-nav-item[href*="requests"]'), pendingBookings, 'pending bookings');
   return { unreadMessages, pendingBookings, notificationCount };

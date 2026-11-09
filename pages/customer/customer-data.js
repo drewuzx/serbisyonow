@@ -358,7 +358,11 @@ function snUpdateCustomerNotificationBadges(data, notificationCountOverride = nu
   || document.querySelector('.sn-topbar-right [title*="Notification"], .sn-topbar-right [title*="notification"]');
  snSetCountBadge(messageButton, unreadMessages, 'unread messages');
  snSetCountBadge(notificationButton, notificationCount, 'new notifications');
- snSetCountBadge(document.getElementById('sn-hamburger-top'), notificationCount, 'new notifications');
+ const hamburgerTop = document.getElementById('sn-hamburger-top');
+ snSetCountBadge(hamburgerTop, activeBookings, 'active bookings');
+ if (hamburgerTop) hamburgerTop.setAttribute('aria-label', activeBookings > 0
+  ? `Open menu, ${activeBookings} active bookings`
+  : 'Open menu');
  snSetCountBadge(snFindNavItem('inbox'), unreadMessages, 'unread messages');
  snSetCountBadge(snFindNavItem('bookings'), activeBookings, 'active bookings');
  return { unreadMessages, activeBookings, notificationCount };
