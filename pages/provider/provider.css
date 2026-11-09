@@ -180,6 +180,7 @@ body {
   height: 44px;
   border-radius: 12px;
   margin-left: 0;
+  position: relative;
   background: #eef4ff;
   border-color: #d8e4f7;
 }
