@@ -143,6 +143,16 @@ function validateStep1() {
     return false;
   }
 
+  const dobField = document.getElementById('dob');
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (dobField.value > today) {
+    showFieldError(dobField, 'Date of birth cannot be in the future.');
+    SN.toast.error('Choose a date of birth that is today or earlier.');
+    dobField.focus();
+    return false;
+  }
+
   const pass = document.getElementById('password').value;
   const conf = document.getElementById('confirm-password').value;
   const contactField = document.getElementById('contact');

@@ -19,6 +19,11 @@ test('personal fields preserve omitted values and validate calendar dates', () =
   assert.deepEqual(profilePersonalFields({}), { gender: null, dob: null });
   assert.deepEqual(profilePersonalFields({ gender: 'Female', dob: '2000-02-29' }), { gender: 'Female', dob: '2000-02-29' });
   for (const dob of ['2001-02-29', '2000-02-30', '2000-13-01', '2099-01-01', '1899-01-01', 'January 1', {}, '']) assert.throws(() => profilePersonalFields({ dob }), { statusCode: 400 });
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
+  assert.equal(profilePersonalFields({ dob: today }).dob, today);
+  const tomorrow = new Date(`${today}T00:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  assert.throws(() => profilePersonalFields({ dob: tomorrow.toISOString().slice(0, 10) }), { statusCode: 400 });
   for (const gender of ['', 'invalid', {}]) assert.throws(() => profilePersonalFields({ gender }), { statusCode: 400 });
 });
 

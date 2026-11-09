@@ -310,6 +310,15 @@
         'confirm-pw': 'Confirm your password.',
       });
       if (!valid) return SN.toast.error('Please complete all required fields before continuing.'), false;
+      const dobField = document.getElementById('dob');
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (dobField.value > today) {
+        showFieldError(dobField, 'Date of birth cannot be in the future.');
+        SN.toast.error('Choose a date of birth that is today or earlier.');
+        dobField.focus();
+        return false;
+      }
       const contactField = document.getElementById('contact');
       const contact = normalizeContactField(contactField);
       if (!/^\d{11}$/.test(contact)) {

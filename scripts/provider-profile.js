@@ -12,13 +12,24 @@ function profileBirthDate(value) {
   return value ? String(value).slice(0, 10) : null;
 }
 
+function currentManilaDate() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function profilePersonalFields(body) {
   const gender = body.gender === undefined ? null : body.gender;
   const dob = body.dob === undefined ? null : body.dob;
   if (gender !== null && !['Male', 'Female', 'Prefer not to say'].includes(gender)) fail(400, 'Choose a valid gender.');
   if (dob !== null) {
     const date = typeof dob === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dob) ? new Date(`${dob}T00:00:00Z`) : null;
-    if (!date || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dob || dob < '1900-01-01' || date > new Date()) fail(400, 'Enter a valid date of birth that is not in the future.');
+    if (!date || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dob || dob < '1900-01-01' || dob > currentManilaDate()) fail(400, 'Enter a valid date of birth that is not in the future.');
   }
   return { gender, dob };
 }
