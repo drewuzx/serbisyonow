@@ -18,7 +18,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-.sn-page-search span {
+.sn-page-search > span {
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -28,7 +28,7 @@
   flex-shrink: 0;
 }
 
-.sn-page-search span::before {
+.sn-page-search > span::before {
   content: "";
   position: absolute;
   inset: 5px;
