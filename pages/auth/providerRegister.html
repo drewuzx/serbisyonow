@@ -85,7 +85,7 @@
               <div class="form-group"><label>Select Services</label><select class="form-control" id="service" required disabled><option value="" disabled selected>Select a category first</option></select></div>
               <div class="form-group" id="custom-service-group" hidden><label for="custom-service">Service name</label><input class="form-control" id="custom-service" type="text" maxlength="150" placeholder="Enter the service you offer" disabled /></div>
               <div class="form-group"><label>Years of Experience</label><select id="experience-years" class="form-control" required><option value="" disabled selected>Enter your years of experience</option><option>1 year below</option><option>2-3 years</option><option>3 years and higher</option></select></div>
-              <div class="form-group"><label>Skill Verification</label><p class="field-note">(Certificates, Recognition, Portfolio, Feedbacks, Photos, etc.)</p><label class="upload-pill" id="docs-box"><span id="docs-label">Upload Supporting Documents</span><strong>+</strong><input id="docs" type="file" multiple accept="image/*,.pdf" required onchange="handleUpload(this,'docs-label','docs-box')"/></label></div>
+              <div class="form-group"><label>Skill Verification (Optional)</label><p class="field-note">(Certificates, Recognition, Portfolio, Feedbacks, Photos, etc.)</p><label class="upload-pill" id="docs-box"><span id="docs-label">Upload Supporting Documents (Optional)</span><strong>+</strong><input id="docs" type="file" multiple accept="image/*,.pdf" onchange="handleUpload(this,'docs-label','docs-box')"/></label></div>
             </div>
             <div>
               <div class="form-group"><label>Upload Resume</label><label class="upload-pill" id="resume-box"><span id="resume-label">Upload your resume</span><strong>+</strong><input id="resume" type="file" accept=".pdf,.doc,.docx,image/*" required onchange="handleUpload(this,'resume-label','resume-box')"/></label></div>
@@ -343,7 +343,6 @@
         service: 'Select a service.',
         'custom-service': 'Enter the service you offer.',
         'experience-years': 'Select your years of experience.',
-        docs: 'Upload supporting documents.',
         resume: 'Upload your resume.',
         'id-front': 'Upload the front of your ID.',
         'id-back': 'Upload the back of your ID.',
