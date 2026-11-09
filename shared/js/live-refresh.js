@@ -2,7 +2,7 @@
 
 (function () {
   const tasks = new Map();
-  const intervalMs = 3000;
+  const intervalMs = 1000;
   let suspended = false;
   let lastActivity = Date.now();
   let idleTimer;

@@ -18,7 +18,7 @@ function fixture() {
   const window = {
     addEventListener: on,
     clearInterval: key => timers.delete(key), clearTimeout: key => timers.delete(key),
-    setInterval(callback, delay) { assert.equal(delay, 3000); return addTimer(callback, delay, delay); },
+    setInterval(callback, delay) { assert.equal(delay, 1000); return addTimer(callback, delay, delay); },
     setTimeout: (callback, delay) => addTimer(callback, delay, 0),
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../shared/js/live-refresh.js'), 'utf8'), { window, document, navigator, Date: { now: () => now }, console: { warn() {} } });
@@ -35,11 +35,11 @@ function fixture() {
     }
     now = end;
   };
-  return { live: window.snLiveRefresh, document, navigator, tick: () => advance(3000), advance, emit: name => (events.get(name) || []).forEach(callback => callback()) };
+  return { live: window.snLiveRefresh, document, navigator, tick: () => advance(1000), advance, emit: name => (events.get(name) || []).forEach(callback => callback()) };
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
-test('refreshes every three seconds without overlapping slow requests', async () => {
+test('refreshes every second without overlapping slow requests', async () => {
   const f = fixture();
   let calls = 0;
   let finish;
@@ -96,11 +96,11 @@ test('typing, clicking, pointer movement, scrolling and touch postpone refresh u
   let calls = 0;
   f.live.register('data', async () => { calls++; });
   for (const event of ['pointermove', 'pointerdown', 'keydown', 'input', 'change', 'wheel', 'touchstart', 'touchmove']) {
-    await f.advance(2000); f.emit(event);
+    await f.advance(500); f.emit(event);
     assert.equal(f.live.isIdle(), false);
     assert.equal(calls, 0);
   }
-  await f.advance(2999); assert.equal(calls, 0);
+  await f.advance(999); assert.equal(calls, 0);
   await f.advance(1); assert.equal(calls, 1);
   await f.tick(); assert.equal(calls, 2);
 });

@@ -67,7 +67,7 @@ function fixture() {
       await page.waitForFunction(() => Boolean(window.snLiveRefresh));
       await page.waitForTimeout(150);
       const documentId = await page.evaluate(() => window.__liveDocumentId);
-      const tick = async () => { await page.clock.runFor(3100); await page.waitForTimeout(200); };
+      const tick = async () => { await page.clock.runFor(1100); await page.waitForTimeout(200); };
       await check(page, data, tick, requests);
       assert.equal(await page.evaluate(() => window.__liveDocumentId), documentId, 'Must not reload the document');
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('sn_customer_user')).auth_token), customer.auth_token);
@@ -81,14 +81,14 @@ function fixture() {
       data.bookings[0].status = 'upcoming';
       await page.mouse.move(200, 200);
       const before = requests.filter(url => url === '/api/customer/61/dashboard').length;
-      for (let i = 0; i < 4; i++) {
-        await page.clock.runFor(2000);
+      for (let i = 0; i < 8; i++) {
+        await page.clock.runFor(500);
         await page.mouse.move(200 + i * 10, 220 + i * 10);
       }
       assert.equal(requests.filter(url => url === '/api/customer/61/dashboard').length, before, 'Active user must pause automatic data requests');
       assert.equal(await page.evaluate(() => window.snCustomerBookings[0].status), 'pending');
       await tick();
-      assert.equal(await page.evaluate(() => window.snCustomerBookings[0].status), 'upcoming', 'Refresh resumes after three idle seconds');
+      assert.equal(await page.evaluate(() => window.snCustomerBookings[0].status), 'upcoming', 'Refresh resumes after one idle second');
     });
     await scenario('customer/bookings/bookings.html', '.sn-customer-booking-card', async (page, data, tick, requests) => {
       await page.locator('.sn-filter-tab[data-filter="upcoming"]').click();
