@@ -19,9 +19,9 @@
     .id-consent-copy strong { color: var(--blue-dark); }
     .id-consent-copy button { justify-self: start; padding: 0; border: 0; background: none; color: var(--blue-main); font: inherit; font-weight: 700; text-decoration: underline; }
     .id-consent-status { color: var(--text-muted); font-size: var(--text-xs); }
-    .id-consent-dialog { width: min(680px, calc(100vw - 28px)); max-width: none; max-height: min(88dvh, 780px); padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--white); color: var(--text-primary); box-shadow: 0 24px 80px rgba(17, 34, 70, .28); }
+    .id-consent-dialog { position: fixed; inset: 0; box-sizing: border-box; width: min(680px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--white); color: var(--text-primary); box-shadow: 0 24px 80px rgba(17, 34, 70, .28); }
     .id-consent-dialog::backdrop { background: rgba(12, 24, 48, .58); backdrop-filter: blur(5px); }
-    .id-consent-dialog-inner { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: min(88dvh, 780px); }
+    .id-consent-dialog-inner { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: calc(100dvh - 32px); }
     .id-consent-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-top: 5px solid var(--blue-main); border-bottom: 1px solid var(--border); }
     .id-consent-header h2 { margin: 0; color: var(--blue-dark); font: 800 1.25rem/1.3 var(--font-heading); }
     .id-consent-close { width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-input); color: var(--blue-dark); font-size: 1.5rem; line-height: 1; }
