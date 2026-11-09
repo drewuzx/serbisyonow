@@ -259,6 +259,10 @@ function repairQuestionField(field) {
  const placeholder = field.placeholder ? ` placeholder="${bookingEsc(field.placeholder)}"` : '';
  const min = field.min ? ` min="${bookingEsc(field.min)}"` : '';
  const name = repairFieldName(field.key);
+ const id = `sn-${name}`;
+ if (field.key === 'appliance_type') {
+  return `<label class="sn-appliance-autocomplete" for="${id}"><span>${bookingEsc(field.label)}</span><input id="${id}" name="${bookingEsc(name)}" type="search" placeholder="${bookingEsc(field.placeholder || '')}" required autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-suggestions" data-appliance-search /><div class="sn-appliance-suggestions" id="${id}-suggestions" role="listbox" hidden></div></label>`;
+ }
  if (field.type === 'select') {
   return `
    <label><span>${bookingEsc(field.label)}</span><select name="${bookingEsc(name)}"${required}>
@@ -425,9 +429,58 @@ function calculatedQuestionField(field, defaults, category) {
    ? `<textarea id="${id}" name="${name}"${length}${placeholder}${required}>${bookingEsc(defaults[field.key])}</textarea>`
    : `<input id="${id}" name="${name}" type="${field.type}" value="${bookingEsc(defaults[field.key])}"${field.type === 'number' ? ` min="${field.min}" max="${field.max}" step="${field.step}"` : length}${placeholder}${required} />`;
  if (field.key === 'appliance_type') {
-  return `<label class="sn-appliance-autocomplete" ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span><input id="${id}" name="${bookingEsc(name)}" type="search" placeholder="${bookingEsc(field.placeholder || '')}" required autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sn-repair-appliance-suggestions" /><div class="sn-appliance-suggestions" id="sn-repair-appliance-suggestions" role="listbox" hidden></div></label>`;
+  return `<label class="sn-appliance-autocomplete" ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span><input id="${id}" name="${bookingEsc(name)}" type="search" placeholder="${bookingEsc(field.placeholder || '')}" required autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-suggestions" data-appliance-search /><div class="sn-appliance-suggestions" id="${id}-suggestions" role="listbox" hidden></div></label>`;
  }
  return `<label${field.type === 'textarea' ? ' class="full"' : ''} ${wrapper} for="${id}"><span>${bookingEsc(field.label)}</span>${control}</label>`;
+}
+
+function bindApplianceAutocomplete(host, onSelect) {
+ const search = host.querySelector('[data-appliance-search]');
+ const suggestions = search?.parentElement?.querySelector('.sn-appliance-suggestions');
+ if (!search || !suggestions) return;
+ const catalog = [
+  { name: 'Air conditioner', aliases: ['aircon', 'air con', 'ac', 'a/c', 'air conditioner', 'air conditioning'] },
+  { name: 'Refrigerator', aliases: ['fridge', 'refrigerator', 'ref', 'freezer'] },
+  { name: 'Washing machine', aliases: ['washer', 'washing machine', 'washing', 'laundry machine'] },
+  { name: 'Television', aliases: ['tv', 't.v.', 'television', 'smart tv'] },
+  { name: 'Rice cooker', aliases: ['rice cooker', 'ricecooker'] },
+  { name: 'Electric fan', aliases: ['fan', 'electric fan', 'stand fan', 'ceiling fan'] },
+  { name: 'Microwave', aliases: ['microwave', 'microwave oven'] },
+  { name: 'Water dispenser', aliases: ['water dispenser', 'dispenser'] },
+  { name: 'Other appliance', aliases: ['other appliance', 'other'] },
+ ];
+ const normalize = value => normalizeBookingText(value).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+ const close = () => { suggestions.hidden = true; search.setAttribute('aria-expanded', 'false'); };
+ const update = () => {
+  const query = normalize(search.value);
+  const matches = query ? catalog.filter(item => item.aliases.some(alias => {
+   const normalizedAlias = normalize(alias);
+   return normalizedAlias.includes(query) || query.includes(normalizedAlias);
+  })).slice(0, 5) : [];
+  suggestions.innerHTML = matches.map((item, index) => `<button type="button" role="option" aria-selected="false" data-appliance-suggestion="${index}">${bookingEsc(item.name)}</button>`).join('');
+  suggestions.hidden = matches.length === 0;
+  search.setAttribute('aria-expanded', String(matches.length > 0));
+  suggestions.querySelectorAll('[data-appliance-suggestion]').forEach((button, index) => {
+   button.addEventListener('mousedown', event => event.preventDefault());
+   button.addEventListener('click', () => {
+    search.value = matches[index].name;
+    close();
+    onSelect();
+   });
+  });
+ };
+ search.addEventListener('input', update);
+ search.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !suggestions.hidden) close();
+  else if (event.key === 'ArrowDown' && !suggestions.hidden) {
+   event.preventDefault();
+   suggestions.querySelector('button')?.focus();
+  }
+ });
+ suggestions.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { close(); search.focus(); }
+ });
+ search.addEventListener('blur', () => window.setTimeout(close, 120));
 }
 
 function updateCalculatedEstimateDisplay(category) {
@@ -505,6 +558,7 @@ function renderBookingAssessment() {
   ${pricing.configs[key].media ? `<label class="full"><span>Photo/video (optional)</span><input id="sn-${category.id}-media" type="file" accept="image/*,video/*" multiple /><small>Up to 3 photos/videos, 10 MB each.</small></label>` : ''}</div>
   <div class="sn-calculated-price-summary sn-${category.id}-price-summary"></div>`;
  delete panel.dataset.rendering;
+ bindApplianceAutocomplete(panel, () => updateCalculatedEstimateDisplay(category));
  panel.querySelector(`#${selectorId}`)?.addEventListener('change', renderBookingAssessment);
  const media = panel.querySelector(`#sn-${category.id}-media`);
  media?.addEventListener('change', () => {
@@ -585,55 +639,7 @@ function renderRepairAssessment() {
   serviceSearch.value = REPAIR_SERVICE_CONFIGS[match[0]].title;
   renderRepairAssessment();
  });
- const applianceSearch = host.querySelector('[name="repair_appliance_type"]');
- const applianceSuggestions = host.querySelector('#sn-repair-appliance-suggestions');
- const applianceCatalog = [
-  { name: 'Air conditioner', aliases: ['aircon', 'air con', 'ac', 'a/c', 'air conditioner', 'air conditioning'] },
-  { name: 'Refrigerator', aliases: ['fridge', 'refrigerator', 'ref', 'freezer'] },
-  { name: 'Washing machine', aliases: ['washer', 'washing machine', 'washing', 'laundry machine'] },
-  { name: 'Television', aliases: ['tv', 't.v.', 'television', 'smart tv'] },
-  { name: 'Rice cooker', aliases: ['rice cooker', 'ricecooker'] },
-  { name: 'Electric fan', aliases: ['fan', 'electric fan', 'stand fan', 'ceiling fan'] },
-  { name: 'Microwave', aliases: ['microwave', 'microwave oven'] },
-  { name: 'Water dispenser', aliases: ['water dispenser', 'dispenser'] },
-  { name: 'Other appliance', aliases: ['other appliance', 'other'] },
- ];
- const normalizeSearch = value => normalizeBookingText(value).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
- function updateApplianceSuggestions() {
-  if (!applianceSearch || !applianceSuggestions) return;
-  const query = normalizeSearch(applianceSearch.value);
-  const matches = query ? applianceCatalog.filter(item => item.aliases.some(alias => {
-   const normalizedAlias = normalizeSearch(alias);
-   return normalizedAlias.includes(query) || query.includes(normalizedAlias);
-  })).slice(0, 5) : [];
-  applianceSuggestions.innerHTML = matches.map((item, index) => `<button type="button" role="option" aria-selected="false" data-appliance-suggestion="${index}">${bookingEsc(item.name)}</button>`).join('');
-  applianceSuggestions.hidden = matches.length === 0;
-  applianceSearch.setAttribute('aria-expanded', String(matches.length > 0));
-  applianceSuggestions.querySelectorAll('[data-appliance-suggestion]').forEach((button, index) => {
-   button.addEventListener('mousedown', event => event.preventDefault());
-   button.addEventListener('click', () => {
-    applianceSearch.value = matches[index].name;
-    applianceSuggestions.hidden = true;
-    applianceSearch.setAttribute('aria-expanded', 'false');
-    updateRepairEstimateDisplay();
-   });
-  });
- }
- applianceSearch?.addEventListener('input', updateApplianceSuggestions);
- applianceSearch?.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && applianceSuggestions && !applianceSuggestions.hidden) {
-   applianceSuggestions.hidden = true;
-   applianceSearch.setAttribute('aria-expanded', 'false');
-  } else if (event.key === 'ArrowDown' && applianceSuggestions && !applianceSuggestions.hidden) {
-   event.preventDefault(); applianceSuggestions.querySelector('button')?.focus();
-  }
- });
- applianceSuggestions?.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { applianceSuggestions.hidden = true; applianceSearch?.focus(); applianceSearch?.setAttribute('aria-expanded', 'false'); }
- });
- applianceSearch?.addEventListener('blur', () => {
-  window.setTimeout(() => { if (applianceSuggestions) applianceSuggestions.hidden = true; applianceSearch?.setAttribute('aria-expanded', 'false'); }, 120);
- });
+ bindApplianceAutocomplete(host, updateRepairEstimateDisplay);
  host.querySelectorAll('input, select, textarea').forEach((field) => {
   if (field.id !== 'sn-repair-specific-service') {
    field.addEventListener('input', updateRepairEstimateDisplay);
