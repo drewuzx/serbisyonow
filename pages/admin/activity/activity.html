@@ -18,7 +18,7 @@
       <div class="admin-panel-head"><h2>Recent admin actions</h2><button class="btn btn-outline" id="activity-refresh" type="button">Refresh</button></div>
       <p id="activity-message" role="status">Loading activity...</p>
       <div class="admin-activity-tools">
-        <label>Search<input id="activity-search" type="search" placeholder="Admin, account, or action" /></label>
+        <label>Search<div class="admin-search-combobox"><input id="activity-search" type="search" placeholder="Admin, account, or action" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="activity-suggestions" autocomplete="off" /><div class="admin-search-suggestions" id="activity-suggestions" role="listbox" hidden></div></div></label>
         <label>Activity type<select id="activity-filter"><option value="all">All activity</option><option value="document">Document views</option><option value="decision">Verification decisions</option><option value="other">Other actions</option></select></label>
       </div>
       <div class="admin-activity-list" id="activity-list"></div>
@@ -36,6 +36,57 @@
       'feedback.status_changed': 'Changed feedback status',
     };
     let activityItems = [];
+    let activeSuggestion = -1;
+    const searchInput = document.getElementById('activity-search');
+    const suggestionList = document.getElementById('activity-suggestions');
+    function activitySearchText(item) {
+      const documentType = item.metadata?.document_type === 'identity_document' ? 'Identity document' : item.metadata?.document_type === 'provider_credential' ? 'Provider credential' : '';
+      const imageType = item.metadata?.image_type || '';
+      return `${item.admin_username || ''} ${item.target_name || ''} ${actionLabels[item.action_key] || item.action_key} ${documentType} ${imageType} ${item.metadata?.status || ''}`.trim();
+    }
+    function activitySuggestions(query) {
+      const candidates = new Map();
+      const add = (value, kind) => {
+        const label = String(value || '').trim();
+        if (!label || !label.toLowerCase().includes(query)) return;
+        const key = `${kind}:${label.toLowerCase()}`;
+        const suggestion = candidates.get(key) || { label, kind, count: 0 };
+        suggestion.count++;
+        candidates.set(key, suggestion);
+      };
+      for (const item of activityItems) {
+        add(item.admin_username, 'Admin');
+        add(item.target_name, item.target_role === 'provider' ? 'Provider' : item.target_role === 'customer' ? 'Customer' : 'Record');
+        add(actionLabels[item.action_key] || item.action_key, 'Action');
+        if (item.metadata?.document_type === 'identity_document') add('Identity document', 'Document');
+        if (item.metadata?.document_type === 'provider_credential') add('Provider credential', 'Document');
+        if (item.metadata?.image_type) add(`${item.metadata.image_type} image`, 'Document');
+        if (item.metadata?.status) add(item.metadata.status, 'Status');
+      }
+      return [...candidates.values()].sort((a, b) => Number(b.label.toLowerCase().startsWith(query)) - Number(a.label.toLowerCase().startsWith(query)) || b.count - a.count || a.label.localeCompare(b.label)).slice(0, 6);
+    }
+    function closeSuggestions() {
+      suggestionList.hidden = true;
+      suggestionList.replaceChildren();
+      searchInput.setAttribute('aria-expanded', 'false');
+      searchInput.removeAttribute('aria-activedescendant');
+      activeSuggestion = -1;
+    }
+    function chooseSuggestion(value) {
+      searchInput.value = value;
+      closeSuggestions();
+      renderActivity();
+    }
+    function showSuggestions() {
+      const query = searchInput.value.trim().toLowerCase();
+      if (!query || !activityItems.length) return closeSuggestions();
+      const suggestions = activitySuggestions(query);
+      if (!suggestions.length) return closeSuggestions();
+      suggestionList.innerHTML = suggestions.map((item, index) => `<button type="button" class="admin-search-option" id="activity-option-${index}" role="option" aria-selected="false" data-suggestion="${adminEscape(item.label)}"><span>${adminEscape(item.label)}</span><small>${adminEscape(item.kind)} · ${item.count} match${item.count === 1 ? '' : 'es'}</small></button>`).join('');
+      suggestionList.hidden = false;
+      searchInput.setAttribute('aria-expanded', 'true');
+      activeSuggestion = -1;
+    }
     function renderActivity() {
       const query = document.getElementById('activity-search').value.trim().toLowerCase();
       const filter = document.getElementById('activity-filter').value;
@@ -43,7 +94,7 @@
         const decision = item.action_key.startsWith('account.') || item.action_key.startsWith('provider_photo.approved') || item.action_key.startsWith('provider_photo.declined');
         const documentView = item.action_key === 'document.view' || item.action_key === 'provider_photo.image_view';
         const matchesFilter = filter === 'all' || (filter === 'document' && documentView) || (filter === 'decision' && decision) || (filter === 'other' && !documentView && !decision);
-        const text = `${item.admin_username || ''} ${item.target_name || ''} ${actionLabels[item.action_key] || item.action_key}`.toLowerCase();
+        const text = activitySearchText(item).toLowerCase();
         return matchesFilter && text.includes(query);
       });
       document.getElementById('activity-list').innerHTML = entries.length ? entries.map(item => {
@@ -58,7 +109,29 @@
       try { activityItems = (await adminGet('/api/admin/activity')).activity || []; renderActivity(); }
       catch (error) { document.getElementById('activity-message').textContent = error.message; }
     }
-    document.getElementById('activity-search').addEventListener('input', renderActivity);
+    searchInput.addEventListener('input', () => { renderActivity(); showSuggestions(); });
+    searchInput.addEventListener('focus', showSuggestions);
+    searchInput.addEventListener('keydown', event => {
+      const options = [...suggestionList.querySelectorAll('[role="option"]')];
+      if (event.key === 'ArrowDown' && options.length) {
+        event.preventDefault(); activeSuggestion = (activeSuggestion + 1) % options.length;
+      } else if (event.key === 'ArrowUp' && options.length) {
+        event.preventDefault(); activeSuggestion = activeSuggestion < 0 ? options.length - 1 : (activeSuggestion - 1 + options.length) % options.length;
+      } else if (event.key === 'Enter' && activeSuggestion >= 0 && options[activeSuggestion]) {
+        event.preventDefault(); chooseSuggestion(options[activeSuggestion].dataset.suggestion); return;
+      } else if (event.key === 'Escape') { closeSuggestions(); return; }
+      else return;
+      options.forEach((option, index) => {
+        option.setAttribute('aria-selected', String(index === activeSuggestion));
+        if (index === activeSuggestion) searchInput.setAttribute('aria-activedescendant', option.id);
+      });
+    });
+    suggestionList.addEventListener('mousedown', event => event.preventDefault());
+    suggestionList.addEventListener('click', event => {
+      const option = event.target.closest('[data-suggestion]');
+      if (option) chooseSuggestion(option.dataset.suggestion);
+    });
+    document.addEventListener('click', event => { if (!event.target.closest('.admin-search-combobox')) closeSuggestions(); });
     document.getElementById('activity-filter').addEventListener('change', renderActivity);
     document.getElementById('activity-refresh').addEventListener('click', loadActivity);
     loadActivity();
