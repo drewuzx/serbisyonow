@@ -15,6 +15,8 @@ async function main() {
   }, f.providerToken);
   assert.equal(created.status, 201);
   const service = created.data.service;
+  const categoryChange = await f.request(`/api/provider/81/services/${service.id}`, 'PATCH', { category: 'Others' }, f.providerToken);
+  assert.equal(categoryChange.status, 400, 'service categories cannot be reassigned after creation');
   browser = await chromium.launch({ headless: true, channel: 'msedge' });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
   await context.route('**/*', route => new URL(route.request().url()).origin === f.base ? route.continue() : route.fulfill({ body: '', contentType: route.request().url().includes('fonts.googleapis.com') ? 'text/css' : 'application/javascript' }));
@@ -38,21 +40,19 @@ async function main() {
   assert.equal(await form.getByRole('button', { name: 'Next', exact: true }).count(), 0);
   assert.equal(await form.getByLabel('Service name', { exact: true }).inputValue(), service.title);
   assert.equal(await form.getByLabel('Description', { exact: true }).inputValue(), service.description);
+  assert.equal(await form.getByLabel('Category', { exact: true }).inputValue(), service.category);
+  assert.equal(await form.getByLabel('Category', { exact: true }).getAttribute('readonly'), '');
   await form.getByLabel('Service name', { exact: true }).fill('   ');
   await save();
   await form.getByRole('alert').filter({ hasText: 'Enter a service name' }).waitFor();
   assert.equal(writes.length, 0);
   await form.getByLabel('Service name', { exact: true }).fill('Appliance inspection and repair');
   await form.getByLabel('Description', { exact: true }).fill('Includes appliance inspection and maintenance.');
-  await form.getByLabel('Category', { exact: true }).selectOption('Others');
-  await save();
-  await form.getByRole('alert').filter({ hasText: 'Enter a service category' }).waitFor();
-  await form.getByLabel('New category name', { exact: true }).fill('Appliance Maintenance');
   // Refreshes cannot replace the editor or its draft.
   await page.evaluate(() => loadProviderDatabase({ background: true }));
   await page.evaluate(() => loadProviderDatabase());
   assert.equal(await form.getByLabel('Service name', { exact: true }).inputValue(), 'Appliance inspection and repair');
-  assert.equal(await form.getByLabel('New category name', { exact: true }).inputValue(), 'Appliance Maintenance');
+  assert.equal(await form.getByLabel('Category', { exact: true }).inputValue(), service.category);
   for (const width of [1440, 1024, 768, 390, 320]) {
    await page.setViewportSize({ width, height: 900 });
    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
@@ -63,7 +63,7 @@ async function main() {
   }
   await form.getByRole('button', { name: 'Back to services', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
-  assert.equal(await form.getByLabel('New category name', { exact: true }).inputValue(), 'Appliance Maintenance');
+  assert.equal(await form.getByLabel('Category', { exact: true }).inputValue(), service.category);
   let fail = true;
   await page.route(`**/api/provider/81/services/${service.id}`, route => fail ? route.fulfill({ status: 503, json: { message: 'Test: unable to save.' } }) : route.continue());
   await save();
@@ -73,12 +73,12 @@ async function main() {
   await save();
   await page.getByText('Service details saved.', { exact: true }).waitFor();
   assert.equal(await page.locator('#sn-price-editor').count(), 0);
-  for (const body of writes) assert.deepEqual(Object.keys(body).sort(), ['category', 'description', 'title']);
+  for (const body of writes) assert.deepEqual(Object.keys(body).sort(), ['description', 'title']);
   const rows = (await f.db.query('SELECT * FROM provider_services WHERE provider_id=81')).rows;
   assert.equal(rows.length, originalCount);
   const saved = rows.find(row => row.id === service.id);
   assert.equal(saved.title, 'Appliance inspection and repair');
-  assert.equal(saved.category, 'Appliance Maintenance');
+  assert.equal(saved.category, service.category);
   assert.equal(saved.accepts_cash, true);
   assert.equal(saved.accepts_gcash, true);
   assert.deepEqual(saved.pricing_config, service.pricing_config);
@@ -89,7 +89,7 @@ async function main() {
   assert.equal(await form.getByLabel('Service name', { exact: true }).inputValue(), saved.title);
   assert.equal(await form.getByLabel('Category', { exact: true }).inputValue(), saved.category);
   await form.getByLabel('Service name', { exact: true }).fill('Discard this change');
-  await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await form.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Discard', exact: true }).click();
   await edit();
   assert.equal(await form.getByLabel('Service name', { exact: true }).inputValue(), saved.title);
@@ -100,7 +100,7 @@ async function main() {
   assert.equal(await page.getByLabel('Minimum price', { exact: true }).inputValue(), '500');
   assert.equal(await page.getByLabel('Maximum price', { exact: true }).inputValue(), '2000');
   assert.deepEqual(errors, []);
-  console.log('Separate Edit Service passed: direct editor, no Next or pricing redirect, details-only save, validation, custom category, draft retention, retry, reload, discard, five widths, unchanged pricing/payment options and separate Set Price.');
+  console.log('Separate Edit Service passed: direct editor, locked category, details-only save, validation, draft retention, retry, reload, discard, five widths, unchanged pricing/payment options and separate Set Price.');
  } finally {
   if (browser) await browser.close();
   await f.close();

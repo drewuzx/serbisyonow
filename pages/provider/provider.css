@@ -2372,6 +2372,17 @@ textarea.sn-modal-input {
   margin-top: 20px;
 }
 
+.sn-service-wizard .sn-modal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sn-service-wizard .sn-modal-actions .btn {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .sn-chart-bars {
   display: grid;
   gap: 10px;

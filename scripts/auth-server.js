@@ -3697,6 +3697,10 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
   if (req.body.category !== undefined && (typeof req.body.category !== 'string' || !req.body.category.trim() || req.body.category.trim().length > 80)) {
     return res.status(400).json({ message: 'Category is required and must be no more than 80 characters.' });
   }
+  if (req.body.category !== undefined
+      && canonicalCategoryName(req.body.category) !== canonicalCategoryName(currentService.category)) {
+    return res.status(400).json({ message: 'A service category cannot be changed after it is assigned.' });
+  }
   if (req.body.description !== undefined && typeof req.body.description !== 'string') {
     return res.status(400).json({ message: 'Description must be text.' });
   }

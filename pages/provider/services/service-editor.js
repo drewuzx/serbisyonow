@@ -4,35 +4,27 @@ async function openServiceEdit(service) {
  const host = document.querySelector('.sn-section, .sn-panel');
  if (!host || !service?.id || host.querySelector('#sn-service-editor')) return;
  let dirty = false, busy = false;
- const categoryOptions = [...new Set([service.category || '', 'Others'].filter(Boolean))];
  host.innerHTML = `<form id="sn-service-editor" novalidate>
   <header class="sn-price-heading"><button type="button" class="btn btn-outline sn-price-back" aria-label="Back to services" title="Back to services">&larr;</button><div><h2>Edit Service</h2><p>${esc(service.title)}</p></div></header>
   <p class="sn-price-state" role="status"></p>
   <div class="sn-price-layout">
    <section class="sn-price-main sn-price-section"><h3>1. Service Details</h3>
     <label class="sn-price-field">Service name<input name="title" value="${esc(service.title)}" maxlength="160" required autocomplete="off"></label>
-    <label class="sn-price-field">Description<textarea name="description" aria-label="Description" rows="7">${esc(service.description || '')}</textarea></label>
+    <label class="sn-price-field">Description<textarea name="description" aria-label="Description" rows="5">${esc(service.description || '')}</textarea></label>
    </section>
    <aside class="sn-price-side"><section class="sn-price-section"><h3>2. Category</h3>
-    <label class="sn-price-field">Category<select name="category" aria-label="Category" required>${categoryOptions.map(category => `<option${category === service.category ? ' selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
-    <label class="sn-price-field" data-custom-category hidden>New category name<input name="custom_category" maxlength="80" autocomplete="off"></label>
+    <label class="sn-price-field">Category<input name="category" aria-label="Category" value="${esc(service.category)}" readonly aria-readonly="true"></label>
    </section></aside>
   </div>
   <p class="sn-service-error" role="alert" tabindex="-1"></p>
-  <footer class="sn-price-footer"><button type="button" class="btn btn-outline" data-service-cancel>Cancel</button><button type="submit" class="btn btn-primary"><img src="/shared/icons/lucide/pencil.svg" alt="" width="18" height="18"> Save Changes</button></footer>
+  <footer class="sn-price-footer"><button type="button" class="btn btn-outline" data-service-cancel>Back</button><button type="submit" class="btn btn-primary"><img src="/shared/icons/lucide/pencil.svg" alt="" width="18" height="18"> Save Changes</button></footer>
  </form>`;
  const form = host.querySelector('#sn-service-editor');
- const category = form.elements.category;
  const notice = form.querySelector('.sn-service-error');
  const submit = form.querySelector('[type="submit"]');
  const submitMarkup = submit.innerHTML;
  function beforeUnload(event) {
   if (dirty || busy) { event.preventDefault(); event.returnValue = ''; }
- }
- function updateCategory() {
-  const custom = category.value === 'Others';
-  form.querySelector('[data-custom-category]').hidden = !custom;
-  form.elements.custom_category.required = custom;
  }
  async function close() {
   if (busy) return;
@@ -48,7 +40,6 @@ async function openServiceEdit(service) {
   form.querySelector('.sn-price-state').textContent = 'Unsaved changes';
   notice.textContent = '';
  });
- category.addEventListener('change', updateCategory);
  form.querySelector('.sn-price-back').addEventListener('click', close);
  form.querySelector('[data-service-cancel]').addEventListener('click', close);
  form.addEventListener('submit', async event => {
@@ -58,9 +49,8 @@ async function openServiceEdit(service) {
   const body = {
    title: form.elements.title.value.trim(),
    description: form.elements.description.value.trim(),
-   category: (category.value === 'Others' ? form.elements.custom_category.value : category.value).trim(),
   };
-  notice.textContent = !body.title ? 'Enter a service name.' : body.title.length > 160 ? 'Service name must be no more than 160 characters.' : !body.category ? 'Enter a service category.' : body.category.length > 80 ? 'Category must be no more than 80 characters.' : '';
+  notice.textContent = !body.title ? 'Enter a service name.' : body.title.length > 160 ? 'Service name must be no more than 160 characters.' : '';
   if (notice.textContent) { notice.focus(); return; }
   busy = true;
   ++providerDatabaseVersion;
@@ -88,12 +78,6 @@ async function openServiceEdit(service) {
    form.removeAttribute('aria-busy');
   }
  });
- updateCategory();
  form.querySelector('.sn-price-back').focus({ preventScroll: true });
  window.scrollTo({ top: 0, behavior: 'instant' });
- const categories = await getAvailableServiceCategories();
- if (!form.isConnected || busy) return;
- const selected = category.value;
- category.innerHTML = [...new Set([...categories.filter(value => value !== 'Others'), ...categoryOptions])].map(value => `<option${value === selected ? ' selected' : ''}>${esc(value)}</option>`).join('');
- updateCategory();
 }

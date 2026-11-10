@@ -1095,36 +1095,34 @@ async function saveService(service) {
   const providerCategory = catalog.categories.find(item =>
     item.toLowerCase() === String(provider.category || '').trim().toLowerCase()
   ) || '';
-  const defaultCategory = service?.category || providerCategory;
-  let category = defaultCategory;
+  let category = service?.category || providerCategory;
   let title = service?.title || provider.service || '';
+  let description = service?.description || '';
+  let starting_price = Number(service?.starting_price || 500);
+  let max_price = Number(service?.max_price || starting_price);
+  let step = service?.id ? 'title' : 'category';
 
-  if (service?.id) {
-    const editedTitle = await openProviderModal({
-      title: modalTitle, label: 'Service name', value: title,
-      placeholder: 'Select service name', confirmText: 'Next',
+  if (!service?.id && !providerCategory) {
+    await openProviderModal({
+      title: 'Category unavailable',
+      message: 'Your account does not have a valid service category assigned. Please contact the admin.',
+      confirmText: 'OK',
     });
-    if (!editedTitle) return;
-    title = editedTitle;
-  } else {
-    if (!providerCategory) {
-      await openProviderModal({
-        title: 'Category unavailable',
-        message: 'Your account does not have a valid service category assigned. Please contact the admin.',
-        confirmText: 'OK',
+    return;
+  }
+
+  while (step) {
+    let result;
+    if (step === 'category') {
+      result = await openProviderModal({
+        title: modalTitle, label: 'Category', value: providerCategory,
+        readOnly: true, confirmText: 'Next', cancelText: 'Back',
+        className: 'sn-service-wizard',
       });
-      return;
-    }
-    while (true) {
-      category = await openProviderModal({
-        title: modalTitle,
-        label: 'Category',
-        value: providerCategory,
-        readOnly: true,
-        confirmText: 'Next',
-        cancelText: 'Back',
-      });
-      if (!category) return;
+      if (!result) return;
+      category = providerCategory;
+      step = 'service';
+    } else if (step === 'service') {
       const serviceOptions = catalog.servicesByCategory[category] || [];
       if (!serviceOptions.length) {
         await openProviderModal({
@@ -1134,49 +1132,61 @@ async function saveService(service) {
         });
         return;
       }
-      const selectedService = await openProviderModal({
-        title: modalTitle,
-        label: `Services under ${category}`,
-        value: serviceOptions.includes(provider.service) ? provider.service : serviceOptions[0],
-        placeholder: 'Select a service',
-        confirmText: 'Next',
-        cancelText: 'Back',
-        cancelResult: '__back__',
-        options: serviceOptions,
+      result = await openProviderModal({
+        title: modalTitle, label: `Services under ${category}`,
+        value: serviceOptions.includes(title) ? title : serviceOptions[0],
+        placeholder: 'Select a service', confirmText: 'Next',
+        cancelText: 'Back', cancelResult: '__back__', options: serviceOptions,
+        className: 'sn-service-wizard',
       });
-      if (selectedService === '__back__') continue;
-      if (!selectedService) return;
-      title = selectedService;
-      break;
+      if (result === '__back__') step = 'category';
+      else if (!result) return;
+      else { title = result; step = 'description'; }
+    } else if (step === 'title') {
+      result = await openProviderModal({
+        title: modalTitle, label: 'Service name', value: title,
+        placeholder: 'Select service name', confirmText: 'Next',
+        cancelText: 'Back', className: 'sn-service-wizard',
+      });
+      if (!result) return;
+      title = result;
+      step = 'description';
+    } else if (step === 'description') {
+      result = await openProviderModal({
+        title: modalTitle, label: 'Description', value: description,
+        placeholder: 'Describe the service', multiline: true,
+        confirmText: service?.pricing_config ? 'Save' : 'Next',
+        cancelText: 'Back', cancelResult: '__back__',
+        className: 'sn-service-wizard',
+      });
+      if (result === '__back__') step = service?.id ? 'title' : 'service';
+      else if (result === null || result === undefined) return;
+      else {
+        description = result;
+        step = service?.pricing_config ? '' : 'starting-price';
+      }
+    } else if (step === 'starting-price') {
+      result = await openProviderModal({
+        title: modalTitle, label: 'Starting price', value: starting_price,
+        placeholder: 'Enter starting price', confirmText: 'Next',
+        cancelText: 'Back', cancelResult: '__back__',
+        className: 'sn-service-wizard',
+      });
+      if (result === '__back__') step = 'description';
+      else if (!result) return;
+      else { starting_price = Number(result); step = 'maximum-price'; }
+    } else if (step === 'maximum-price') {
+      result = await openProviderModal({
+        title: modalTitle, label: 'Maximum price', value: max_price || starting_price,
+        placeholder: 'Enter maximum price', confirmText: 'Save',
+        cancelText: 'Back', cancelResult: '__back__',
+        className: 'sn-service-wizard',
+      });
+      if (result === '__back__') step = 'starting-price';
+      else if (!result) return;
+      else { max_price = Number(result); step = ''; }
     }
   }
-  const description = await openProviderModal({
-    title: modalTitle,
-    label: 'Description',
-    value: service?.description || '',
-    placeholder: 'Describe the service',
-    multiline: true,
-    confirmText: service?.pricing_config ? 'Save' : 'Next',
-  });
-  if (description === null || description === undefined) return;
-  const startingPriceInput = service?.pricing_config ? service.starting_price : await openProviderModal({
-    title: modalTitle,
-    label: 'Starting price',
-    value: service?.starting_price || 500,
-    placeholder: 'Enter starting price',
-    confirmText: 'Next',
-  });
-  if (!startingPriceInput) return;
-  const starting_price = Number(startingPriceInput || 0);
-  const maxPriceInput = service?.pricing_config ? service.max_price : await openProviderModal({
-    title: modalTitle,
-    label: 'Maximum price',
-    value: service?.max_price || starting_price || 500,
-    placeholder: 'Enter maximum price',
-    confirmText: 'Save',
-  });
-  if (!maxPriceInput) return;
-  const max_price = Number(maxPriceInput || 0);
   const body = {
     title,
     category,
