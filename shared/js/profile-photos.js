@@ -27,9 +27,12 @@
    node.replaceWith(link);
   });
   const own = user(pageRole);
-  if (own?.id) document.querySelectorAll('.sn-user-greeting .sn-avatar-lg, .sn-topbar .sn-avatar, #sn-profile-avatar').forEach(node => {
-   const key = `${pageRole}/${own.id}`;
-   if (node.dataset.photoTarget !== key) node.dataset.photoTarget = key;
+  if (pageRole) document.querySelectorAll('.sn-user-greeting .sn-avatar-lg, .sn-topbar .sn-avatar, #sn-profile-avatar').forEach(node => {
+   node.classList.add('sn-photo-avatar');
+   if (own?.id) {
+    const key = `${pageRole}/${own.id}`;
+    if (node.dataset.photoTarget !== key) node.dataset.photoTarget = key;
+   }
   });
   document.querySelectorAll('[data-photo-target]').forEach(node => {
    const key = node.dataset.photoTarget;

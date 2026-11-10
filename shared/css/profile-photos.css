@@ -1,11 +1,11 @@
-.sn-photo-avatar { position: relative; overflow: hidden; }
+.sn-photo-avatar { position: relative; overflow: hidden; background: #fff url('/shared/images/default-profile.svg') center/cover no-repeat; }
 .sn-topbar .sn-profile-link { display: block; flex-shrink: 0; cursor: pointer; text-decoration: none; }
 .sn-topbar .sn-profile-link:focus-visible { outline: 3px solid #2b50ce; outline-offset: 3px; }
 .sn-photo-avatar > img.sn-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; border-radius: inherit; }
 .sn-photo-section { margin: 20px 0; padding: 24px 0; border-block: 1px solid #d7e1f2; color: #193b88; }
 .sn-photo-section h2 { margin: 0 0 16px; font-size: 22px; }
 .sn-photo-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
-.sn-photo-portrait { width: 88px; height: 88px; flex: 0 0 88px; border-radius: 50%; background: #dbe7ff url('/shared/icons/lucide/user.svg') center/45% no-repeat; }
+.sn-photo-portrait { width: 88px; height: 88px; flex: 0 0 88px; border-radius: 50%; background: #fff url('/shared/images/default-profile.svg') center/cover no-repeat; }
 .sn-photo-section p { color: #52647c; font-size: 14px; max-width: 640px; }
 .sn-photo-dialog { box-sizing: border-box; position: fixed; inset: 0; margin: auto; width: min(580px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #cfdaee; border-top: 5px solid #2b50ce; border-radius: 20px; color: #193b88; background: #fff; box-shadow: 0 16px 60px #162c5a33; overflow: auto; font-family: 'Poppins', sans-serif; }
 .sn-photo-dialog::backdrop { background: #152d5c80; backdrop-filter: blur(3px); }
