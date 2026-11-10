@@ -78,7 +78,7 @@ function attachDashboardShell() {
   const hamburger = document.getElementById('sn-hamburger');
   const hamburgerTop = document.getElementById('sn-hamburger-top');
 
-  if (window.location.pathname.includes('/pages/customer/categories/')) {
+  if (window.location.pathname.includes('/pages/customer/')) {
     const nav = sidebar?.querySelector('.sn-nav');
     if (nav && !nav.querySelector('#sn-logout')) {
       nav.setAttribute('aria-label', 'Sidebar');
