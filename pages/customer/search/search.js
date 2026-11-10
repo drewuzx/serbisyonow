@@ -38,14 +38,17 @@ function providerBadge(provider) {
   return `<div class="sn-provider-badge sn-badge--${style}">${esc(provider.badge_status || 'Pending Verification')}</div>`;
 }
 
-async function saveCustomerFavorite(customerId, providerId) {
-  const response = await fetch(`${API_BASE}/api/customer/${customerId}/favorites`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider_id: providerId }),
+async function setCustomerFavorite(customerId, providerId, shouldFavorite) {
+  const url = `${API_BASE}/api/customer/${customerId}/favorites${shouldFavorite ? '' : `/${encodeURIComponent(providerId)}`}`;
+  const response = await fetch(url, {
+    method: shouldFavorite ? 'POST' : 'DELETE',
+    ...(shouldFavorite ? {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_id: providerId }),
+    } : {}),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Unable to save favorite.');
+  if (!response.ok) throw new Error(data.message || 'Unable to update favorite.');
   return data;
 }
 
@@ -55,6 +58,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!currentCustomer) {
     window.location.href = '../../auth/customerLogin.html';
     return;
+  }
+
+  const favoriteProviderIds = new Set();
+  try {
+    const response = await fetch(`${API_BASE}/api/customer/${currentCustomer.id}/favorites`);
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && Array.isArray(data.favorites)) {
+      data.favorites.forEach(provider => favoriteProviderIds.add(String(provider.id)));
+    }
+  } catch {
+    // Keep search usable if favorite status cannot be loaded.
   }
 
   try {
@@ -806,7 +820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="sn-result-price-wrap">
             <span class="sn-result-price">${Number(provider.starting_price) > 0 ? `Starts at <strong>${money(provider.starting_price)}</strong>` : '<strong>Price not set</strong>'}</span>
             <span class="sn-result-price-note">*Price may vary</span>
-            <button class="sn-fav-btn" type="button" data-provider-id="${provider.id}" aria-label="Favorite provider">♥</button>
+            <button class="sn-fav-btn ${favoriteProviderIds.has(String(provider.id)) ? 'sn-fav-btn--active' : ''}" type="button" data-provider-id="${provider.id}" aria-label="${favoriteProviderIds.has(String(provider.id)) ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${favoriteProviderIds.has(String(provider.id))}">♥</button>
           </div>
           <a class="sn-btn sn-btn-outline" href="../provider-profile/provider-profile.html?id=${provider.id}">View Profile</a>
           <a class="sn-btn sn-btn-primary" href="../bookings/bookings.html?provider_id=${provider.id}">Book Now</a>
@@ -823,13 +837,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const favoriteButton = event.target.closest('.sn-fav-btn[data-provider-id]');
     if (!favoriteButton) return;
     event.preventDefault();
+    const providerId = String(favoriteButton.dataset.providerId);
+    const shouldFavorite = !favoriteProviderIds.has(providerId);
+    const restoreFavorite = favoriteProviderIds.has(providerId);
     favoriteButton.disabled = true;
+    favoriteButton.classList.toggle('sn-fav-btn--active', shouldFavorite);
+    favoriteButton.setAttribute('aria-pressed', String(shouldFavorite));
+    favoriteButton.setAttribute('aria-label', shouldFavorite ? 'Remove from favorites' : 'Add to favorites');
     try {
-      await saveCustomerFavorite(currentCustomer.id, favoriteButton.dataset.providerId);
-      favoriteButton.classList.add('sn-fav-btn--active');
-      favoriteButton.setAttribute('aria-label', 'Saved to favorites');
+      await setCustomerFavorite(currentCustomer.id, providerId, shouldFavorite);
+      if (shouldFavorite) favoriteProviderIds.add(providerId);
+      else favoriteProviderIds.delete(providerId);
     } catch (error) {
       console.warn(error.message || error);
+      favoriteButton.classList.toggle('sn-fav-btn--active', restoreFavorite);
+      favoriteButton.setAttribute('aria-pressed', String(restoreFavorite));
+      favoriteButton.setAttribute('aria-label', restoreFavorite ? 'Remove from favorites' : 'Add to favorites');
+      window.SN?.toast?.error(error.message || 'Unable to update favorite.');
+    } finally {
       favoriteButton.disabled = false;
     }
   });

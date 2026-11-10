@@ -46,10 +46,19 @@ async function main() {
    assert.match(await card.getByRole('link', { name: 'Book Now' }).getAttribute('href'), /provider_id=81$/);
    await card.screenshot({ path: path.join(os.tmpdir(), `search-result-aligned-${width}.png`) });
   }
-  const favorite = page.locator('.sn-result-card').filter({ hasText: 'Drew Wu' }).getByRole('button', { name: /Favorite provider/ });
+  const favorite = page.locator('.sn-result-card').filter({ hasText: 'Drew Wu' }).getByRole('button', { name: 'Add to favorites' });
   await favorite.click();
-  await page.waitForFunction(() => document.querySelector('.sn-fav-btn[data-provider-id="81"]')?.classList.contains('sn-fav-btn--active'));
+  await page.waitForFunction(() => {
+   const button = document.querySelector('.sn-fav-btn[data-provider-id="81"]');
+   return button?.classList.contains('sn-fav-btn--active') && button.getAttribute('aria-pressed') === 'true';
+  });
   assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM customer_favorites WHERE customer_id=61 AND provider_id=81')).rows[0].count, 1);
+  await page.locator('.sn-fav-btn[data-provider-id="81"]').click();
+  await page.waitForFunction(() => {
+   const button = document.querySelector('.sn-fav-btn[data-provider-id="81"]');
+   return button && !button.classList.contains('sn-fav-btn--active') && button.getAttribute('aria-pressed') === 'false';
+  });
+  assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM customer_favorites WHERE customer_id=61 AND provider_id=81')).rows[0].count, 0);
   assert.deepEqual(errors, []);
   console.log('PASS: seven viewport widths, aligned photos/details, contained actions, matching button widths, saved rates, navigation links, and favorite interaction.');
  } finally { await browser?.close(); await f.close(); }
