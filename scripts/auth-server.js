@@ -1101,6 +1101,7 @@ function customerRow(row) {
     location_updated_at: row.location_updated_at || null,
     is_verified: row.is_verified,
     verification_status: row.verification_status,
+    updated_at: row.updated_at,
     created_at: row.created_at,
   };
 }
@@ -1146,6 +1147,7 @@ function providerRow(row) {
     promoted: Boolean(row.promoted),
     is_verified: row.is_verified,
     verification_status: row.verification_status,
+    updated_at: row.updated_at,
     created_at: row.created_at,
   };
 }
@@ -2439,7 +2441,8 @@ app.patch('/api/auth/customer/change-password', asyncRoute(async (req, res) => {
 app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'customer', req.params.id);
   const customerId = req.params.id;
-  const [categories, providers, bookings, messages, favorites, reviews, recommendations] = await Promise.all([
+  const [customer, categories, providers, bookings, messages, favorites, reviews, recommendations] = await Promise.all([
+    db.query('SELECT * FROM customers WHERE id = $1', [customerId]),
     db.query(`
       SELECT c.*, COUNT(p.id)::int AS provider_count
       FROM service_categories c
@@ -2494,6 +2497,7 @@ app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
   ]);
 
   res.json({
+    customer: customerRow(customer.rows[0]),
     categories: categories.rows.map(categoryRow),
     providers: await providerViews(providers.rows),
     recommendations,

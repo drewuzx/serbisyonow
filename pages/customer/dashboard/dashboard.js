@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let previousStatus = currentCustomer.verification_status;
   document.addEventListener('sn:customer-account-updated', ({ detail: user }) => {
     applyVerificationState(user);
-    if (previousStatus !== user.verification_status) showVerificationToast(user.verification_status);
+    if (previousStatus !== user.verification_status && user.verification_status === 'verified') showVerificationToast(user.verification_status);
     previousStatus = user.verification_status;
   });
 });

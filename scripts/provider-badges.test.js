@@ -128,5 +128,13 @@ test('live API badges are consistent, review-backed and recalculate after review
     const rejected = await f.request('/api/admin/providers/81/reject', 'PATCH', {}, adminToken);
     assert.equal(rejected.data.provider.badge_status, 'Verification Declined');
     assert.equal(rejected.data.provider.badge_details.credential_points, 0);
+    const rejectedProviderDashboard = await dashboard();
+    assert.equal(rejectedProviderDashboard.provider.verification_status, 'rejected');
+    assert.ok(rejectedProviderDashboard.provider.updated_at, 'provider decline timestamp is available for a notification');
+    const rejectedCustomer = await f.request('/api/admin/customers/61/reject', 'PATCH', {}, adminToken);
+    assert.equal(rejectedCustomer.status, 200);
+    const rejectedCustomerDashboard = await f.request('/api/customer/61/dashboard', 'GET', undefined, f.customerToken);
+    assert.equal(rejectedCustomerDashboard.data.customer.verification_status, 'rejected');
+    assert.ok(rejectedCustomerDashboard.data.customer.updated_at, 'customer decline timestamp is available for a notification');
   } finally { await f.close(); }
 });

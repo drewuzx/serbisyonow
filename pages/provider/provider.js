@@ -228,6 +228,15 @@ function providerPageHref(page) {
 }
 
 function providerNotificationItems(data) {
+  const verificationStatus = data.provider?.verification_status || (data.provider?.is_verified ? 'verified' : 'pending');
+  const verificationNotice = verificationStatus === 'rejected' ? [{
+    id: `verification-declined-${data.provider?.updated_at || data.provider?.id || 'account'}`,
+    kind: 'Verification',
+    title: 'Verification declined',
+    body: 'Your provider verification was declined by the admin. Open your profile to review and resubmit your documents.',
+    time: data.provider?.updated_at,
+    href: providerPageHref('profile'),
+  }] : [];
   const messages = (data.messages || []).filter((message) => message.sender_role === 'customer').slice(0, 5).map((message) => ({
     id: `message-${message.id}`,
     kind: 'Message',
@@ -244,9 +253,10 @@ function providerNotificationItems(data) {
     time: booking.created_at,
     href: providerPageHref('requests'),
   }));
-  return [...messages, ...bookings]
+  const activity = [...messages, ...bookings]
     .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
-    .slice(0, 8);
+    .slice(0, verificationNotice.length ? 7 : 8);
+  return [...verificationNotice, ...activity];
 }
 
 function providerUnreadMessages(data) {
@@ -425,8 +435,14 @@ function handleProviderNotifications(data, notify = false) {
   const key = `sn_provider_latest_notice_${provider.id}`;
   const latestKey = localStorage.getItem(key) || '';
   const newest = unseenItems[0];
+  const declinedNotice = unseenItems.find((item) => item.kind === 'Verification');
+  const declineToastKey = `sn_provider_decline_toast_${provider.id}`;
+  if (declinedNotice && localStorage.getItem(declineToastKey) !== declinedNotice.id) {
+    showProviderToast(declinedNotice);
+    localStorage.setItem(declineToastKey, declinedNotice.id);
+  }
   if (newest?.id && newest.id !== latestKey) {
-    if (notify) showProviderToast(newest);
+    if (notify && newest.kind !== 'Verification') showProviderToast(newest);
     localStorage.setItem(key, newest.id);
   }
 }

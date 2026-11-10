@@ -269,6 +269,15 @@ function snInboxHref(peerId) {
 }
 
 function snNotificationItems(data) {
+ const verificationStatus = data.customer?.verification_status || (data.customer?.is_verified ? 'verified' : 'pending');
+ const verificationNotice = verificationStatus === 'rejected' ? [{
+  id: `verification-declined-${data.customer?.updated_at || data.customer?.id || 'account'}`,
+  kind: 'Verification',
+  title: 'Verification declined',
+  body: 'Your ID verification was declined by the admin. Open your profile to review and resubmit your documents.',
+  time: data.customer?.updated_at,
+  href: '../profile/profile.html',
+ }] : [];
  const messages = (data.messages || []).filter(message => message.sender_role === 'provider').slice(0, 5).map(message => ({
   id: `message-${message.id}`,
   kind: 'Message',
@@ -285,9 +294,10 @@ function snNotificationItems(data) {
   time: booking.created_at,
   href: '../bookings/bookings.html',
  }));
- return [...messages, ...bookings]
+ const activity = [...messages, ...bookings]
   .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
-  .slice(0, 8);
+  .slice(0, verificationNotice.length ? 7 : 8);
+ return [...verificationNotice, ...activity];
 }
 
 function snUnreadCustomerMessages(data) {
@@ -382,11 +392,14 @@ function snShowToast(item) {
  toast.type = 'button';
  toast.innerHTML = `<strong>${snEsc(item.kind)}: ${snEsc(item.title)}</strong><span>${snEsc(item.body)}</span>`;
  toast.addEventListener('click', () => {
+  if (item.href) {
+    window.location.href = item.href;
+    return;
+  }
   if (window.snFloatingChat) {
     window.snFloatingChat.toggleList();
     return;
   }
-  window.location.href = item.href;
 });
  host.appendChild(toast);
  window.setTimeout(() => toast.remove(), 5200);
@@ -457,8 +470,15 @@ if (messageButton) {
   const counts = snUpdateCustomerNotificationBadges(data, unseenItems.length);
   if (dot) dot.hidden = counts.notificationCount <= 0;
   const newest = unseenItems[0];
+  const declinedNotice = unseenItems.find(item => item.kind === 'Verification');
+  const declineToastKey = `sn_customer_decline_toast_${customer.id}`;
+  if (declinedNotice && (!initialized || notify)
+      && localStorage.getItem(declineToastKey) !== declinedNotice.id) {
+   snShowToast(declinedNotice);
+   localStorage.setItem(declineToastKey, declinedNotice.id);
+  }
   if (newest?.id && newest.id !== latestKey) {
-   if (notify && initialized) snShowToast(newest);
+   if (notify && initialized && newest.kind !== 'Verification') snShowToast(newest);
    latestKey = newest.id;
    localStorage.setItem(`sn_customer_latest_notice_${customer.id}`, latestKey);
   }
