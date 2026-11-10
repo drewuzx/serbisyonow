@@ -212,8 +212,11 @@
         .then((data) => {
           localStorage.setItem('sn_provider_user', JSON.stringify(data.user));
           localStorage.setItem('sn_last_account_role', 'provider');
-          SN.toast.success('Provider login successful!');
-          setTimeout(() => window.location.href = '../provider/dashboard/dashboard.html', 700);
+          const isApproved = data.user.is_verified === true && data.user.verification_status === 'verified';
+          SN.toast.success(isApproved ? 'Provider login successful!' : 'Signed in. Your application status is ready to review.');
+          setTimeout(() => window.location.href = isApproved
+            ? '../provider/dashboard/dashboard.html'
+            : '../provider/profile/profile.html', 700);
         })
         .catch((error) => {
           const message = error.message || 'Login failed.';

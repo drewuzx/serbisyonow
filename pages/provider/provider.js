@@ -88,12 +88,15 @@ async function providerSendForm(path, method, body) {
   return data;
 }
 
-async function getAvailableServiceCategories() {
+async function getAvailableServiceCatalog() {
   try {
     const data = await providerGet('/api/categories');
-    return Array.isArray(data.categories) ? data.categories.filter(Boolean) : [];
+    return {
+      categories: Array.isArray(data.categories) ? data.categories.filter(Boolean) : [],
+      servicesByCategory: data.servicesByCategory || {},
+    };
   } catch {
-    return [];
+    return { categories: [], servicesByCategory: {} };
   }
 }
 
@@ -549,6 +552,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '../../auth/providerLogin.html';
     return;
   }
+  const providerApproved = provider.is_verified === true && provider.verification_status === 'verified';
+  const currentProviderPath = window.location.pathname;
+  const applicationPage = currentProviderPath.includes('/provider/profile/')
+    || currentProviderPath.includes('/provider/assessment/');
+  if (!providerApproved && !applicationPage) {
+    window.location.replace('/pages/provider/profile/profile.html');
+    return;
+  }
   const userName = document.getElementById('sn-user-name');
   const userStatus = document.getElementById('sn-user-status');
   const shell = document.querySelector('.sn-shell');
@@ -573,7 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     { key: 'history', label: 'History', href: '../history/history.html', icon: '&#128344;' },
     { key: 'assessment', label: 'Skill Status', href: '../assessment/assessment.html', icon: '&#9989;' },
     { key: 'profile', label: 'Profile', href: '../profile/profile.html', icon: '&#128100;' },
-  ];
+  ].filter(item => providerApproved || ['profile', 'assessment'].includes(item.key));
 
   const nav = document.querySelector('.sn-nav');
   if (nav) {
@@ -615,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (userName) userName.textContent = provider?.full_name || 'Service Provider';
   if (userStatus) {
     const status = provider?.verification_status || (provider?.is_verified ? 'verified' : 'pending');
-    userStatus.textContent = status === 'verified' ? 'Verified provider' : 'Awaiting provider verification';
+    userStatus.textContent = status === 'verified' ? 'Verified provider' : status === 'rejected' ? 'Verification declined' : 'Awaiting provider verification';
   }
 
   function isMobile() {
@@ -694,6 +705,14 @@ async function loadProviderDatabase({ background = false } = {}) {
     if (version !== providerDatabaseVersion) return false;
     if (background && providerProfileActions.size) return false;
     if (String(getProviderUser()?.id || '') !== String(provider.id)) return false;
+    const refreshedProvider = data.provider || provider;
+    const approved = refreshedProvider.is_verified === true && refreshedProvider.verification_status === 'verified';
+    const pathNow = window.location.pathname;
+    const applicationPage = pathNow.includes('/provider/profile/') || pathNow.includes('/provider/assessment/');
+    if (!approved && !applicationPage) {
+      window.location.replace('/pages/provider/profile/profile.html');
+      return false;
+    }
     window.snProviderLiveData = data;
     document.dispatchEvent(new CustomEvent('sn:provider-data-updated', { detail: data }));
     const path = window.location.pathname;
@@ -1062,36 +1081,55 @@ async function saveService(service) {
   const provider = getProviderUser();
   if (!provider?.id) return;
   const modalTitle = service?.id ? 'Edit service' : 'Add service';
-  const categoryOptions = await getAvailableServiceCategories();
-  const defaultCategory = service?.category || provider.category || categoryOptions[0] || 'Repair Services';
+  const catalog = await getAvailableServiceCatalog();
+  if (!service?.id && !catalog.categories.length) {
+    await openProviderModal({
+      title: 'Categories unavailable',
+      message: 'Service categories could not be loaded. Refresh the page and try again.',
+      confirmText: 'OK',
+    });
+    return;
+  }
+  const defaultCategory = service?.category || provider.category || catalog.categories[0] || '';
+  let category = defaultCategory;
+  let title = service?.title || provider.service || '';
 
-  const title = await openProviderModal({
-    title: modalTitle,
-    label: 'Service name',
-    value: service?.title || provider.service || '',
-    placeholder: 'Enter service name',
-    confirmText: 'Next',
-  });
-  if (!title) return;
-  const categoryChoices = [...new Set([...(categoryOptions.length ? categoryOptions : [defaultCategory]), 'Others'])];
-  const selectedCategory = await openProviderModal({
-    title: modalTitle,
-    label: 'Category',
-    value: defaultCategory,
-    placeholder: 'Select service category',
-    confirmText: 'Next',
-    options: categoryChoices,
-  });
-  if (!selectedCategory) return;
-  const category = selectedCategory === 'Others'
-    ? await openProviderModal({
-        title: modalTitle,
-        label: 'New category name',
-        placeholder: 'Enter service category',
-        confirmText: 'Next',
-      })
-    : selectedCategory;
-  if (!category) return;
+  if (service?.id) {
+    const editedTitle = await openProviderModal({
+      title: modalTitle, label: 'Service name', value: title,
+      placeholder: 'Select service name', confirmText: 'Next',
+    });
+    if (!editedTitle) return;
+    title = editedTitle;
+  } else {
+    category = await openProviderModal({
+      title: modalTitle,
+      label: 'Category',
+      value: catalog.categories.includes(defaultCategory) ? defaultCategory : catalog.categories[0],
+      placeholder: 'Select a category',
+      confirmText: 'Next',
+      options: catalog.categories,
+    });
+    if (!category) return;
+    const serviceOptions = catalog.servicesByCategory[category] || [];
+    if (!serviceOptions.length) {
+      await openProviderModal({
+        title: 'No services available',
+        message: 'There are no services configured for this category yet. Please contact the admin.',
+        confirmText: 'OK',
+      });
+      return;
+    }
+    title = await openProviderModal({
+      title: modalTitle,
+      label: `Services under ${category}`,
+      value: serviceOptions.includes(provider.service) ? provider.service : serviceOptions[0],
+      placeholder: 'Select a service',
+      confirmText: 'Next',
+      options: serviceOptions,
+    });
+    if (!title) return;
+  }
   const description = await openProviderModal({
     title: modalTitle,
     label: 'Description',
@@ -2865,8 +2903,13 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
     ? `${Number(provider.latitude).toFixed(6)}, ${Number(provider.longitude).toFixed(6)}${accuracyLabel}${updatedLabel}`
     : 'GPS location not saved yet';
   const documentLinks = renderProviderCredentialLinks(provider);
+  const verificationNotice = provider.is_verified === true && provider.verification_status === 'verified' ? ''
+    : provider.verification_status === 'rejected'
+      ? '<aside class="sn-provider-verification-notice is-declined" role="status"><strong>Verification declined</strong><span>Your account is not approved yet. Update your ID or supporting documents, then submit them for another admin review.</span><a href="#sn-provider-credentials-title">Update documents</a><a href="../assessment/assessment.html">Review skill assessment</a></aside>'
+      : '<aside class="sn-provider-verification-notice" role="status"><strong>Application under review</strong><span>Provider workspace features will be available after admin approval. You can update your profile, documents, or assessment while you wait.</span><a href="../assessment/assessment.html">View skill assessment</a></aside>';
   panel.classList.add('sn-provider-account-page');
   panel.innerHTML = `
+    ${verificationNotice}
     <div class="sn-provider-account-grid">
     <section class="sn-provider-personal" aria-labelledby="sn-provider-personal-title">
     <div class="sn-provider-section-heading"><h2 id="sn-provider-personal-title">Profile Information</h2><button class="btn btn-outline" id="sn-provider-edit-profile" type="button" aria-controls="sn-provider-profile-form" aria-expanded="false"><img src="/shared/icons/lucide/pencil.svg" width="16" height="16" alt="" />Edit Profile</button></div>

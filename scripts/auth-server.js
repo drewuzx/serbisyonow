@@ -156,6 +156,32 @@ app.post('/api/payments/paymongo/webhook', express.raw({ type: 'application/json
     ? await settlePromotionPayment(db, event) : await settleBookingPayment(db, event));
 }));
 app.use(express.json());
+app.use('/api/provider/:id', asyncRoute(async (req, res, next) => {
+  const providerId = req.params.id;
+  if (!/^\d+$/.test(providerId)) return next();
+  await authenticateAccount(db, req, 'provider', providerId);
+  const allowedBeforeVerification = new Set([
+    'GET /api/provider/:id/dashboard',
+    'PATCH /api/provider/:id/profile',
+    'PATCH /api/provider/:id/change-password',
+    'POST /api/provider/:id/reassessment',
+    'PATCH /api/provider/:id/credentials',
+    'PATCH /api/provider/:id/location',
+  ]);
+  const routeKey = `${req.method} ${req.originalUrl.split('?')[0].replace(new RegExp(`^/api/provider/${providerId}`), '/api/provider/:id')}`;
+  const verified = (await db.query(
+    `SELECT is_verified, verification_status FROM providers WHERE id = $1`, [providerId]
+  )).rows[0];
+  if (!verified) return res.status(404).json({ message: 'Provider not found.' });
+  if ((verified.is_verified !== true || verified.verification_status !== 'verified')
+      && !allowedBeforeVerification.has(routeKey)) {
+    return res.status(403).json({
+      code: 'PROVIDER_VERIFICATION_REQUIRED',
+      message: 'Your provider account is not approved yet. You can manage your application and retake the assessment from your profile.',
+    });
+  }
+  next();
+}));
 registerPromotionRoutes(app, db, paymentImageUpload, { gateway:paymongo,
   returnBase:configuredFrontendBaseUrl || configuredApiBaseUrl, channel:process.env.PROMOTION_PAYMENT_CHANNEL || 'manual' });
 registerAdminProviderDetails(app, db, providerView, uploadDir);
@@ -3285,7 +3311,11 @@ app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
   await ensureRepeats(db,req.params.id,req.query.date || undefined);
   const date = String(req.query.date || '').trim();
   const params = [req.params.id];
-  const where = ['a.provider_id = $1', bookableSlot()];
+  const where = [
+    'a.provider_id = $1',
+    bookableSlot(),
+    `EXISTS (SELECT 1 FROM providers p WHERE p.id = a.provider_id AND p.is_verified IS TRUE AND lower(COALESCE(p.verification_status, '')) = 'verified')`,
+  ];
   if (date) {
     params.push(date);
     where.push(`available_date = $${params.length}`);
@@ -3474,7 +3504,13 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
 }));
 
 app.get('/api/providers/:id/services', asyncRoute(async (req, res) => {
-  const result = await db.query('SELECT * FROM provider_services WHERE provider_id = $1 AND is_active = TRUE ORDER BY created_at DESC', [req.params.id]);
+  const result = await db.query(`
+    SELECT s.* FROM provider_services s
+    JOIN providers p ON p.id = s.provider_id
+    WHERE s.provider_id = $1 AND s.is_active = TRUE
+      AND p.is_verified IS TRUE AND lower(COALESCE(p.verification_status, '')) = 'verified'
+    ORDER BY s.created_at DESC
+  `, [req.params.id]);
   res.json({ services: result.rows.map(providerServiceRow) });
 }));
 
@@ -3543,6 +3579,25 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
   const providerData = await providerView(providerRecord);
   const computedBadge = providerData.badge_status;
 
+  if (providerRecord.is_verified !== true || providerRecord.verification_status !== 'verified') {
+    return res.json({
+      provider: providerData,
+      metrics: { badge_status: computedBadge },
+      services: [],
+      bookings: [],
+      history_bookings: [],
+      messages: [],
+      reviews: [],
+      availability: [],
+      assessment: assessmentRecord ? { ...assessmentRecord, badge: computedBadge } : {
+        provider_id: Number(providerId),
+        category: canonicalCategoryName(providerRecord.category || 'General'),
+        score: assessmentScore,
+        badge: computedBadge,
+      },
+    });
+  }
+
   res.json({
     provider: providerData,
     metrics: {
@@ -3589,6 +3644,14 @@ app.post('/api/provider/:id/services', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'provider', req.params.id);
   validateServiceOptions(req.body);
   requireFields(req.body, ['title', 'category']);
+  const categoryRows = await db.query('SELECT name, services FROM service_categories WHERE is_active = TRUE');
+  const selectedCategory = categoryRows.rows.find(row =>
+    canonicalCategoryName(row.name).toLowerCase() === canonicalCategoryName(req.body.category).toLowerCase()
+  );
+  const allowedServices = (selectedCategory?.services || []).map(value => String(value).trim().toLowerCase());
+  if (!selectedCategory || !allowedServices.includes(String(req.body.title).trim().toLowerCase())) {
+    return res.status(400).json({ message: 'Choose a service listed under the selected category.' });
+  }
   const pricingConfig = providerPricing.validate(req.body.pricing_config || {
     mode: 'range', min: req.body.starting_price, max: req.body.max_price ?? req.body.starting_price,
     service_area: '', duration: 'Flexible', notes: '', addons: [],
@@ -3978,12 +4041,23 @@ app.get('/api/admin/providers', asyncRoute(async (req, res) => {
 
 app.get('/api/categories', asyncRoute(async (_req, res) => {
   const result = await db.query(`
-    SELECT name
+    SELECT name, services
     FROM service_categories
     WHERE is_active = TRUE
     ORDER BY name ASC
   `);
-  res.json({ categories: result.rows.map((row) => row.name).filter(Boolean) });
+  const servicesByCategory = {};
+  for (const row of result.rows) {
+    const category = canonicalCategoryName(row.name);
+    servicesByCategory[category] = [...new Set([
+      ...(servicesByCategory[category] || []),
+      ...(Array.isArray(row.services) ? row.services : []),
+    ].map(value => String(value || '').trim()).filter(Boolean))];
+  }
+  res.json({
+    categories: [...new Set(result.rows.map(row => canonicalCategoryName(row.name)).filter(Boolean))],
+    servicesByCategory,
+  });
 }));
 
 app.get('/api/admin/categories', asyncRoute(async (req, res) => {

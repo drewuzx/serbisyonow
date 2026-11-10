@@ -60,6 +60,12 @@ test('live API badges are consistent, review-backed and recalculate after review
     assert.equal(registered.status, 201, JSON.stringify(registered.data));
     assert.equal(registered.data.user.assessment_score, 60, 'signup score is graded on the server');
     assert.equal(registered.data.user.badge_status, 'Pending Verification');
+    const pendingDashboard = await f.request(`/api/provider/${registered.data.user.id}/dashboard`, 'GET', undefined, registered.data.user.auth_token);
+    assert.equal(pendingDashboard.status, 200);
+    assert.equal(pendingDashboard.data.provider.verification_status, 'pending');
+    assert.deepEqual(pendingDashboard.data.bookings, [], 'unapproved providers receive no customer booking data');
+    const blockedService = await f.request(`/api/provider/${registered.data.user.id}/services`, 'POST', {}, registered.data.user.auth_token);
+    assert.equal(blockedService.status, 403, 'unapproved providers cannot publish services');
     await f.db.query("INSERT INTO admins (id, username, password_hash) VALUES (91, 'badge-admin', 'fixture')");
     const adminToken = await issueSession(f.db, 'admin', 91);
     await f.db.query("UPDATE providers SET documents_files = ARRAY['certificate.pdf'], experience_years = '20 years' WHERE id = 81");
