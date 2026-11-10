@@ -2062,8 +2062,8 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
         <div class="sn-actions-row full">
           <button class="btn btn-primary" type="submit">Save Availability</button>
         </div>
+        <p class="sn-profile-status sn-schedule-status" id="sn-provider-schedule-status" hidden></p>
       </form>
-      <p class="sn-profile-status" id="sn-provider-schedule-status" hidden></p>
     </article>
     <article class="sn-panel sn-schedule-appointments-panel">
       <h3>Appointments</h3>

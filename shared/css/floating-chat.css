@@ -366,7 +366,7 @@
     right: 14px;
     bottom: calc(12px + env(safe-area-inset-bottom));
     left: auto;
-    width: auto;
+    width: min(400px, calc(100vw - 28px));
     height: auto;
     padding: 0;
     border: 0;
@@ -378,8 +378,8 @@
 
   .sn-float-windows {
     position: absolute;
-    inset: auto 10px calc(100% + 8px) 10px;
-    width: auto;
+    inset: auto 0 calc(100% + 8px);
+    width: 100%;
   }
 
   .sn-float-panel,

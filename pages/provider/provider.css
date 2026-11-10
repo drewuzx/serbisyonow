@@ -1846,6 +1846,7 @@ body {
 }
 
 .sn-schedule-form { grid-template-columns: minmax(0, 1fr); }
+.sn-schedule-form > .sn-schedule-status { grid-column: 1 / -1; margin: 0; line-height: 1.5; }
 .sn-schedule-week { grid-column:1 / -1; min-width:0; }
 .sn-week-repeats { border-top:1px solid var(--border); margin-top:20px; padding-top:20px; }
 .sn-repeat-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px 0; border-bottom:1px solid var(--border); }
