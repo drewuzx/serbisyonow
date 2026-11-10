@@ -148,8 +148,8 @@ function applyFilters() {
     if (role !== 'all' && rowRole !== role) return false;
     if (selectedSearchUser && `${rowRole}:${user.id}` !== selectedSearchUser) return false;
     if (!query) return true;
-    const haystack = `${rowRole} ${user.full_name || ''} ${user.email || ''} ${user.contact || ''} ${getAccountDetail(user)}`.toLowerCase();
-    return haystack.includes(query);
+    return adminSearchRank(query, [user.id, user.full_name, user.email, user.contact, getAccountDetail(user),
+      rowRole, rowRole === 'provider' ? 'providers' : 'customers', rowStatus === 'rejected' ? 'declined' : rowStatus]) >= 0;
   });
 
   renderRows(filtered);
@@ -171,20 +171,16 @@ function renderSearchSuggestions() {
 
   const status = document.getElementById('status-filter')?.value || 'pending';
   const role = document.getElementById('role-filter')?.value || 'all';
-  const matches = allUsers.filter((user) => {
+  const matches = allUsers.map((user) => {
     const rowStatus = getStatus(user);
     const rowRole = getRole(user);
-    if (status !== 'all' && rowStatus !== status) return false;
-    if (role !== 'all' && rowRole !== role) return false;
-    const values = [user.full_name, user.email, user.contact, user.category, user.service, getRoleLabel(user)];
-    return values.some((value) => String(value || '').toLowerCase().includes(query));
-  }).sort((a, b) => {
-    const aName = String(a.full_name || '').toLowerCase();
-    const bName = String(b.full_name || '').toLowerCase();
-    const aStarts = aName.startsWith(query) ? 0 : 1;
-    const bStarts = bName.startsWith(query) ? 0 : 1;
-    return aStarts - bStarts || aName.localeCompare(bName);
-  }).slice(0, 6);
+    if (status !== 'all' && rowStatus !== status) return null;
+    if (role !== 'all' && rowRole !== role) return null;
+    const rank = adminSearchRank(query, [user.id, user.full_name, user.email, user.contact, getAccountDetail(user),
+      getRoleLabel(user), rowStatus === 'rejected' ? 'declined' : rowStatus]);
+    return rank < 0 ? null : { user, rank };
+  }).filter(Boolean).sort((a, b) => b.rank - a.rank || String(a.user.full_name || '').localeCompare(String(b.user.full_name || '')))
+    .slice(0, 6).map(result => result.user);
 
   if (!matches.length) {
     const empty = document.createElement('div');
@@ -205,7 +201,7 @@ function renderSearchSuggestions() {
       primary.textContent = user.full_name || 'Unnamed account';
       const secondary = document.createElement('span');
       secondary.className = 'user-search-secondary';
-      secondary.textContent = `${getRoleLabel(user)} | ${user.email || user.contact || 'No contact details'}`;
+      secondary.textContent = `ID ${user.id} | ${getRoleLabel(user)} | ${user.email || user.contact || 'No contact details'}`;
       option.append(primary, secondary);
       option.addEventListener('pointerdown', (event) => event.preventDefault());
       option.addEventListener('click', () => {

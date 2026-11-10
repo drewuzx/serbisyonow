@@ -121,3 +121,28 @@ function adminVerificationStatus(status = 'pending') {
   if (normalized === 'pending') return { className: 'pending', label: 'Pending' };
   return { className: 'pending', label: normalized };
 }
+
+function adminNormalizeSearch(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+function adminSearchRank(query, values = []) {
+  const normalizedQuery = adminNormalizeSearch(query);
+  if (!normalizedQuery) return 0;
+  const fields = values.map(adminNormalizeSearch).filter(Boolean);
+  const combined = fields.join(' ');
+  const tokens = normalizedQuery.split(' ');
+  const allTokensMatch = tokens.every(token => combined.includes(token));
+  const digits = String(query || '').replace(/\D/g, '');
+  const digitsMatch = digits.length >= 3 && values.some(value => String(value || '').replace(/\D/g, '').includes(digits));
+  if (!allTokensMatch && !digitsMatch) return -1;
+
+  let rank = allTokensMatch ? tokens.length : 0;
+  if (fields.some(field => field === normalizedQuery)) rank += 100;
+  if (fields.some(field => field.startsWith(normalizedQuery))) rank += 60;
+  if (fields.some(field => field.includes(normalizedQuery))) rank += 30;
+  if (fields[0]?.startsWith(normalizedQuery)) rank += 20;
+  if (digitsMatch) rank += 40;
+  return rank;
+}
