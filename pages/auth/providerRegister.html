@@ -87,7 +87,7 @@
               <div class="form-group"><label>Years of Experience</label><select id="experience-years" class="form-control" required><option value="" disabled selected>Enter your years of experience</option><option>1 year below</option><option>2-3 years</option><option>3 years and higher</option></select></div>
             </div>
             <div>
-              <div class="form-group"><label>Upload Resume</label><label class="upload-pill" id="resume-box"><span id="resume-label">Upload your resume</span><strong>+</strong><input id="resume" type="file" accept=".pdf,.doc,.docx,image/*" required onchange="handleUpload(this,'resume-label','resume-box')"/></label></div>
+              <div class="form-group"><label>Upload Resume (Optional)</label><label class="upload-pill" id="resume-box"><span id="resume-label">Upload your resume (optional)</span><strong>+</strong><input id="resume" type="file" accept=".pdf,.doc,.docx,image/*" onchange="handleUpload(this,'resume-label','resume-box')"/></label></div>
               <div class="form-group"><label>Skill Verification (Optional)</label><p class="field-note">(Certificates, Recognition, Portfolio, Feedbacks, Photos, etc.)</p><label class="upload-pill" id="docs-box"><span id="docs-label">Upload Supporting Documents (Optional)</span><strong>+</strong><input id="docs" type="file" multiple accept="image/*,.pdf" onchange="handleUpload(this,'docs-label','docs-box')"/></label></div>
             </div>
           </div>
@@ -351,7 +351,6 @@
         service: 'Select a service.',
         'custom-service': 'Enter the service you offer.',
         'experience-years': 'Select your years of experience.',
-        resume: 'Upload your resume.',
       });
       if (!valid) SN.toast.error('Please fill out all required provider fields before continuing.');
       return valid;
