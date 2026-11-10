@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../../shared/css/variables.css"/>
   <link rel="stylesheet" href="../../shared/css/sn-topbar.css"/>
-  <link rel="stylesheet" href="../../shared/css/auth.css?v=20260915-forgot-password"/>
+  <link rel="stylesheet" href="../../shared/css/auth.css?v=20261110-assessment-status"/>
   <link rel="stylesheet" href="../landing/landing.css"/>
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
@@ -116,13 +116,13 @@
         <div class="submitted-card">
           <div class="submitted-check"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
           <h1>Application Submitted!</h1>
-          <p>Your profile selfie needs a separate admin review.</p>
+          <p>Your provider application was received. Assessment and identity review have separate statuses.</p>
           <p id="sn-photo-status" role="status"></p>
           <button class="btn btn-primary btn-full" type="button" onclick="window.SNProfilePhotos.openProvider()">Submit ID &amp; Selfie</button>
-          <p>Thank you for signing up! Your service provider application has been submitted and is now under admin review.</p>
-          <strong id="provider-score-text">Score: 0%</strong>
-          <span>Status: Under Review</span>
-          <a class="btn btn-primary btn-full" href="providerLogin.html">Go to Application Status <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></a>
+          <strong id="provider-score-text" class="assessment-result-score">Assessment score: 0%</strong>
+          <p id="provider-assessment-result" class="assessment-result-status" role="status" aria-live="polite"></p>
+          <p class="application-review-status"><strong>Application review:</strong> Pending admin review. Your submitted ID and profile selfie are reviewed separately.</p>
+          <a id="provider-assessment-action" class="btn btn-primary btn-full" href="providerLogin.html">Go to Application Status <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg></a>
           <button type="button" class="btn btn-outline btn-full" onclick="showStep(1)">Edit Profile</button>
         </div>
       </div>
@@ -406,7 +406,20 @@
         success.classList.add('is-visible');
         success.style.display = 'flex';
       }
-      document.getElementById('provider-score-text').textContent = `Score: ${latestAssessmentScore}%`;
+      const passed = latestAssessmentScore >= 60;
+      const score = document.getElementById('provider-score-text');
+      const result = document.getElementById('provider-assessment-result');
+      const action = document.getElementById('provider-assessment-action');
+      score.textContent = `Assessment score: ${latestAssessmentScore}%`;
+      result.textContent = passed
+        ? 'Assessment passed. The passing score is 60% or higher.'
+        : 'Assessment not passed. A score of at least 60% is required. Sign in and retake it from the Assessment section.';
+      result.classList.toggle('is-passed', passed);
+      result.classList.toggle('is-failed', !passed);
+      if (!passed) {
+        action.href = '../provider/assessment/assessment.html?retake=1';
+        action.innerHTML = 'Retake Assessment <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>';
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 

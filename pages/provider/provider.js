@@ -2377,6 +2377,22 @@ function renderInbox(messages) {
 function renderAssessment(assessment, metrics, provider = {}) {
   const grid = document.querySelector('.sn-page-grid');
   if (!grid) return;
+  if (new URLSearchParams(window.location.search).get('retake') === '1') {
+    grid.classList.add('sn-assessment-page');
+    grid.innerHTML = `
+      <section class="sn-assessment-section" aria-labelledby="sn-retake-title">
+        <h2 id="sn-retake-title">Retake Skill Assessment</h2>
+        <p>Your questions are based on your primary service category. Answer all 10 questions, then submit to see your updated score.</p>
+        <p class="sn-profile-status" id="sn-provider-profile-status" role="status" hidden></p>
+        ${renderProviderReassessmentSection(provider, metrics, assessment)}
+      </section>
+    `;
+    document.getElementById('sn-provider-start-reassessment')?.addEventListener('click', () => startProviderReassessment(provider));
+    document.getElementById('sn-provider-cancel-reassessment')?.addEventListener('click', cancelProviderReassessment);
+    document.getElementById('sn-provider-submit-reassessment')?.addEventListener('click', () => submitProviderReassessment(provider));
+    startProviderReassessment(provider);
+    return;
+  }
   const details = provider.badge_details;
   grid.classList.add('sn-assessment-page');
   if (!details) {
@@ -2715,9 +2731,20 @@ async function submitProviderReassessment(provider) {
     });
     if (data.user) localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...data.user }));
     activeProviderReassessmentQuestions = [];
+    const directRetake = new URLSearchParams(window.location.search).get('retake') === '1';
+    if (directRetake) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete('retake');
+      window.history.replaceState({}, '', nextUrl);
+    }
     await loadProviderDatabase();
     const savedScore = data.assessment?.score ?? data.user?.assessment_score;
-    setProviderProfileStatus(`Reassessment submitted. New score: ${savedScore}% (${data.user?.badge_status || data.assessment?.badge || 'updated'}).`, savedScore >= 60 ? 'success' : 'error');
+    const resultMessage = `Reassessment submitted. New score: ${savedScore}% (${data.user?.badge_status || data.assessment?.badge || 'updated'}).`;
+    if (directRetake && window.SN?.toast) {
+      window.SN.toast[savedScore >= 60 ? 'success' : 'error'](resultMessage);
+    } else {
+      setProviderProfileStatus(resultMessage, savedScore >= 60 ? 'success' : 'error');
+    }
   } catch (error) {
     setProviderProfileStatus(error.message || 'Unable to submit reassessment.', 'error');
   } finally {

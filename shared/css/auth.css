@@ -844,6 +844,47 @@
   margin-bottom: 22px;
 }
 
+.submitted-card .assessment-result-score {
+  display: block;
+  color: #1a3a8f;
+  font-size: 0.95rem;
+  margin: 16px 0 6px;
+}
+
+.submitted-card .assessment-result-status {
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.submitted-card .assessment-result-status.is-passed {
+  color: #137a42;
+  background: #e8f8ef;
+}
+
+.submitted-card .assessment-result-status.is-failed {
+  color: #a52b32;
+  background: #fff0f0;
+}
+
+.submitted-card .application-review-status {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #46556b;
+  background: #f1f5fb;
+  font-size: 0.78rem;
+}
+
+.submitted-card .application-review-status strong {
+  display: inline;
+  color: #1a3a8f;
+  font-size: inherit;
+  margin: 0;
+}
+
 .submitted-card .btn {
   border-radius: 5px;
   min-height: 40px;
