@@ -359,7 +359,7 @@
           <div class="sn-float-chat-body"></div>
           <form class="sn-float-compose" id="sn-float-form">
             <input id="sn-float-input" type="text" placeholder="Aa" autocomplete="off" />
-            <button class="sn-float-send" id="sn-float-send" type="submit">➤</button>
+            <button class="sn-float-send" id="sn-float-send" type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
           </form>
         </section>
         <section class="sn-float-panel sn-float-list" aria-label="Chats">

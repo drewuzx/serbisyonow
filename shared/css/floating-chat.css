@@ -329,6 +329,7 @@
 
 .sn-float-compose input {
   flex: 1;
+  min-width: 0;
   border: 0;
   background: #f0f2f5;
   border-radius: 999px;
@@ -338,14 +339,30 @@
 }
 
 .sn-float-send {
-  width: 36px;
-  height: 36px;
+  display: grid;
+  flex: 0 0 42px;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: #0084ff;
   color: #fff;
   cursor: pointer;
   font-weight: 900;
+}
+
+.sn-float-send svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .sn-float-send:disabled {
