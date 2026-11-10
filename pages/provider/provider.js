@@ -456,7 +456,7 @@ function startProviderNotificationRealtime(provider) {
   window.snProviderNotificationTimer = window.snStartLiveRefresh('provider-data', () => loadProviderDatabase({ background: true }));
 }
 
-function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', danger = false, options = [], validate = null, className = '', maxLength = null }) {
+function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, readOnly = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', cancelResult = null, danger = false, options = [], validate = null, className = '', maxLength = null }) {
   return new Promise((resolve) => {
     const previousFocus = document.activeElement;
     const backdrop = document.createElement('div');
@@ -466,6 +466,8 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
         <span>${esc(label)}</span>
         ${multiline
           ? `<textarea class="sn-modal-input" rows="4" placeholder="${esc(placeholder)}">${esc(value)}</textarea>`
+          : readOnly
+            ? `<input class="sn-modal-input" type="text" value="${esc(value)}" readonly aria-readonly="true" />`
           : options.length
             ? `<select class="sn-modal-input">
                 ${options.map((option) => `<option value="${esc(option)}" ${String(option) === String(value) ? 'selected' : ''}>${esc(option)}</option>`).join('')}
@@ -537,7 +539,7 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
       if (event.target === backdrop) close(null);
     });
     backdrop.querySelector('.sn-modal-close')?.addEventListener('click', () => close(null));
-    backdrop.querySelector('[data-modal-cancel]')?.addEventListener('click', () => close(null));
+    backdrop.querySelector('[data-modal-cancel]')?.addEventListener('click', () => close(cancelResult));
     backdrop.querySelector('[data-modal-confirm]')?.addEventListener('click', submitModal);
     document.addEventListener('keydown', onKeydown);
     document.body.appendChild(backdrop);
@@ -1090,7 +1092,10 @@ async function saveService(service) {
     });
     return;
   }
-  const defaultCategory = service?.category || provider.category || catalog.categories[0] || '';
+  const providerCategory = catalog.categories.find(item =>
+    item.toLowerCase() === String(provider.category || '').trim().toLowerCase()
+  ) || '';
+  const defaultCategory = service?.category || providerCategory;
   let category = defaultCategory;
   let title = service?.title || provider.service || '';
 
@@ -1102,33 +1107,48 @@ async function saveService(service) {
     if (!editedTitle) return;
     title = editedTitle;
   } else {
-    category = await openProviderModal({
-      title: modalTitle,
-      label: 'Category',
-      value: catalog.categories.includes(defaultCategory) ? defaultCategory : catalog.categories[0],
-      placeholder: 'Select a category',
-      confirmText: 'Next',
-      options: catalog.categories,
-    });
-    if (!category) return;
-    const serviceOptions = catalog.servicesByCategory[category] || [];
-    if (!serviceOptions.length) {
+    if (!providerCategory) {
       await openProviderModal({
-        title: 'No services available',
-        message: 'There are no services configured for this category yet. Please contact the admin.',
+        title: 'Category unavailable',
+        message: 'Your account does not have a valid service category assigned. Please contact the admin.',
         confirmText: 'OK',
       });
       return;
     }
-    title = await openProviderModal({
-      title: modalTitle,
-      label: `Services under ${category}`,
-      value: serviceOptions.includes(provider.service) ? provider.service : serviceOptions[0],
-      placeholder: 'Select a service',
-      confirmText: 'Next',
-      options: serviceOptions,
-    });
-    if (!title) return;
+    while (true) {
+      category = await openProviderModal({
+        title: modalTitle,
+        label: 'Category',
+        value: providerCategory,
+        readOnly: true,
+        confirmText: 'Next',
+        cancelText: 'Back',
+      });
+      if (!category) return;
+      const serviceOptions = catalog.servicesByCategory[category] || [];
+      if (!serviceOptions.length) {
+        await openProviderModal({
+          title: 'No services available',
+          message: 'There are no services configured for this category yet. Please contact the admin.',
+          confirmText: 'OK',
+        });
+        return;
+      }
+      const selectedService = await openProviderModal({
+        title: modalTitle,
+        label: `Services under ${category}`,
+        value: serviceOptions.includes(provider.service) ? provider.service : serviceOptions[0],
+        placeholder: 'Select a service',
+        confirmText: 'Next',
+        cancelText: 'Back',
+        cancelResult: '__back__',
+        options: serviceOptions,
+      });
+      if (selectedService === '__back__') continue;
+      if (!selectedService) return;
+      title = selectedService;
+      break;
+    }
   }
   const description = await openProviderModal({
     title: modalTitle,
