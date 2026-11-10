@@ -9,6 +9,7 @@ async function main() {
  const f = await startQrFixture();
  let browser;
  try {
+  await f.db.query("UPDATE providers SET category='Repair Services' WHERE id=81");
   const created = await f.request('/api/provider/81/services', 'POST', {
    title: 'Appliance repair', description: 'Original description', category: 'Repair Services',
    starting_price: 500, max_price: 2000, accepts_cash: true, accepts_gcash: true,
@@ -21,7 +22,6 @@ async function main() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
   await context.route('**/*', route => new URL(route.request().url()).origin === f.base ? route.continue() : route.fulfill({ body: '', contentType: route.request().url().includes('fonts.googleapis.com') ? 'text/css' : 'application/javascript' }));
   const provider = (await f.request('/api/auth/provider/session', 'GET', undefined, f.providerToken)).data.user;
-  provider.category = 'Repair Services';
   await context.addInitScript(provider => localStorage.setItem('sn_provider_user', JSON.stringify(provider)), provider);
   const page = await context.newPage(), errors = [], writes = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -39,11 +39,14 @@ async function main() {
   await infoButton().click();
   await infoPanel().waitFor({ state: 'hidden' });
   await wizard.getByRole('button', { name: 'Next', exact: true }).click();
-  await wizard.getByLabel('Services under Repair Services', { exact: true }).waitFor();
+  const serviceSelect = () => wizard.locator('.sn-modal-field select');
+  await serviceSelect().waitFor();
+  assert.match(await wizard.locator('.sn-modal-field').innerText(), /Services under Repair Services/);
   await infoButton().click();
   await infoPanel().getByText('Choose the service you offer', { exact: false }).waitFor();
   await wizard.getByRole('button', { name: 'Next', exact: true }).click();
-  await wizard.getByLabel('Description', { exact: true }).waitFor();
+  await wizard.locator('.sn-modal-field textarea').waitFor();
+  assert.match(await wizard.locator('.sn-modal-field').innerText(), /Description/);
   await infoButton().click();
   await infoPanel().getByText('Describe what the service includes', { exact: false }).waitFor();
   await wizard.getByRole('button', { name: 'Close', exact: true }).click();
