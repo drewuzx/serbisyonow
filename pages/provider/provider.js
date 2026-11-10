@@ -456,7 +456,7 @@ function startProviderNotificationRealtime(provider) {
   window.snProviderNotificationTimer = window.snStartLiveRefresh('provider-data', () => loadProviderDatabase({ background: true }));
 }
 
-function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, readOnly = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', cancelResult = null, danger = false, options = [], validate = null, className = '', maxLength = null }) {
+function openProviderModal({ title, message = '', label = '', value = '', placeholder = '', multiline = false, readOnly = false, allowEmpty = false, confirmText = 'Save', cancelText = 'Cancel', cancelResult = null, danger = false, options = [], validate = null, className = '', maxLength = null, detailsText = '' }) {
   return new Promise((resolve) => {
     const previousFocus = document.activeElement;
     const backdrop = document.createElement('div');
@@ -475,10 +475,14 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
             : `<input class="sn-modal-input" type="text" value="${esc(value)}" placeholder="${esc(placeholder)}" />`}
       </label>
     ` : '';
+    const modalDetails = detailsText || (label
+      ? `This step is for ${label.toLowerCase()}.`
+      : `More information about ${title.toLowerCase()}.`);
 
     backdrop.innerHTML = `
       <section class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-modal-title">
-        <div class="sn-provider-modal-icon ${danger ? 'is-danger' : 'is-info'}">${danger ? '!' : 'i'}</div>
+        <button class="sn-provider-modal-icon ${danger ? 'is-danger' : 'is-info'}" type="button" aria-label="More information about ${esc(title)}" aria-expanded="false" aria-controls="sn-modal-info-detail">${danger ? '!' : 'i'}</button>
+        <p class="sn-modal-info-popover" id="sn-modal-info-detail" role="status" hidden>${esc(modalDetails)}</p>
         <div class="sn-modal-head">
           <h2 id="sn-modal-title">${esc(title)}</h2>
           <button class="sn-modal-close" type="button" aria-label="Close">×</button>
@@ -494,6 +498,13 @@ function openProviderModal({ title, message = '', label = '', value = '', placeh
     `;
 
     const field = backdrop.querySelector('.sn-modal-input');
+    const infoButton = backdrop.querySelector('.sn-provider-modal-icon');
+    const infoPopover = backdrop.querySelector('.sn-modal-info-popover');
+    infoButton?.addEventListener('click', () => {
+      const expanded = infoButton.getAttribute('aria-expanded') === 'true';
+      infoButton.setAttribute('aria-expanded', String(!expanded));
+      infoPopover.hidden = expanded;
+    });
     if (field && maxLength) field.maxLength = maxLength;
     field?.addEventListener('input', () => {
       if (validate && !validate(field.value.trim())) {
@@ -1117,6 +1128,7 @@ async function saveService(service) {
       result = await openProviderModal({
         title: modalTitle, label: 'Category', value: providerCategory,
         readOnly: true, confirmText: 'Next', cancelText: 'Back',
+        detailsText: 'This category is assigned to your provider account and cannot be changed here. Select Next to choose a service in this category.',
         className: 'sn-service-wizard',
       });
       if (!result) return;
@@ -1137,6 +1149,7 @@ async function saveService(service) {
         value: serviceOptions.includes(title) ? title : serviceOptions[0],
         placeholder: 'Select a service', confirmText: 'Next',
         cancelText: 'Back', cancelResult: '__back__', options: serviceOptions,
+        detailsText: `Choose the service you offer from the list for ${category}. Use Back if you need to return to the category step.`,
         className: 'sn-service-wizard',
       });
       if (result === '__back__') step = 'category';
@@ -1157,6 +1170,7 @@ async function saveService(service) {
         placeholder: 'Describe the service', multiline: true,
         confirmText: service?.pricing_config ? 'Save' : 'Next',
         cancelText: 'Back', cancelResult: '__back__',
+        detailsText: 'Describe what the service includes and what customers can expect. Clear details help customers decide whether this service fits their needs.',
         className: 'sn-service-wizard',
       });
       if (result === '__back__') step = service?.id ? 'title' : 'service';

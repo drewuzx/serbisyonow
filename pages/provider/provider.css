@@ -2280,12 +2280,42 @@ body {
 .sn-provider-modal-icon {
   width: 48px;
   height: 48px;
+  padding: 0;
+  border: 0;
   display: grid;
   place-items: center;
   border-radius: 16px;
   margin-bottom: 12px;
+  cursor: pointer;
   font-family: var(--font-heading);
   font-weight: 900;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.sn-provider-modal-icon:hover,
+.sn-provider-modal-icon[aria-expanded="true"] {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 3px rgba(43, 89, 211, 0.12);
+}
+
+.sn-provider-modal-icon:focus-visible {
+  outline: 3px solid rgba(43, 89, 211, 0.35);
+  outline-offset: 3px;
+}
+
+.sn-modal-info-popover {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border: 1px solid #d6e3fa;
+  border-radius: 8px;
+  background: #f2f6ff;
+  color: #40577b;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.sn-modal-info-popover[hidden] {
+  display: none;
 }
 
 .sn-provider-modal-icon.is-info {
