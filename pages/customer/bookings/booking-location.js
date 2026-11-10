@@ -31,7 +31,7 @@ window.SNBookingLocation = {
    if (!marker) {
     marker = L.marker([point.latitude, point.longitude], {
      draggable: true, title: 'Service location', alt: 'Service location pin',
-     icon: L.divIcon({ className: 'sn-booking-pin', html: '<img src="/shared/icons/lucide/map-pin.svg" alt="" />', iconSize: [36, 44], iconAnchor: [18, 44] }),
+     icon: L.divIcon({ className: 'sn-booking-pin', html: '<img src="/shared/icons/lucide/map-pin.svg" alt="" />', iconSize: [40, 46], iconAnchor: [20, 46] }),
     }).addTo(map);
     marker.on('dragstart', invalidate);
     marker.on('dragend', () => { const p = marker.getLatLng(); select(p.lat, p.lng); });
