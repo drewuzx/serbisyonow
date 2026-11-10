@@ -110,7 +110,8 @@ body:has(.promotion-dialog[open]) .sn-float-launch,body:has(.promotion-dialog[op
  .promotion-current { flex-wrap:wrap; gap:12px; }
  .promotion-current-action { flex-direction:row; align-items:center; justify-content:space-between; width:100%; }
  .promotion-detail-summary { padding:14px; flex-wrap:wrap; }
- .promotion-dialog .promotion-actions>.primary { width:100%; }
+ .promotion-dialog .promotion-actions { flex-direction:column-reverse; flex-wrap:nowrap; align-items:stretch; }
+ .promotion-dialog .promotion-actions>.promotion-button { width:100%; min-height:48px; }
  .promotion-table tr { border-radius:6px; box-shadow:none; }
  .promotion-table td { display:grid; grid-template-columns:minmax(95px,40%) minmax(0,1fr); padding:10px 0; min-width:0; }
  .promotion-table td[colspan] { display:block; }

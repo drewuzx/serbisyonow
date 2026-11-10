@@ -65,6 +65,15 @@ async function main() {
   await page.waitForFunction(()=>document.querySelector('[data-order-qr]')?.naturalWidth>0);
   await page.setViewportSize({width:390,height:1000});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+  const receiptActions=page.locator('dialog form[data-receipt-form] .promotion-actions');
+  assert.equal(await receiptActions.evaluate(node=>getComputedStyle(node).flexDirection),'column-reverse');
+  const receiptActionButtons=receiptActions.locator('.promotion-button');
+  const receiptSubmitBox=await receiptActionButtons.filter({hasText:'Submit Receipt'}).boundingBox();
+  const receiptCancelBox=await receiptActionButtons.filter({hasText:'Cancel Unpaid Order'}).boundingBox();
+  assert.ok(receiptSubmitBox && receiptCancelBox);
+  assert.ok(receiptSubmitBox.y<receiptCancelBox.y,'Primary receipt action should appear before cancel');
+  assert.ok(Math.abs(receiptSubmitBox.width-receiptCancelBox.width)<1,'Receipt actions should share the same width');
+  assert.ok(Math.abs(receiptSubmitBox.height-receiptCancelBox.height)<1,'Receipt actions should share the same height');
   await page.screenshot({path:path.join(os.tmpdir(),'promotion-payment-mobile.png'),fullPage:true});
   await page.getByLabel('Transaction reference',{exact:true}).fill('PROMOTION-BROWSER-ONE');
   await page.getByLabel('Payment receipt',{exact:true}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
