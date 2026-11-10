@@ -2958,7 +2958,7 @@ app.post('/api/auth/provider/register', upload.fields([
       VALUES ($1, $2, $3, $4)
     `, [result.rows[0].id, category || 'General', assessmentScore, badge]);
     await ensureProviderProfileService(result.rows[0]);
-    return res.status(201).json({ user: await providerView(result.rows[0]) });
+    return res.status(201).json({ user: { ...await providerView(result.rows[0]), auth_token: await issueSession(db, 'provider', result.rows[0].id, { req, res }) } });
   }
 
   const result = await db.query(

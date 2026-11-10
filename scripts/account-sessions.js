@@ -35,7 +35,7 @@ async function authenticateAccount(db, req, role, accountId) {
   WHERE token_hash = $1 AND expires_at > NOW()`, [hashToken(token)]) : { rows: [] };
  const session = result.rows[0];
  if (!session) {
-  const error = new Error('Please log in again before managing a booking payment.');
+  const error = new Error('Please sign in again to continue.');
   error.statusCode = 401;
   throw error;
  }
@@ -49,7 +49,7 @@ async function authenticateAccount(db, req, role, accountId) {
   RETURNING account_id`,
  [hashToken(token), role, session.account_id]);
  if (!renewal.rows.length) {
-  const error = new Error('Please log in again before managing a booking payment.');
+  const error = new Error('Please sign in again to continue.');
   error.statusCode = 401;
   throw error;
  }

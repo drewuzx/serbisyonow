@@ -103,7 +103,9 @@ test('remembered sessions are renewable, role-bound, hashed and revocable', asyn
  await revokeSession(database, cookieRequest, res, 'customer');
  assert.ok(!database.sessions.has(hashToken(token)));
  assert.equal(cookies.at(-1)[0], 'sn_customer_session');
- await assert.rejects(authenticateAccount(database, cookieRequest, 'customer', 61), { statusCode: 401 });
+ await assert.rejects(authenticateAccount(database, cookieRequest, 'customer', 61), {
+  statusCode: 401, message: 'Please sign in again to continue.',
+ });
 });
 
 test('expired or concurrently revoked sessions cannot be renewed', async () => {

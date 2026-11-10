@@ -207,6 +207,7 @@
      const form = new FormData(); form.append('selfie', await exportPhoto(), 'selfie.jpg'); form.append('idFront', front); if (back) form.append('idBack', back); form.append('consent', 'true');
      const result = await request('provider', '/api/provider/profile-photo', { method: 'POST', body: form });
      if (dialog.open) dialog.close(); await loadStatus(); statusNotice(result.message);
+     options.onSubmitted?.(result);
     } catch (error) { notice(error.message, true); }
     finally { busy = false; event.target.disabled = false; const retake = body.querySelector('[data-retake]'); if (retake) retake.disabled = false; }
    };
@@ -218,6 +219,7 @@
  }
  async function loadStatus() {
   if (pageRole !== 'provider' || !document.querySelector('#sn-photo-status')) return;
+  if (!user('provider')?.auth_token) return;
   try {
    const { review } = await request('provider', '/api/provider/profile-photo');
    statusNotice(review ? { pending: 'Awaiting admin review. Your existing account verification is unchanged.', approved: 'Profile photo approved.', declined: `Photo declined: ${review.reason}` }[review.status] : 'No verified profile photo yet.');
