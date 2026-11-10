@@ -77,6 +77,23 @@ function attachDashboardShell() {
   const overlay = document.getElementById('sn-overlay');
   const hamburger = document.getElementById('sn-hamburger');
   const hamburgerTop = document.getElementById('sn-hamburger-top');
+
+  if (window.location.pathname.includes('/pages/customer/categories/')) {
+    const nav = sidebar?.querySelector('.sn-nav');
+    if (nav && !nav.querySelector('#sn-logout')) {
+      nav.setAttribute('aria-label', 'Sidebar');
+      const separator = document.createElement('div');
+      separator.className = 'sn-nav-sep';
+      separator.setAttribute('role', 'separator');
+      const logout = document.createElement('button');
+      logout.className = 'sn-nav-item sn-nav-item--danger';
+      logout.id = 'sn-logout';
+      logout.type = 'button';
+      logout.innerHTML = '<span class="sn-ico"></span><span>Logout</span>';
+      nav.append(separator, logout);
+    }
+  }
+
   const logoutBtn = document.getElementById('sn-logout');
   const storageKey = 'sn.dashboard.sidebarState';
 
