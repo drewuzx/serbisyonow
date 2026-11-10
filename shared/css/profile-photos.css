@@ -1,4 +1,6 @@
 .sn-photo-avatar { position: relative; overflow: hidden; background: #fff url('/shared/images/default-profile.svg') center/cover no-repeat; }
+.sn-shell .sn-topbar .sn-avatar.sn-photo-avatar,
+.sn-shell--provider .sn-topbar .sn-avatar.sn-photo-avatar { background: #fff url('/shared/images/default-profile.svg') center/cover no-repeat; }
 .sn-topbar .sn-profile-link { display: block; flex-shrink: 0; cursor: pointer; text-decoration: none; }
 .sn-topbar .sn-profile-link:focus-visible { outline: 3px solid #2b50ce; outline-offset: 3px; }
 .sn-photo-avatar > img.sn-photo-image { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; border-radius: inherit; }

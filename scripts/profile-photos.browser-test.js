@@ -26,6 +26,9 @@ async function main() {
   await context.route('**/*', route => new URL(route.request().url()).origin === f.base ? route.continue() : route.fulfill({ body: '', contentType: 'text/css' }));
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  async function assertDefaultNavbarAvatar() {
+   await page.waitForFunction(() => getComputedStyle(document.querySelector('.sn-topbar .sn-avatar')).backgroundImage.includes('default-profile.svg'));
+  }
   const file = { name: 'photo.png', mimeType: 'image/png', buffer: f.image };
   async function screenshot(name) {
    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, name);
@@ -34,6 +37,7 @@ async function main() {
    await page.screenshot({ path: path.join(os.tmpdir(), `profile-photo-${name}.png`) });
   }
   await page.goto(f.base + '/pages/customer/profile/profile.html');
+  await assertDefaultNavbarAvatar();
   await page.locator('#sn-photo-open').click();
   await page.locator('dialog input[type=file]').setInputFiles(file);
   await page.locator('dialog [data-save]:not([disabled])').waitFor();
@@ -52,6 +56,7 @@ async function main() {
   await screenshot('customer-saved');
 
   await page.goto(f.base + '/pages/provider/profile/profile.html');
+  await assertDefaultNavbarAvatar();
   await page.locator('#sn-photo-open').click();
   await page.locator('[data-front]').setInputFiles(file);
   await page.locator('[data-next]').click();
