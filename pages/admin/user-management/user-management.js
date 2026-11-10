@@ -3,6 +3,8 @@
 const AUTH_API_BASE = (window.SN_API_BASE || window.SN?.utils?.apiBase?.() || ((window.location.protocol === 'file:' || window.location.port === '5500') ? `http://${window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname}:3000` : window.location.origin));
 let allUsers = [];
 let declineResolver = null;
+let selectedSearchUser = null;
+let activeSuggestionIndex = -1;
 
 function getStatus(user) {
   if (user.verification_status) return user.verification_status;
@@ -144,12 +146,93 @@ function applyFilters() {
     if (status === 'verified' && rowStatus !== 'verified') return false;
     if (status === 'rejected' && rowStatus !== 'rejected') return false;
     if (role !== 'all' && rowRole !== role) return false;
+    if (selectedSearchUser && `${rowRole}:${user.id}` !== selectedSearchUser) return false;
     if (!query) return true;
     const haystack = `${rowRole} ${user.full_name || ''} ${user.email || ''} ${user.contact || ''} ${getAccountDetail(user)}`.toLowerCase();
     return haystack.includes(query);
   });
 
   renderRows(filtered);
+}
+
+function renderSearchSuggestions() {
+  const input = document.getElementById('search-input');
+  const list = document.getElementById('search-suggestions');
+  if (!input || !list) return;
+  const query = input.value.trim().toLowerCase();
+  const shouldShow = query.length > 0 && !selectedSearchUser;
+  list.replaceChildren();
+  activeSuggestionIndex = -1;
+  if (!shouldShow) {
+    list.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    return;
+  }
+
+  const status = document.getElementById('status-filter')?.value || 'pending';
+  const role = document.getElementById('role-filter')?.value || 'all';
+  const matches = allUsers.filter((user) => {
+    const rowStatus = getStatus(user);
+    const rowRole = getRole(user);
+    if (status !== 'all' && rowStatus !== status) return false;
+    if (role !== 'all' && rowRole !== role) return false;
+    const values = [user.full_name, user.email, user.contact, user.category, user.service, getRoleLabel(user)];
+    return values.some((value) => String(value || '').toLowerCase().includes(query));
+  }).sort((a, b) => {
+    const aName = String(a.full_name || '').toLowerCase();
+    const bName = String(b.full_name || '').toLowerCase();
+    const aStarts = aName.startsWith(query) ? 0 : 1;
+    const bStarts = bName.startsWith(query) ? 0 : 1;
+    return aStarts - bStarts || aName.localeCompare(bName);
+  }).slice(0, 6);
+
+  if (!matches.length) {
+    const empty = document.createElement('div');
+    empty.className = 'user-search-empty';
+    empty.textContent = 'No matching accounts';
+    list.appendChild(empty);
+  } else {
+    matches.forEach((user, index) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'user-search-option';
+      option.role = 'option';
+      option.id = `user-search-option-${index}`;
+      option.dataset.userKey = `${getRole(user)}:${user.id}`;
+      option.setAttribute('aria-selected', 'false');
+      const primary = document.createElement('span');
+      primary.className = 'user-search-primary';
+      primary.textContent = user.full_name || 'Unnamed account';
+      const secondary = document.createElement('span');
+      secondary.className = 'user-search-secondary';
+      secondary.textContent = `${getRoleLabel(user)} | ${user.email || user.contact || 'No contact details'}`;
+      option.append(primary, secondary);
+      option.addEventListener('pointerdown', (event) => event.preventDefault());
+      option.addEventListener('click', () => {
+        input.value = user.full_name || user.email || '';
+        selectedSearchUser = option.dataset.userKey;
+        list.hidden = true;
+        input.setAttribute('aria-expanded', 'false');
+        applyFilters();
+      });
+      list.appendChild(option);
+    });
+  }
+  list.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function moveSearchSuggestion(direction) {
+  const list = document.getElementById('search-suggestions');
+  const options = [...(list?.querySelectorAll('.user-search-option') || [])];
+  if (!options.length) return false;
+  activeSuggestionIndex = (activeSuggestionIndex + direction + options.length) % options.length;
+  options.forEach((option, index) => {
+    option.setAttribute('aria-selected', String(index === activeSuggestionIndex));
+    if (index === activeSuggestionIndex) document.getElementById('search-input')?.setAttribute('aria-activedescendant', option.id);
+    if (index === activeSuggestionIndex) option.scrollIntoView({ block: 'nearest' });
+  });
+  return true;
 }
 
 function closeDeclineModal(result) {
@@ -243,9 +326,33 @@ document.addEventListener('DOMContentLoaded', () => {
     return loadUsers({ background: true });
   });
 
-  searchInput?.addEventListener('input', applyFilters);
-  statusFilter?.addEventListener('change', applyFilters);
-  roleFilter?.addEventListener('change', applyFilters);
+  searchInput?.addEventListener('input', () => {
+    selectedSearchUser = null;
+    applyFilters();
+    renderSearchSuggestions();
+  });
+  searchInput?.addEventListener('focus', renderSearchSuggestions);
+  searchInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' && moveSearchSuggestion(1)) event.preventDefault();
+    else if (event.key === 'ArrowUp' && moveSearchSuggestion(-1)) event.preventDefault();
+    else if (event.key === 'Enter') {
+      const active = document.querySelector('#search-suggestions .user-search-option[aria-selected="true"]');
+      if (active) { event.preventDefault(); active.click(); }
+      else document.getElementById('search-suggestions').hidden = true;
+    } else if (event.key === 'Escape') {
+      document.getElementById('search-suggestions').hidden = true;
+      searchInput.setAttribute('aria-expanded', 'false');
+      searchInput.removeAttribute('aria-activedescendant');
+    }
+  });
+  statusFilter?.addEventListener('change', () => { applyFilters(); renderSearchSuggestions(); });
+  roleFilter?.addEventListener('change', () => { applyFilters(); renderSearchSuggestions(); });
+  document.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.user-search')) return;
+    const list = document.getElementById('search-suggestions');
+    if (list) list.hidden = true;
+    searchInput?.setAttribute('aria-expanded', 'false');
+  });
 
   tableBody?.addEventListener('click', (event) => {
     const fileButton = event.target.closest('[data-private-file]');

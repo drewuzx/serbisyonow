@@ -81,6 +81,42 @@ body {
   display: grid; grid-template-columns: 1fr minmax(160px, 210px) minmax(190px, 240px);
   gap: 10px; margin-bottom: 14px;
 }
+.user-search { position: relative; min-width: 0; }
+.user-search .form-control { height: 100%; }
+.user-search-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: 0 12px 28px rgba(25, 45, 85, 0.16);
+}
+.user-search-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.user-search-option:last-child { border-bottom: 0; }
+.user-search-option:hover,
+.user-search-option[aria-selected="true"] { background: var(--bg-hover); }
+.user-search-primary { font-weight: 700; }
+.user-search-secondary,
+.user-search-empty { color: var(--text-muted); font-size: var(--text-xs); }
+.user-search-empty { padding: 13px 14px; }
 .form-control {
   width: 100%; border: 1.5px solid var(--border);
   border-radius: var(--radius-full); /* matches landing search/tags */

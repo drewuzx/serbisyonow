@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../../../shared/css/variables.css" />
   <link rel="stylesheet" href="../admin-module.css" />
+  <link rel="stylesheet" href="./provider-verification.css?v=20261110-smart-search" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,13 +20,18 @@
   <main class="admin-wrap">
     <header class="admin-header shell"><div class="admin-brand"><p class="eyebrow">ADMIN PROVIDER VERIFICATION</p><h1>Service Provider Verification Page</h1><p>Provider credentials loaded from the database.</p></div><div class="admin-header-actions"><a class="btn btn-light" href="../user-management/user-management.html">All Users</a></div></header>
     <nav class="admin-module-nav"><a href="../dashboard/dashboard.html">Dashboard</a><a href="../user-management/user-management.html">Users</a><a class="active" href="./provider-verification.html">Provider Verification</a><a href="../categories/categories.html">Categories</a><a href="../reports/reports.html">Reports</a><a href="../feedback/feedback.html">Feedback</a></nav>
-    <section class="admin-panel"><div class="admin-panel-head"><h2>Provider Submissions</h2><span class="pill" id="provider-count">0 providers</span></div><p class="admin-form-message" id="provider-message" hidden></p><div class="admin-list" id="provider-list"></div></section>
+    <section class="admin-panel"><div class="admin-panel-head"><h2>Provider Submissions</h2><span class="pill" id="provider-count">0 providers</span></div><p class="admin-form-message" id="provider-message" hidden></p><div class="provider-search"><input id="provider-search-input" class="provider-search-input" type="search" placeholder="Search by name, email, contact, service..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="provider-search-suggestions" aria-expanded="false" /><div id="provider-search-suggestions" class="provider-search-suggestions" role="listbox" aria-label="Matching providers" hidden></div></div><div class="admin-list" id="provider-list"></div></section>
   </main>
   <script src="../admin-data.js"></script>
   <script src="./provider-details.js"></script>
   <script src="./photo-reviews.js"></script>
   <script>
     const providerMessage = document.getElementById('provider-message');
+    const providerSearchInput = document.getElementById('provider-search-input');
+    const providerSuggestions = document.getElementById('provider-search-suggestions');
+    let allProviders = [];
+    let selectedProviderId = null;
+    let activeProviderSuggestion = -1;
     let providerMutationPending = false;
 
     function providerActions(provider) {
@@ -79,11 +85,8 @@
       providerMessage.hidden = !text;
     }
 
-    function loadProviders(options) {
-      return adminGet('/api/admin/providers?status=all').then(({ providers }) => {
-        if (!adminDataChanged('providers', providers, options)) return;
-        document.getElementById('provider-count').textContent = `${providers.length} providers`;
-        document.getElementById('provider-list').innerHTML = (providers.length ? providers : [{ full_name: 'No provider registrations yet', category: '-', service: '-', verification_status: 'pending' }]).map(provider => `
+    function renderProviderList(providers) {
+      document.getElementById('provider-list').innerHTML = (providers.length ? providers : [{ full_name: allProviders.length ? 'No providers match this search' : 'No provider registrations yet', category: '-', service: '-', verification_status: 'pending' }]).map(provider => `
         ${(() => { const status = adminVerificationStatus(provider.verification_status); return `
         <div class="admin-list-item">
           <div class="admin-provider-main">
@@ -103,6 +106,91 @@
         </div>
         `; })()}
         `).join('');
+    }
+
+    function applyProviderSearch() {
+      const query = String(providerSearchInput?.value || '').trim().toLowerCase();
+      const providers = allProviders.filter(provider => {
+        if (selectedProviderId !== null && String(provider.id) !== selectedProviderId) return false;
+        if (!query) return true;
+        return [provider.full_name, provider.email, provider.contact, provider.category, provider.service,
+          provider.experience_years, provider.badge_status, provider.verification_status]
+          .some(value => String(value || '').toLowerCase().includes(query));
+      });
+      document.getElementById('provider-count').textContent = `${providers.length} of ${allProviders.length} providers`;
+      renderProviderList(providers);
+    }
+
+    function renderProviderSuggestions() {
+      if (!providerSearchInput || !providerSuggestions) return;
+      const query = providerSearchInput.value.trim().toLowerCase();
+      providerSuggestions.replaceChildren();
+      activeProviderSuggestion = -1;
+      if (!query || selectedProviderId !== null) {
+        providerSuggestions.hidden = true;
+        providerSearchInput.setAttribute('aria-expanded', 'false');
+        providerSearchInput.removeAttribute('aria-activedescendant');
+        return;
+      }
+      const matches = allProviders.filter(provider => [provider.full_name, provider.email, provider.contact, provider.category,
+        provider.service, provider.experience_years, provider.badge_status, provider.verification_status]
+        .some(value => String(value || '').toLowerCase().includes(query)))
+        .sort((a, b) => Number(!String(a.full_name || '').toLowerCase().startsWith(query)) - Number(!String(b.full_name || '').toLowerCase().startsWith(query)))
+        .slice(0, 6);
+      if (!matches.length) {
+        const empty = document.createElement('div');
+        empty.className = 'provider-search-empty';
+        empty.textContent = 'No matching providers';
+        providerSuggestions.appendChild(empty);
+      } else matches.forEach((provider, index) => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'provider-search-option';
+        option.id = `provider-search-option-${index}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', 'false');
+        const name = document.createElement('span');
+        name.className = 'provider-search-name';
+        name.textContent = provider.full_name || 'Unnamed provider';
+        const details = document.createElement('span');
+        details.className = 'provider-search-details';
+        details.textContent = [provider.email, provider.contact, provider.service || adminCategoryLabel(provider.category), adminVerificationStatus(provider.verification_status).label].filter(Boolean).join(' | ');
+        option.append(name, details);
+        option.addEventListener('pointerdown', event => event.preventDefault());
+        option.addEventListener('click', () => {
+          providerSearchInput.value = provider.full_name || provider.email || '';
+          selectedProviderId = String(provider.id);
+          providerSuggestions.hidden = true;
+          providerSearchInput.setAttribute('aria-expanded', 'false');
+          applyProviderSearch();
+        });
+        providerSuggestions.appendChild(option);
+      });
+      providerSuggestions.hidden = false;
+      providerSearchInput.setAttribute('aria-expanded', 'true');
+    }
+
+    function moveProviderSuggestion(direction) {
+      const options = [...providerSuggestions.querySelectorAll('.provider-search-option')];
+      if (!options.length) return false;
+      activeProviderSuggestion = (activeProviderSuggestion + direction + options.length) % options.length;
+      options.forEach((option, index) => {
+        const active = index === activeProviderSuggestion;
+        option.setAttribute('aria-selected', String(active));
+        if (active) {
+          providerSearchInput.setAttribute('aria-activedescendant', option.id);
+          option.scrollIntoView({ block: 'nearest' });
+        }
+      });
+      return true;
+    }
+
+    function loadProviders(options) {
+      return adminGet('/api/admin/providers?status=all').then(({ providers }) => {
+        if (!adminDataChanged('providers', providers, options)) return;
+        allProviders = Array.isArray(providers) ? providers : [];
+        applyProviderSearch();
+        renderProviderSuggestions();
       });
     }
 
@@ -134,6 +222,31 @@
 
     loadProviders().catch(error => {
       document.getElementById('provider-list').innerHTML = `<div class="admin-list-item"><strong>${adminEscape(error.message)}</strong></div>`;
+    });
+    providerSearchInput.addEventListener('input', () => {
+      selectedProviderId = null;
+      applyProviderSearch();
+      renderProviderSuggestions();
+    });
+    providerSearchInput.addEventListener('focus', renderProviderSuggestions);
+    providerSearchInput.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' && moveProviderSuggestion(1)) event.preventDefault();
+      else if (event.key === 'ArrowUp' && moveProviderSuggestion(-1)) event.preventDefault();
+      else if (event.key === 'Enter') {
+        const active = providerSuggestions.querySelector('.provider-search-option[aria-selected="true"]');
+        if (active) { event.preventDefault(); active.click(); }
+        else providerSuggestions.hidden = true;
+      } else if (event.key === 'Escape') {
+        providerSuggestions.hidden = true;
+        providerSearchInput.setAttribute('aria-expanded', 'false');
+        providerSearchInput.removeAttribute('aria-activedescendant');
+      }
+    });
+    document.addEventListener('pointerdown', event => {
+      if (event.target.closest('.provider-search')) return;
+      providerSuggestions.hidden = true;
+      providerSearchInput.setAttribute('aria-expanded', 'false');
+      providerSearchInput.removeAttribute('aria-activedescendant');
     });
     adminLive('providers', loadProviders);
   </script>

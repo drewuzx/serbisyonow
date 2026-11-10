@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../../shared/css/variables.css" />
   <link rel="stylesheet" href="../../../shared/css/modals.css" />
   <link rel="stylesheet" href="../admin-module.css" />
-  <link rel="stylesheet" href="./user-management.css" />
+  <link rel="stylesheet" href="./user-management.css?v=20261110-smart-search" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -66,7 +66,10 @@
       </div>
 
       <div class="admin-controls">
-        <input id="search-input" type="search" class="form-control" placeholder="Search by name, email, contact..." />
+        <div class="user-search">
+          <input id="search-input" type="search" class="form-control" placeholder="Search by name, email, contact..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="search-suggestions" aria-expanded="false" />
+          <div id="search-suggestions" class="user-search-suggestions" role="listbox" aria-label="Matching user accounts" hidden></div>
+        </div>
         <select id="status-filter" class="form-control" aria-label="Account status">
           <option value="pending">Pending</option>
           <option value="verified">Verified</option>
@@ -118,7 +121,7 @@
 
   <script src="../../../shared/js/app.js"></script>
   <script src="../admin-data.js"></script>
-  <script src="user-management.js"></script>
+  <script src="user-management.js?v=20261110-smart-search"></script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>
 </html>
