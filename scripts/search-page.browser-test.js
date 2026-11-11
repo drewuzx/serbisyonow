@@ -25,6 +25,18 @@ async function main() {
   const input=page.locator('#sn-page-search');
   const results=page.locator('#sn-results-list');
   await expect(results).toContainText('Drew Wu');
+  await page.getByRole('button',{name:/^Basic Verified/}).click();
+  await expect(results).toContainText('Drew Wu');
+  await expect(page.locator('#sn-results-count')).toHaveText('1 Basic Verified provider found');
+  await expect(page.locator('#sn-map-canvas .sn-map-marker--provider')).toHaveCount(1);
+  await page.getByRole('button',{name:/^Skilled Verified/}).click();
+  await expect(results).toContainText('No available services or providers match');
+  await expect(page.locator('#sn-results-count')).toHaveText('0 Skilled Verified providers found');
+  await expect(page.locator('#sn-map-canvas .sn-map-marker--provider')).toHaveCount(0);
+  await page.getByRole('button',{name:/^Top-Rated/}).click();
+  await expect(page.locator('#sn-results-count')).toHaveText('0 Top-Rated providers found');
+  await page.getByRole('button',{name:/^Recommended/}).click();
+  await expect(results).toContainText('Drew Wu');
   await input.pressSequentially('Drew Wu',{delay:40});
   await expect(input).toHaveValue('Drew Wu');
   await expect(results).toContainText('Drew Wu');

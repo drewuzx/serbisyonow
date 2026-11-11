@@ -173,16 +173,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       text: 'Based on nearest location match.',
     },
     top: {
-      title: 'Top-Rated',
-      text: 'Based on assessment, supporting documents, and ratings.',
+      title: 'Basic Verified',
+      text: 'Shows only providers with a Basic Verified badge.',
     },
     highest: {
-      title: 'Highest Verified',
-      text: 'Based on assessment and supporting documents.',
+      title: 'Skilled Verified',
+      text: 'Shows only providers with a Skilled Verified badge.',
     },
     basic: {
-      title: 'Basic Verified',
-      text: 'Based on assessment and supporting documents.',
+      title: 'Top-Rated',
+      text: 'Shows only providers with a Top-Rated badge.',
     },
     available: {
       title: 'Available First',
@@ -195,6 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentCategory = initialFilters.get('category') || '';
   let currentLocationQuery = initialFilters.get('location') || currentCustomer.address || '';
   let availableOnly = ['true', '1', 'yes', 'available'].includes(String(initialFilters.get('available') || '').toLowerCase());
+  const selectedBadgeTier = () => ({ top: 'basic', highest: 'skilled', basic: 'top' }[currentSort] || '');
   let deviceCoords = null;
   let searchMap = null;
   let searchMapLayer = null;
@@ -374,9 +375,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <span>Sort Results</span>
         <select id="sn-filter-sort">
           <option value="recommended">Recommended</option>
-          <option value="top">Top-Rated</option>
-          <option value="highest">Highest Verified</option>
           <option value="basic">Basic Verified</option>
+          <option value="highest">Skilled Verified</option>
+          <option value="top">Top-Rated</option>
           <option value="available">Available First</option>
         </select>
       </label>
@@ -441,6 +442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         q: currentQuery,
         category: currentCategory,
         sort: currentSort,
+        badge: selectedBadgeTier(),
         available: String(availableOnly),
         customerId: currentCustomer.id,
         location: currentLocationQuery,
@@ -474,6 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       category: currentCategory,
       location: currentLocationQuery,
       sort: currentSort,
+      badge: selectedBadgeTier(),
       available: String(availableOnly),
     });
     if (deviceCoords) {
@@ -790,7 +793,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderProviders(providers) {
     if (countEl) {
-      countEl.textContent = `${providers.length} provider${providers.length === 1 ? '' : 's'} found`;
+      const tierName = selectedBadgeTier() ? sortLabels[currentSort].title : '';
+      countEl.textContent = `${providers.length} ${tierName ? `${tierName} ` : ''}provider${providers.length === 1 ? '' : 's'} found`;
     }
 
     if (!providers.length) {

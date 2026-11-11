@@ -2579,6 +2579,8 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
   const q = String(req.query.q || '').trim().toLowerCase();
   const category = String(req.query.category || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'recommended').trim().toLowerCase();
+  const badgeTier = ['basic', 'skilled', 'top'].includes(String(req.query.badge || '').trim().toLowerCase())
+    ? String(req.query.badge).trim().toLowerCase() : '';
   const availableOnly = ['true', '1', 'yes', 'available'].includes(String(req.query.available || '').toLowerCase());
   const params = [];
   const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
@@ -2630,10 +2632,12 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
     ) extract_score ON TRUE
     WHERE ${where.join(' AND ')}
     GROUP BY p.id, psa.score, extract_score.score
-    LIMIT 40
+    LIMIT ${badgeTier ? 300 : 40}
   `, params);
 
-  const providers = (await loadProviderBadgeData(db, result.rows)).filter(isCustomerDiscoverableProvider).map((row) => {
+  const providers = (await loadProviderBadgeData(db, result.rows))
+    .filter(row => isCustomerDiscoverableProvider(row) && (!badgeTier || row.verified_tier === badgeTier))
+    .map((row) => {
     const point = geoPointFromRow(row);
     const distance = distanceKm(customerPoint, point);
     const sameArea = String(row.address || '').toLowerCase().split(/\W+/)
@@ -3172,6 +3176,8 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
   const q = String(req.query.q || '').trim();
   const category = String(req.query.category || '').trim();
   const sort = String(req.query.sort || 'recommended');
+  const badgeTier = ['basic', 'skilled', 'top'].includes(String(req.query.badge || '').trim().toLowerCase())
+    ? String(req.query.badge).trim().toLowerCase() : '';
   const availableOnly = ['true', '1', 'yes', 'available'].includes(String(req.query.available || '').toLowerCase());
   const customerId = req.query.customerId || null;
 
@@ -3285,7 +3291,8 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
     ${['top', 'highest', 'basic'].includes(sort) ? '' : 'LIMIT 30'}
   `, params);
 
-  const providerRows = (await loadProviderBadgeData(db, result.rows)).filter(isCustomerDiscoverableProvider);
+  const providerRows = (await loadProviderBadgeData(db, result.rows))
+    .filter(row => isCustomerDiscoverableProvider(row) && (!badgeTier || row.verified_tier === badgeTier));
   if (['top', 'highest', 'basic'].includes(sort)) {
     const rank = row => sort === 'basic' ? Number(row.verified_tier === 'basic') : sort === 'highest' ? row.badge_details.total_points : ({ top: 3, skilled: 2, basic: 1 }[row.verified_tier] || 0);
     providerRows.sort((a, b) => rank(b) - rank(a) || b.badge_details.total_points - a.badge_details.total_points || Number(b.rating) - Number(a.rating) || b.completed_jobs - a.completed_jobs);
