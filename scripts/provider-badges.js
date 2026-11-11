@@ -3,9 +3,18 @@
 const { assessmentQuestionBanks, fallbackQuestionBank } = require('../shared/js/providerAssessmentBank');
 const { fail } = require('./booking-payments');
 
-const RULES = Object.freeze({ assessment_weight: 70, credentials_weight: 20, ratings_weight: 10, passing_assessment: 60, basic_points: 60, skilled_points: 80, top_points: 90, top_completed_services: 5, top_reviews: 5, top_average_rating: 4.5 });
+const RULES = Object.freeze({ assessment_weight: 55, credentials_weight: 20, experience_weight: 15, ratings_weight: 10, passing_assessment: 60, basic_points: 60, skilled_points: 80, top_points: 90, top_completed_services: 5, top_reviews: 5, top_average_rating: 4.5 });
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 const round = value => Math.floor((value + 1e-9) * 100) / 100;
+
+function experiencePoints(value) {
+  const years = String(value || '').trim().toLowerCase();
+  if (/^2\s*[-–]\s*3\b/.test(years)) return 10;
+  const parsedYears = Number(years.match(/\d+(?:\.\d+)?/)?.[0] || 0);
+  if (/3\s*years?\s*(and\s*)?(higher|more|above|over|\+)/.test(years) || parsedYears >= 3) return 15;
+  if (parsedYears >= 2) return 10;
+  return 5;
+}
 
 function providerBadge(data = {}) {
   const score = Math.max(0, Math.min(100, number(data.assessment_score)));
@@ -17,8 +26,10 @@ function providerBadge(data = {}) {
   const average = reviews ? Math.max(0, Math.min(5, number(data.rating))) : null;
   const assessmentPoints = score * RULES.assessment_weight / 100;
   const credentialPoints = documentsApproved ? RULES.credentials_weight : 0;
+  const experienceScore = experiencePoints(data.experience_years);
+  const experienceBadgePoints = experienceScore;
   const ratingPoints = average === null ? 0 : average / 5 * RULES.ratings_weight;
-  const total = assessmentPoints + credentialPoints + ratingPoints;
+  const total = assessmentPoints + credentialPoints + experienceBadgePoints + ratingPoints;
   const requirements = [
     { key: 'assessment', label: 'Assessment score of at least 60%', met: score >= RULES.passing_assessment },
     { key: 'verification', label: 'Admin verification approved', met: verified },
@@ -36,6 +47,7 @@ function providerBadge(data = {}) {
   return {
     badge, tier: badge === 'Top-Rated' ? 'top' : badge === 'Skilled Verified' ? 'skilled' : badge === 'Basic Verified' ? 'basic' : 'unqualified',
     total_points: round(total), assessment_score: score, assessment_points: round(assessmentPoints), credential_points: credentialPoints,
+    experience_years: data.experience_years || '', experience_score: experienceScore, experience_points: experienceBadgePoints,
     rating_points: round(ratingPoints), admin_verified: verified, document_count: documents, documents_approved: documentsApproved,
     review_count: reviews, completed_jobs: completed, average_rating: average === null ? null : round(average),
     top_rated_requirements: requirements, rules: RULES,
@@ -46,7 +58,7 @@ async function loadProviderBadgeData(db, rows) {
   const ids = [...new Set(rows.map(row => Number(row.id)).filter(Number.isSafeInteger))];
   if (!ids.length) return rows;
   const result = await db.query(`
-    SELECT p.id, p.is_verified, p.verification_status, p.documents_files,
+    SELECT p.id, p.is_verified, p.verification_status, p.documents_files, p.experience_years,
       COALESCE(a.score, NULLIF(substring(p.experience FROM 'Assessment score: ([0-9]{1,3})%'), '')::int, 0) AS assessment_score,
       a.created_at AS assessed_at, jobs.completed_jobs, reviews.review_count, reviews.rating
     FROM providers p
@@ -69,7 +81,7 @@ async function loadProviderBadgeData(db, rows) {
   return rows.map(row => {
     const data = { ...row, ...stats.get(Number(row.id)) };
     const details = providerBadge(data);
-    return { ...row, assessment_score: details.assessment_score, badge_status: details.badge, verified_tier: details.tier,
+    return { ...row, experience_years: data.experience_years || '', assessment_score: details.assessment_score, badge_status: details.badge, verified_tier: details.tier,
       badge_details: details, rating: details.average_rating, review_count: details.review_count, completed_jobs: details.completed_jobs,
       assessed_at: data.assessed_at || null };
   });

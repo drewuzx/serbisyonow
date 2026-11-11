@@ -9,28 +9,34 @@ const { issueSession } = require('./account-sessions');
 
 const verified = { is_verified: true, verification_status: 'verified', documents_files: ['certificate.pdf'], assessment_score: 100, rating: null, review_count: 0, completed_jobs: 0 };
 
-test('70/20/10 breakdown: new providers cannot get Top-Rated', () => {
+test('55/20/15/10 breakdown awards experience points by reported years', () => {
   const badge = providerBadge(verified);
-  assert.equal(badge.assessment_points, 70);
+  assert.equal(badge.assessment_points, 55);
   assert.equal(badge.credential_points, 20);
+  assert.equal(badge.experience_points, 5);
   assert.equal(badge.rating_points, 0);
-  assert.equal(badge.total_points, 90);
+  assert.equal(badge.total_points, 80);
   assert.equal(badge.badge, 'Skilled Verified');
   assert.equal(badge.average_rating, null);
   assert.equal(providerBadge({ ...verified, experience_years: '50 years' }).badge, 'Skilled Verified');
-  assert.equal(providerBadge({ ...verified, assessment_score: 60 }).badge, 'Basic Verified');
-  assert.equal(providerBadge({ ...verified, assessment_score: 80 }).total_points, 76);
-  assert.equal(providerBadge({ ...verified, documents_files: [] }).total_points, 70);
+  assert.equal(providerBadge({ ...verified, experience_years: '1 year below' }).experience_points, 5);
+  assert.equal(providerBadge({ ...verified, experience_years: '2-3 years' }).experience_points, 10);
+  assert.equal(providerBadge({ ...verified, experience_years: '3 years and higher' }).experience_points, 15);
+  assert.equal(providerBadge({ ...verified, assessment_score: 60 }).badge, 'Not Yet Qualified');
+  assert.equal(providerBadge({ ...verified, assessment_score: 80 }).total_points, 69);
+  assert.equal(providerBadge({ ...verified, documents_files: [] }).total_points, 60);
+  const maxScore = providerBadge({ ...verified, experience_years: '3 years and higher', review_count: 5, completed_jobs: 5, rating: 5 });
+  assert.equal(maxScore.total_points, 100);
 });
 
 test('Top-Rated requires every gate and uses unrounded thresholds', () => {
-  const top = { ...verified, review_count: 5, completed_jobs: 5, rating: 4.5 };
+  const top = { ...verified, experience_years: '3 years and higher', review_count: 5, completed_jobs: 5, rating: 4.5 };
   assert.equal(providerBadge(top).badge, 'Top-Rated');
-  for (const override of [{ review_count: 4 }, { completed_jobs: 4 }, { rating: 4.49 }, { assessment_score: 85 }, { documents_files: [] }]) {
+  for (const override of [{ review_count: 4 }, { completed_jobs: 4 }, { rating: 4.49 }, { assessment_score: 80 }, { documents_files: [] }]) {
     assert.notEqual(providerBadge({ ...top, ...override }).badge, 'Top-Rated');
   }
-  const borderline = providerBadge({ ...top, assessment_score: 87, rating: 4.549 });
-  assert.equal(borderline.total_points, 89.99);
+  const borderline = providerBadge({ ...top, assessment_score: 82, rating: 4.549 });
+  assert.equal(borderline.total_points, 89.19);
   assert.notEqual(borderline.badge, 'Top-Rated');
   assert.equal(providerBadge({ ...top, assessment_score: 50 }).badge, 'Needs Reassessment');
   assert.equal(providerBadge({ ...top, is_verified: false, verification_status: 'pending' }).badge, 'Pending Verification');
