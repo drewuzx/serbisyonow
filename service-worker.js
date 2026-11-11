@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VERSION = 'serbisyonow-pwa-v103';
+const SW_VERSION = 'serbisyonow-pwa-v104';
 const APP_SHELL_CACHE = `${SW_VERSION}-app-shell`;
 const RUNTIME_CACHE = `${SW_VERSION}-runtime`;
 
@@ -55,6 +55,8 @@ const APP_SHELL_URLS = [
   '/shared/js/outdoorPricing.js',
   '/shared/js/direct-payments.js',
   '/shared/js/pwa-register.js',
+  '/shared/js/analytics-motion.js',
+  '/shared/css/analytics-motion.css',
   '/shared/js/resetPassword.js',
   '/pages/admin/admin-data.js',
   '/pages/admin/admin-module.css',

@@ -1,0 +1,33 @@
+.sn-provider-chart-bars .sn-bar,
+.report-bar-button > span {
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 650ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.admin-chart-fill,
+.sn-chart-fill {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 650ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.sn-provider-chart-bars .sn-bar.sn-motion-ready,
+.report-bar-button > span.sn-motion-ready {
+  transform: scaleY(1);
+}
+
+.admin-chart-fill.sn-motion-ready,
+.sn-chart-fill.sn-motion-ready {
+  transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sn-provider-chart-bars .sn-bar,
+  .report-bar-button > span,
+  .admin-chart-fill,
+  .sn-chart-fill {
+    transform: none;
+    transition: none;
+  }
+}

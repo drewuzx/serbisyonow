@@ -1,6 +1,9 @@
 'use strict';
 
 (function registerSerbisyoNowPwa() {
+  const analyticsMotion = document.createElement('script');
+  analyticsMotion.src = '/shared/js/analytics-motion.js';
+  document.head.appendChild(analyticsMotion);
   const interactions = document.createElement('script');
   interactions.src = '/shared/js/interactions.js';
   document.head.appendChild(interactions);
