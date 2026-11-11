@@ -22,9 +22,16 @@ test('55/20/15/10 breakdown awards experience points by reported years', () => {
   assert.equal(providerBadge({ ...verified, experience_years: '1 year below' }).experience_points, 5);
   assert.equal(providerBadge({ ...verified, experience_years: '2-3 years' }).experience_points, 10);
   assert.equal(providerBadge({ ...verified, experience_years: '3 years and higher' }).experience_points, 15);
-  assert.equal(providerBadge({ ...verified, assessment_score: 60 }).badge, 'Not Yet Qualified');
+  assert.equal(providerBadge({ ...verified, assessment_score: 60 }).badge, 'Basic Verified');
+  assert.equal(providerBadge({ ...verified, assessment_score: 50, rating: 5, review_count: 5 }).rating_points, 0);
+  assert.equal(providerBadge({ ...verified, is_verified: false, verification_status: 'pending', rating: 5, review_count: 5 }).rating_points, 0);
+  assert.equal(providerBadge({ ...verified, rating: 5, review_count: 5 }).rating_points, 10);
   assert.equal(providerBadge({ ...verified, assessment_score: 80 }).total_points, 69);
   assert.equal(providerBadge({ ...verified, documents_files: [] }).total_points, 60);
+  const nearThreshold = providerBadge({ ...verified, assessment_score: 80, documents_files: [] });
+  assert.equal(nearThreshold.total_points, 49);
+  assert.equal(nearThreshold.badge, 'Not Yet Qualified');
+  assert.equal(providerBadge({ ...verified, assessment_score: 82, documents_files: [] }).badge, 'Basic Verified');
   const maxScore = providerBadge({ ...verified, experience_years: '3 years and higher', review_count: 5, completed_jobs: 5, rating: 5 });
   assert.equal(maxScore.total_points, 100);
 });

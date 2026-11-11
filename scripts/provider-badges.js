@@ -3,7 +3,7 @@
 const { assessmentQuestionBanks, fallbackQuestionBank } = require('../shared/js/providerAssessmentBank');
 const { fail } = require('./booking-payments');
 
-const RULES = Object.freeze({ assessment_weight: 55, credentials_weight: 20, experience_weight: 15, ratings_weight: 10, passing_assessment: 60, basic_points: 60, skilled_points: 80, top_points: 90, top_completed_services: 5, top_reviews: 5, top_average_rating: 4.5 });
+const RULES = Object.freeze({ assessment_weight: 55, credentials_weight: 20, experience_weight: 15, ratings_weight: 10, passing_assessment: 60, basic_points: 50, skilled_points: 80, top_points: 90, top_completed_services: 5, top_reviews: 5, top_average_rating: 4.5 });
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 const round = value => Math.floor((value + 1e-9) * 100) / 100;
 
@@ -28,7 +28,8 @@ function providerBadge(data = {}) {
   const credentialPoints = documentsApproved ? RULES.credentials_weight : 0;
   const experienceScore = experiencePoints(data.experience_years);
   const experienceBadgePoints = experienceScore;
-  const ratingPoints = average === null ? 0 : average / 5 * RULES.ratings_weight;
+  const ratingsEligible = verified && score >= RULES.passing_assessment;
+  const ratingPoints = average === null || !ratingsEligible ? 0 : average / 5 * RULES.ratings_weight;
   const total = assessmentPoints + credentialPoints + experienceBadgePoints + ratingPoints;
   const requirements = [
     { key: 'assessment', label: 'Assessment score of at least 60%', met: score >= RULES.passing_assessment },
@@ -48,7 +49,7 @@ function providerBadge(data = {}) {
     badge, tier: badge === 'Top-Rated' ? 'top' : badge === 'Skilled Verified' ? 'skilled' : badge === 'Basic Verified' ? 'basic' : 'unqualified',
     total_points: round(total), assessment_score: score, assessment_points: round(assessmentPoints), credential_points: credentialPoints,
     experience_years: data.experience_years || '', experience_score: experienceScore, experience_points: experienceBadgePoints,
-    rating_points: round(ratingPoints), admin_verified: verified, document_count: documents, documents_approved: documentsApproved,
+    rating_points: round(ratingPoints), ratings_eligible: ratingsEligible, admin_verified: verified, document_count: documents, documents_approved: documentsApproved,
     review_count: reviews, completed_jobs: completed, average_rating: average === null ? null : round(average),
     top_rated_requirements: requirements, rules: RULES,
   };
