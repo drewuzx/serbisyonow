@@ -943,12 +943,12 @@ function requestUploadedFiles(req) {
   return Object.values(req.files || {}).flat().filter(Boolean);
 }
 
-async function persistUploadedFile(file, owner = {}) {
+async function persistUploadedFile(file, owner = {}, queryable = db) {
   const folder = uploadedFileFolder(file);
   if (!UPLOAD_FOLDERS.has(folder) || !file?.filename || !file?.path) return;
 
   const content = await fs.promises.readFile(file.path);
-  await db.query(`
+  await queryable.query(`
     INSERT INTO uploaded_files
       (folder, filename, original_name, mime_type, size_bytes, content, owner_role, owner_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -972,10 +972,10 @@ async function persistUploadedFile(file, owner = {}) {
   ]);
 }
 
-async function persistRequestUploads(req, owner = {}) {
+async function persistRequestUploads(req, owner = {}, queryable = db) {
   const files = requestUploadedFiles(req);
   if (!files.length) return;
-  await Promise.all(files.map((file) => persistUploadedFile(file, owner)));
+  await Promise.all(files.map((file) => persistUploadedFile(file, owner, queryable)));
 }
 
 function parseObjectField(value, fallback = {}) {
@@ -3526,9 +3526,9 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
     SET is_available = FALSE
     WHERE provider_id = $1 AND available_date = $2 AND start_time = $3
   `, [req.body.provider_id, req.body.scheduled_date, req.body.scheduled_time]);
+  await persistRequestUploads(req, { role: 'booking', id: inserted.rows[0].id }, client);
   return inserted;
   });
-  await persistRequestUploads(req, { role: 'booking', id: result.rows[0].id });
 
   res.status(201).json({ booking: customerBookingRow(result.rows[0]) });
 }));
