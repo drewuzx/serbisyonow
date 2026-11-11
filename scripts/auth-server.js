@@ -1190,6 +1190,23 @@ async function providerViews(rows) {
   }));
 }
 
+function isCustomerDiscoverableProvider(provider) {
+  return provider.is_verified === true
+    && provider.verification_status === 'verified'
+    && provider.verified_tier !== 'unqualified';
+}
+
+async function customerProviderViews(rows) {
+  return (await providerViews(rows)).filter(isCustomerDiscoverableProvider);
+}
+
+async function isCustomerDiscoverableProviderId(providerId) {
+  const result = await db.query('SELECT * FROM providers WHERE id = $1', [providerId]);
+  if (!result.rowCount) return false;
+  const [provider] = await loadProviderBadgeData(db, result.rows);
+  return isCustomerDiscoverableProvider(provider);
+}
+
 async function providerView(row) {
   return (await providerViews([row]))[0];
 }
@@ -1781,7 +1798,7 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
     LIMIT $2
   `, [customerId, limit]);
 
-  return (await loadProviderBadgeData(db, result.rows)).map((row) => ({
+  return (await loadProviderBadgeData(db, result.rows)).filter(isCustomerDiscoverableProvider).map((row) => ({
     ...providerRow(row),
     rating: row.rating,
     completed_jobs: Number(row.completed_jobs || 0),
@@ -2470,12 +2487,9 @@ app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
   const [customer, categories, providers, bookings, messages, favorites, reviews, recommendations] = await Promise.all([
     db.query('SELECT * FROM customers WHERE id = $1', [customerId]),
     db.query(`
-      SELECT c.*, COUNT(p.id)::int AS provider_count
+      SELECT c.*
       FROM service_categories c
-      LEFT JOIN providers p ON lower(p.category) = lower(c.name)
-        AND (lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)
       WHERE c.is_active = TRUE
-      GROUP BY c.id
       ORDER BY c.name ASC
     `),
     db.query(`
@@ -2522,14 +2536,19 @@ app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
     getCollaborativeRecommendations(customerId, 8),
   ]);
 
+  const customerProviders = await customerProviderViews(providers.rows);
+  const visibleCategories = categories.rows.map(row => ({
+    ...categoryRow(row),
+    provider_count: customerProviders.filter(provider => canonicalCategoryName(provider.category).toLowerCase() === canonicalCategoryName(row.name).toLowerCase()).length,
+  }));
   res.json({
     customer: customerRow(customer.rows[0]),
-    categories: categories.rows.map(categoryRow),
-    providers: await providerViews(providers.rows),
+    categories: visibleCategories,
+    providers: customerProviders,
     recommendations,
     bookings: bookings.rows.map(customerBookingRow),
     messages: messages.rows.map(customerMessageRow),
-    favorites: await providerViews(favorites.rows),
+    favorites: await customerProviderViews(favorites.rows),
     reviews: reviews.rows.map(customerReviewRow),
   });
 }));
@@ -2614,7 +2633,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
     LIMIT 40
   `, params);
 
-  const providers = (await loadProviderBadgeData(db, result.rows)).map((row) => {
+  const providers = (await loadProviderBadgeData(db, result.rows)).filter(isCustomerDiscoverableProvider).map((row) => {
     const point = geoPointFromRow(row);
     const distance = distanceKm(customerPoint, point);
     const sameArea = String(row.address || '').toLowerCase().split(/\W+/)
@@ -3266,7 +3285,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
     ${['top', 'highest', 'basic'].includes(sort) ? '' : 'LIMIT 30'}
   `, params);
 
-  const providerRows = await loadProviderBadgeData(db, result.rows);
+  const providerRows = (await loadProviderBadgeData(db, result.rows)).filter(isCustomerDiscoverableProvider);
   if (['top', 'highest', 'basic'].includes(sort)) {
     const rank = row => sort === 'basic' ? Number(row.verified_tier === 'basic') : sort === 'highest' ? row.badge_details.total_points : ({ top: 3, skilled: 2, basic: 1 }[row.verified_tier] || 0);
     providerRows.sort((a, b) => rank(b) - rank(a) || b.badge_details.total_points - a.badge_details.total_points || Number(b.rating) - Number(a.rating) || b.completed_jobs - a.completed_jobs);
@@ -3308,6 +3327,7 @@ app.get('/api/customer/search/providers', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
+  if (!await isCustomerDiscoverableProviderId(req.params.id)) return res.json({ availability: [] });
   await ensureRepeats(db,req.params.id,req.query.date || undefined);
   const date = String(req.query.date || '').trim();
   const params = [req.params.id];
@@ -3343,6 +3363,9 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
 ]), asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'customer', req.params.id);
   requireFields(req.body, ['provider_id', 'service', 'scheduled_date', 'scheduled_time', 'address']);
+  if (!await isCustomerDiscoverableProviderId(req.body.provider_id)) {
+    return res.status(403).json({ message: 'This provider is not yet qualified to accept customer bookings.' });
+  }
   if (scheduleTime.minutes(req.body.scheduled_time) === null) paymentFail(400,'Choose a valid booking time.');
   const latitude = bookingCoordinate(req.body.latitude, 90);
   const longitude = bookingCoordinate(req.body.longitude, 180);
@@ -3504,6 +3527,7 @@ app.post('/api/customer/:id/bookings', bookingUpload.fields([
 }));
 
 app.get('/api/providers/:id/services', asyncRoute(async (req, res) => {
+  if (!await isCustomerDiscoverableProviderId(req.params.id)) return res.json({ services: [] });
   const result = await db.query(`
     SELECT s.* FROM provider_services s
     JOIN providers p ON p.id = s.provider_id

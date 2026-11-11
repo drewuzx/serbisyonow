@@ -34,6 +34,8 @@ async function startQrFixture({ gateway, promotionChannel, returnBase = 'http://
   for (const id of [81, 82]) await db.query(`INSERT INTO providers (id, full_name, address, gender, contact, dob, email, password_hash, category, service,
    experience, experience_years, experience_certification, is_verified, verification_status)
    VALUES ($1, 'QR Test Provider', 'Test address', 'Female', '09123456789', '2000-01-01', $2, 'fixture', 'Cleaning Services', 'General House Cleaning', '', '1', '', TRUE, 'verified')`, [id, `provider${id}@fixture.invalid`]);
+  await db.query(`INSERT INTO provider_skill_assessments (provider_id, category, score, badge)
+   VALUES (81, 'Cleaning', 100, 'Basic Verified'), (82, 'Cleaning', 100, 'Basic Verified')`);
   const customerToken = await issueSession(db, 'customer', 61);
   const otherCustomerToken = await issueSession(db, 'customer', 62);
   const providerToken = await issueSession(db, 'provider', 81);
