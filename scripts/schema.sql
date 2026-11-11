@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
   mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
   size_bytes INTEGER NOT NULL DEFAULT 0,
   content BYTEA NOT NULL,
-  owner_role TEXT CHECK (owner_role IN ('customer', 'provider')),
+  owner_role TEXT CHECK (owner_role IN ('customer', 'provider', 'booking')),
   owner_id INTEGER,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

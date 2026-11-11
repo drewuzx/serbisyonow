@@ -56,6 +56,9 @@ ALTER TABLE providers
 ALTER TABLE uploaded_files DROP CONSTRAINT IF EXISTS uploaded_files_folder_check;
 ALTER TABLE uploaded_files ADD CONSTRAINT uploaded_files_folder_check
   CHECK (folder IN ('customer-ids', 'provider-docs', 'booking-media', 'provider-payment-qrs'));
+ALTER TABLE uploaded_files DROP CONSTRAINT IF EXISTS uploaded_files_owner_role_check;
+ALTER TABLE uploaded_files ADD CONSTRAINT uploaded_files_owner_role_check
+  CHECK (owner_role IN ('customer', 'provider', 'booking'));
 
 -- Do not change the recipient of an already-started gateway payment.
 ALTER TABLE customer_bookings
