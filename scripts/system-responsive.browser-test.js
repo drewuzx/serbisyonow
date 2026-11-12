@@ -97,6 +97,21 @@ async function main() {
    assert.ok(chat.x>=0&&chat.y>=0&&chat.x+chat.width<=640&&chat.y+chat.height<=360,'chat fits short landscape screens');
    await check(`${route}-landscape-chat`,640);
   }
+  const landingContext=await browser.newContext({serviceWorkers:'block'});
+  await landingContext.route('**/*',r=>new URL(r.request().url()).origin===f.base?r.continue():r.fulfill({body:'',contentType:'text/css'}));
+  const landingPage=await landingContext.newPage();
+  await landingPage.setViewportSize({width:390,height:844});
+  await landingPage.goto(`${f.base}/pages/landing/index.html`);
+  await landingPage.locator('.service-cat-card[data-category="cleaning"]').click();
+  assert.match(landingPage.url(),/\/pages\/landing\/index\.html$/,'choosing a service category stays on the landing page');
+  const cleaningTag=landingPage.locator('#landing-service-tags .service-tag').first();
+  const selectedService=(await cleaningTag.textContent()).trim();
+  await cleaningTag.click();
+  assert.match(landingPage.url(),/\/pages\/landing\/index\.html$/,'choosing a service stays on the landing page');
+  assert.equal(await cleaningTag.getAttribute('aria-pressed'),'true','selected service is accessible');
+  assert.equal(await landingPage.locator('#landing-find-providers').count(),0,'service browsing has no extra Find Providers button');
+  assert.equal((await landingPage.locator('#landing-service-tags .service-tag.active').textContent()).trim(),selectedService,'selected service remains visible');
+  await landingContext.close();
   console.log(JSON.stringify({views:results.length,issues:results.filter(r=>r.issues.length).length,errors}));
   if(!baseline) {
    assert.deepEqual(errors,[]);

@@ -201,7 +201,8 @@
   font-size: 2rem;
 }
 
-.active-indicator {
+.service-cat-card.active::after {
+  content: "";
   position: absolute; bottom: -2px;
   left: 50%; transform: translateX(-50%);
   width: 40px; height: 3px;
@@ -216,6 +217,8 @@
 }
 
 .service-tag {
+  appearance: none;
+  font-family: var(--font-body);
   padding: 8px 18px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-full);

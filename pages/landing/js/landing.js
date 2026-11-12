@@ -1,6 +1,5 @@
 'use strict';
 
-const SERVICE_LOGIN_URL = '../auth/loginChoice.html?from=service';
 const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
 
 const landingServicesByCategory = {
@@ -99,29 +98,21 @@ function redirectToLoginWithSearch({ query = '', category = '', from = 'search' 
   window.location.href = `../auth/loginChoice.html?${params}`;
 }
 
-function redirectToServiceLogin() {
-  window.location.href = SERVICE_LOGIN_URL;
-}
-
-function serviceLoginUrl(service) {
-  const params = new URLSearchParams({ from: 'service' });
-  if (service) params.set('q', service);
-  return `../auth/loginChoice.html?${params}`;
-}
-
 function renderLandingServiceTags(category) {
   const tags = document.getElementById('landing-service-tags');
   if (!tags) return;
 
   const services = landingServicesByCategory[category] || landingServicesByCategory.repairServices;
   tags.innerHTML = services.map((service, index) => (
-    `<a class="service-tag${index === 0 ? ' active' : ''}" href="${serviceLoginUrl(service)}">${service}</a>`
+    `<button class="service-tag${index === 0 ? ' active' : ''}" type="button" aria-pressed="${index === 0}">${service}</button>`
   )).join('');
-
   tags.querySelectorAll('.service-tag').forEach(tag => {
-    tag.addEventListener('click', event => {
-      event.preventDefault();
-      redirectToLoginWithSearch({ query: tag.textContent.trim(), from: 'service' });
+    tag.addEventListener('click', () => {
+      tags.querySelectorAll('.service-tag').forEach(item => {
+        const active = item === tag;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
     });
   });
 }
@@ -130,7 +121,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const categoryCards = document.querySelectorAll('.service-cat-card[data-category]');
   categoryCards.forEach(card => {
     card.addEventListener('click', () => {
-      redirectToServiceLogin();
+      categoryCards.forEach(item => {
+        const active = item === card;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+      renderLandingServiceTags(card.dataset.category);
+    });
+  });
+
+  document.querySelectorAll('[data-select-category]').forEach(link => {
+    link.addEventListener('click', () => {
+      const card = document.querySelector(`.service-cat-card[data-category="${CSS.escape(link.dataset.selectCategory)}"]`);
+      card?.click();
     });
   });
 
@@ -148,4 +151,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   renderLandingServiceTags(document.querySelector('.service-cat-card.active')?.dataset.category || 'repairServices');
+  categoryCards.forEach(card => card.setAttribute('aria-pressed', String(card.classList.contains('active'))));
 });
