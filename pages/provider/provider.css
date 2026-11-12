@@ -667,6 +667,26 @@ body {
   min-width: 0;
 }
 .sn-provider-requests-page .sn-booking-request-side .sn-status-pill { margin-right: auto; }
+.sn-provider-requests-page .sn-request-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.sn-provider-requests-page .sn-request-actions > :is(button, span) { min-width: 0; }
+.sn-provider-requests-page .sn-request-actions--pending > [data-review-payment] { grid-column: 1; }
+.sn-provider-requests-page .sn-request-actions--pending > [data-status="cancelled"] { grid-column: 2; }
+.sn-provider-requests-page .sn-request-actions--upcoming > [data-review-payment] { grid-column: 1; }
+.sn-provider-requests-page .sn-request-actions--upcoming > [data-start-service] { grid-column: 1; }
+.sn-provider-requests-page .sn-request-actions--upcoming.has-payment > [data-start-service] { grid-column: 2; }
+.sn-provider-requests-page .sn-request-actions--upcoming > [data-status="cancelled"] { grid-column: 1; }
+.sn-provider-requests-page .sn-request-actions--upcoming > [data-live-tracking] { grid-column: 2; }
+.sn-provider-requests-page .sn-request-actions--ongoing > * { grid-column: span 2; }
+.sn-provider-requests-page .sn-request-actions--ongoing > [data-live-tracking] { grid-column: 1 / -1; }
+.sn-provider-requests-page .sn-request-actions .btn { width: 100%; white-space: normal; }
+.sn-provider-requests-page .sn-request-actions--pending:has(> [data-review-payment]) > [data-confirm-price],
+.sn-provider-requests-page .sn-request-actions--pending:has(> [data-review-payment]) > [data-status="upcoming"] { grid-column: 1 / -1; }
+.sn-provider-requests-page .sn-start-service-hint { grid-column: 1 / -1; margin: 0; }
 .sn-provider-requests-page .sn-booking-assessment { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; padding: 12px 0 0; }
 .sn-provider-requests-page .sn-booking-assessment-head { flex-wrap: wrap; }
 .sn-provider-requests-page .sn-booking-assessment li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
