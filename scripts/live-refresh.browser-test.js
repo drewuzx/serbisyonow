@@ -213,6 +213,16 @@ function fixture() {
       assert.match(await page.locator('.sn-page-grid').textContent(), /Fresh feedback/);
     });
     await scenario('provider/history/history.html', '.sn-history-item', async (page, data, tick) => {
+      await page.locator('#sn-provider-history-filter-toggle').click();
+      assert.equal(await page.locator('#sn-provider-history-filter-panel').isVisible(), true);
+      await page.locator('#sn-provider-history-tabs [data-filter="cancelled"]').click();
+      assert.equal(await page.locator('.sn-history-item').count(), 1, 'provider status filter narrows the history');
+      await page.locator('#sn-provider-history-search').fill('Customer');
+      await page.locator('#sn-provider-history-suggestions [role="option"]').first().waitFor();
+      await page.locator('#sn-provider-history-suggestions [role="option"]').first().click();
+      assert.equal(await page.locator('#sn-provider-history-search').inputValue(), 'Customer Test');
+      assert.equal(await page.locator('.sn-history-item').count(), 1, 'choosing a customer suggestion narrows results');
+      await page.locator('#sn-provider-history-tabs [data-filter="all"]').click();
       await page.locator('#sn-provider-history-search').fill('House');
       await page.locator('[data-history-id="2"]').click();
       data.bookings.push({ ...booking, id: 4 }); await tick();

@@ -2702,15 +2702,18 @@ function renderHistory(bookings) {
         </div>
         <div class="sn-history-search-row">
           <div class="sn-history-search-wrap">
-            <input class="sn-history-search" id="sn-provider-history-search" type="search" placeholder="Search history..." />
+            <input class="sn-history-search" id="sn-provider-history-search" type="search" placeholder="Search history..." role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sn-provider-history-suggestions" autocomplete="off" />
+            <div class="sn-history-suggestions" id="sn-provider-history-suggestions" role="listbox" aria-label="Service history suggestions" hidden></div>
           </div>
-          <button class="sn-history-filter-btn" type="button" title="Filter history"></button>
+          <button class="sn-history-filter-btn" id="sn-provider-history-filter-toggle" type="button" title="Show filters" aria-label="Show filters" aria-expanded="false" aria-controls="sn-provider-history-filter-panel"></button>
         </div>
-        <div class="sn-filter-tabs" id="sn-provider-history-tabs">
-          <button class="sn-filter-tab active" type="button" data-filter="all">All</button>
-          <button class="sn-filter-tab" type="button" data-filter="completed">Completed</button>
-          <button class="sn-filter-tab" type="button" data-filter="cancelled">Cancelled</button>
-          <button class="sn-filter-tab" type="button" data-filter="ongoing">Ongoing</button>
+        <div class="sn-history-filter-panel" id="sn-provider-history-filter-panel" hidden>
+          <div class="sn-filter-tabs" id="sn-provider-history-tabs">
+            <button class="sn-filter-tab active" type="button" data-filter="all">All</button>
+            <button class="sn-filter-tab" type="button" data-filter="completed">Completed</button>
+            <button class="sn-filter-tab" type="button" data-filter="cancelled">Cancelled</button>
+            <button class="sn-filter-tab" type="button" data-filter="ongoing">Ongoing</button>
+          </div>
         </div>
         <div class="sn-history-list" id="sn-provider-history-list">
           ${normalizedBookings.map((booking, index) => renderProviderHistoryItem(booking, index === 0)).join('') || '<p class="sn-history-empty">No service history yet.</p>'}
@@ -2727,9 +2730,55 @@ function renderHistory(bookings) {
   const list = panel.querySelector('#sn-provider-history-list');
   const detail = panel.querySelector('#sn-provider-history-detail');
   const search = panel.querySelector('#sn-provider-history-search');
+  const suggestions = panel.querySelector('#sn-provider-history-suggestions');
+  const filterToggle = panel.querySelector('#sn-provider-history-filter-toggle');
+  const filterPanel = panel.querySelector('#sn-provider-history-filter-panel');
   const tabs = panel.querySelectorAll('#sn-provider-history-tabs .sn-filter-tab');
   let activeFilter = 'all';
   let selectedId = selected?.id;
+  let activeSuggestion = -1;
+
+  function renderSuggestions() {
+    const query = search?.value.trim().toLowerCase() || '';
+    const matches = new Map();
+    if (query) normalizedBookings.forEach(booking => {
+      const status = String(booking.status || '').toLowerCase();
+      const activeStatuses = ['ongoing', 'upcoming', 'pending', 'accepted'];
+      const matchesFilter = activeFilter === 'all' || status === activeFilter || (activeFilter === 'ongoing' && activeStatuses.includes(status));
+      if (!matchesFilter) return;
+      for (const [kind, value] of [['Customer', booking.customer_name], ['Service', booking.service], ['Location', booking.address], ['Status', status]]) {
+        const label = String(value || '').trim();
+        const key = label.toLowerCase();
+        if (label && key.includes(query) && key !== query && !matches.has(key)) matches.set(key, { kind, label });
+      }
+    });
+    const rows = [...matches.values()].slice(0, 6);
+    suggestions.innerHTML = rows.map(({ kind, label }, index) => `
+      <button class="sn-history-suggestion" id="sn-provider-history-suggestion-${index}" type="button" role="option" aria-selected="false" data-history-suggestion="${esc(label)}">
+        <span>${esc(label)}</span><span>${kind}</span>
+      </button>
+    `).join('');
+    suggestions.hidden = rows.length === 0;
+    search.setAttribute('aria-expanded', String(!suggestions.hidden));
+    search.removeAttribute('aria-activedescendant');
+    activeSuggestion = -1;
+  }
+
+  function chooseSuggestion(value) {
+    search.value = value;
+    suggestions.hidden = true;
+    search.setAttribute('aria-expanded', 'false');
+    search.removeAttribute('aria-activedescendant');
+    renderList();
+    search.focus();
+  }
+
+  function updateFilterButton() {
+    const active = activeFilter !== 'all';
+    filterToggle.dataset.active = String(active);
+    filterToggle.title = filterPanel.hidden ? (active ? 'Filters active' : 'Show filters') : 'Hide filters';
+    filterToggle.setAttribute('aria-label', filterToggle.title);
+  }
 
   function visibleBookings() {
     const query = search?.value.trim().toLowerCase() || '';
@@ -2761,7 +2810,42 @@ function renderHistory(bookings) {
     list.querySelectorAll('.sn-history-item').forEach((button) => button.classList.toggle('active', button === item));
     detail.innerHTML = renderProviderHistoryDetail(booking);
   });
-  search?.addEventListener('input', renderList);
+  search?.addEventListener('input', () => { renderSuggestions(); renderList(); });
+  search?.addEventListener('keydown', event => {
+    const options = [...suggestions.querySelectorAll('[role="option"]')];
+    if (event.key === 'ArrowDown' && options.length) {
+      event.preventDefault(); activeSuggestion = (activeSuggestion + 1) % options.length;
+    } else if (event.key === 'ArrowUp' && options.length) {
+      event.preventDefault(); activeSuggestion = (activeSuggestion - 1 + options.length) % options.length;
+    } else if (event.key === 'Enter' && activeSuggestion >= 0 && options[activeSuggestion]) {
+      event.preventDefault(); chooseSuggestion(options[activeSuggestion].dataset.historySuggestion); return;
+    } else if (event.key === 'Escape' && !suggestions.hidden) {
+      event.stopPropagation(); suggestions.hidden = true; search.setAttribute('aria-expanded', 'false'); search.removeAttribute('aria-activedescendant'); return;
+    } else return;
+    options.forEach((option, index) => option.setAttribute('aria-selected', String(index === activeSuggestion)));
+    search.setAttribute('aria-activedescendant', `sn-provider-history-suggestion-${activeSuggestion}`);
+  });
+  suggestions?.addEventListener('click', event => {
+    const option = event.target.closest('[data-history-suggestion]');
+    if (option) chooseSuggestion(option.dataset.historySuggestion);
+  });
+  document.addEventListener('click', event => {
+    if (event.target.closest('.sn-provider-history-layout .sn-history-search-wrap') || suggestions.hidden) return;
+    suggestions.hidden = true; search.setAttribute('aria-expanded', 'false'); search.removeAttribute('aria-activedescendant');
+  });
+  filterToggle?.addEventListener('click', () => {
+    const open = filterPanel.hidden;
+    filterPanel.hidden = !open;
+    filterToggle.setAttribute('aria-expanded', String(open));
+    updateFilterButton();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || filterPanel.hidden) return;
+    filterPanel.hidden = true;
+    filterToggle.setAttribute('aria-expanded', 'false');
+    updateFilterButton();
+    filterToggle.focus();
+  });
   detail?.addEventListener('click', event => {
     const button = event.target.closest('[data-history-payment]');
     if (!button) return;
@@ -2773,6 +2857,7 @@ function renderHistory(bookings) {
       tabs.forEach((item) => item.classList.remove('active'));
       tab.classList.add('active');
       activeFilter = tab.dataset.filter || 'all';
+      updateFilterButton();
       renderList();
     });
   });
