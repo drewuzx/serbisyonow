@@ -70,6 +70,16 @@
   };
   return { dialog, body: dialog.querySelector('.sn-photo-body'), notice };
  }
+ function confirmPhotoRemoval() {
+  const { dialog, body } = modal('Remove Profile Photo?');
+  body.innerHTML = `<p>Your current profile photo will be removed. You can add a new photo later.</p><div class="sn-photo-actions"><button class="sn-photo-button secondary" data-keep type="button">Keep Photo</button><button class="sn-photo-button sn-photo-button--danger" data-confirm-remove type="button">Remove Photo</button></div>`;
+  return new Promise(resolve => {
+   let confirmed = false;
+   body.querySelector('[data-keep]').onclick = () => dialog.close();
+   body.querySelector('[data-confirm-remove]').onclick = () => { confirmed = true; dialog.close(); };
+   dialog.addEventListener('close', () => resolve(confirmed), { once: true });
+  });
+ }
  async function decode(file) {
   if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP image.');
   if (file.size > 5 * 1024 * 1024) throw new Error('Each image must be 5 MB or smaller.');
@@ -109,7 +119,7 @@
   };
   async function persist(removing) {
    if (busy) return;
-   if (removing && !window.confirm('Remove your profile photo?')) return;
+   if (removing && !await confirmPhotoRemoval()) return;
    busy = true; save.disabled = remove.disabled = true; notice('Saving...');
    try {
     let form;

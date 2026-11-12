@@ -18,6 +18,7 @@
 .sn-photo-dialog p { font-size: 14px; line-height: 1.6; color: #52647c; overflow-wrap: anywhere; }
 .sn-photo-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 44px; padding: 10px 18px; border: 1px solid #2b50ce; border-radius: 8px; background: #2b50ce; color: white; font: 600 15px 'Poppins', sans-serif; cursor: pointer; text-decoration: none; }
 .sn-photo-button.secondary { background: #fff; color: #2b50ce; }
+.sn-photo-button.sn-photo-button--danger { background: #b42318; border-color: #b42318; color: #fff; }
 .sn-photo-button:disabled { opacity: .55; cursor: not-allowed; }
 .sn-photo-button:focus-visible { outline: 3px solid #aac5ff; outline-offset: 3px; }
 .sn-photo-button img { width: 18px; height: 18px; }

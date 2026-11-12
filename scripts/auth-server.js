@@ -3639,6 +3639,7 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
 
   if (providerRecord.is_verified !== true || providerRecord.verification_status !== 'verified') {
     return res.json({
+      server_time: new Date().toISOString(),
       provider: providerData,
       metrics: { badge_status: computedBadge },
       services: [],
@@ -3657,6 +3658,7 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
   }
 
   res.json({
+    server_time: new Date().toISOString(),
     provider: providerData,
     metrics: {
       rating: providerData.rating,

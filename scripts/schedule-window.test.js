@@ -14,5 +14,6 @@ test('Manila schedule rules keep availability and service starts within their ti
  assert.equal(scheduleWindow.canStartService(booking, new Date('2026-11-12T09:34:00.000Z')), false);
  assert.equal(scheduleWindow.canStartService(booking, now), true);
  assert.equal(scheduleWindow.canStartService({ ...booking, scheduled_date: '2026-11-13' }, now), false);
+ assert.equal(scheduleWindow.canStartService({ ...booking, scheduled_date: '2026-11-14' }, now), false);
  assert.equal(scheduleWindow.startServiceMessage(booking), 'Service can start on 2026-11-12 at 5:35 PM (Manila time).');
 });

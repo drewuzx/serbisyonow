@@ -46,12 +46,18 @@ let providerRequestsGpsRefreshStarted = false;
 let providerRequestsGpsInFlight = false;
 let providerNotificationRefreshActive = false;
 let providerDatabaseVersion = 0;
+let providerServerClockOffsetMs = null;
 const providerLiveSignatures = new Map();
 let lastProviderGpsPayload = { at: 0, lat: null, lng: null };
 let lastProviderRouteKey = '';
 const providerBookingActions = new Set();
 const providerProfileActions = new Set();
 const providerRequestsState = { bookings: [], provider: null, filter: 'active', notice: '', noticeType: 'info', signature: '' };
+
+function providerCanStartService(booking) {
+  if (providerServerClockOffsetMs === null) return false;
+  return SNScheduleWindow.canStartService(booking, new Date(Date.now() + providerServerClockOffsetMs));
+}
 let providerStartServiceTimer;
 let providerScheduleClockTimer;
 
@@ -751,6 +757,8 @@ async function loadProviderDatabase({ background = false } = {}) {
     if (version !== providerDatabaseVersion) return false;
     if (background && providerProfileActions.size) return false;
     if (String(getProviderUser()?.id || '') !== String(provider.id)) return false;
+    const serverTime = Date.parse(data.server_time);
+    if (Number.isFinite(serverTime)) providerServerClockOffsetMs = serverTime - Date.now();
     const refreshedProvider = data.provider || provider;
     const approved = refreshedProvider.is_verified === true && refreshedProvider.verification_status === 'verified';
     const pathNow = window.location.pathname;
@@ -1422,10 +1430,10 @@ function renderRequests(bookings, provider) {
               ${booking.status === 'pending' ? `<div class="sn-request-actions sn-request-actions--pending">${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? `<button class="btn btn-primary btn-sm" data-review-payment>${booking.deposit_status === 'awaiting_verification' ? 'Review Payment' : 'Payment Details'}</button>` : ''}${booking.deposit_required
                 ? (!booking.customer_agreed_at && ['awaiting_price', 'awaiting_payment'].includes(booking.deposit_status) ? `<button class="btn btn-success btn-sm" data-confirm-price>${booking.confirmed_price == null ? 'Confirm Price' : 'Edit Price'}</button>` : '')
                 : '<button class="btn btn-success btn-sm" data-status="upcoming">Accept</button>'}<button class="btn btn-neutral btn-sm" data-status="cancelled">Decline</button></div>` : ''}
-              ${booking.status === 'upcoming' ? `<div class="sn-request-actions sn-request-actions--upcoming${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? ' has-payment' : ''}">${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? `<button class="btn btn-primary btn-sm" data-review-payment>${booking.deposit_status === 'awaiting_verification' ? 'Review Payment' : 'Payment Details'}</button>` : ''}${SNScheduleWindow.canStartService(booking)
+              ${booking.status === 'upcoming' ? `<div class="sn-request-actions sn-request-actions--upcoming${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? ' has-payment' : ''}">${booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id ? `<button class="btn btn-primary btn-sm" data-review-payment>${booking.deposit_status === 'awaiting_verification' ? 'Review Payment' : 'Payment Details'}</button>` : ''}${providerCanStartService(booking)
                 ? '<button class="btn btn-success btn-sm" data-start-service data-status="ongoing">Start Service</button>'
-                : `<button class="btn btn-success btn-sm" data-start-service data-status="ongoing" disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}">Start Service</button>`}<button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button><button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false" ${SNScheduleWindow.canStartService(booking) ? '' : `disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}"`}>On the way</button></div>${!SNScheduleWindow.canStartService(booking) ? `<p class="sn-start-service-hint">${esc(SNScheduleWindow.startServiceMessage(booking))}</p>` : ''}` : ''}
-              ${booking.status === 'ongoing' ? `<div class="sn-request-actions sn-request-actions--ongoing">${booking.full_payment_received_at ? '<span class="sn-full-payment-confirmed" role="status">Full payment confirmed</span>' : '<button class="btn btn-outline btn-sm" data-full-payment>Confirm Full Payment Received</button>'}<button class="btn btn-success btn-sm" data-status="completed" ${booking.full_payment_received_at ? '' : 'disabled title="Confirm full payment received first"'}>Mark Completed</button><button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false" ${SNScheduleWindow.canStartService(booking) ? '' : `disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}"`}>On the way</button></div>` : ''}
+                : `<button class="btn btn-success btn-sm" data-start-service data-status="ongoing" disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}">Start Service</button>`}<button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button><button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false" ${providerCanStartService(booking) ? '' : `disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}"`}>On the way</button></div>${!providerCanStartService(booking) ? `<p class="sn-start-service-hint">${esc(SNScheduleWindow.startServiceMessage(booking))}</p>` : ''}` : ''}
+              ${booking.status === 'ongoing' ? `<div class="sn-request-actions sn-request-actions--ongoing">${booking.full_payment_received_at ? '<span class="sn-full-payment-confirmed" role="status">Full payment confirmed</span>' : '<button class="btn btn-outline btn-sm" data-full-payment>Confirm Full Payment Received</button>'}<button class="btn btn-success btn-sm" data-status="completed" ${booking.full_payment_received_at ? '' : 'disabled title="Confirm full payment received first"'}>Mark Completed</button><button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false" ${providerCanStartService(booking) ? '' : `disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}"`}>On the way</button></div>` : ''}
               ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
             </div>
           </article>
@@ -1528,11 +1536,11 @@ function refreshStartServiceButtons(panel) {
   panel.querySelectorAll('[data-start-service], [data-live-tracking]').forEach(button => {
     const id = button.closest('[data-booking-card]')?.dataset.bookingCard;
     const booking = providerRequestsState.bookings.find(item => String(item.id) === String(id));
-    const canStart = SNScheduleWindow.canStartService(booking);
+    const canStart = providerCanStartService(booking);
     if (button.hasAttribute('data-start-service')) {
       button.disabled = !canStart;
       button.title = canStart ? '' : SNScheduleWindow.startServiceMessage(booking);
-      const hint = button.previousElementSibling;
+      const hint = button.closest('.sn-booking-request-card')?.querySelector('.sn-start-service-hint');
       if (hint?.classList.contains('sn-start-service-hint')) hint.hidden = canStart;
     } else {
       const sharing = button.getAttribute('aria-pressed') === 'true';
@@ -1546,7 +1554,7 @@ function restoreProviderBookingButtons(card, booking) {
   if (!card) return;
   card.removeAttribute('aria-busy');
   card.querySelectorAll('button').forEach(button => {
-    const canStart = SNScheduleWindow.canStartService(booking);
+    const canStart = providerCanStartService(booking);
     if (button.hasAttribute('data-start-service')) button.disabled = !canStart;
     else if (button.hasAttribute('data-live-tracking')) button.disabled = !canStart && button.getAttribute('aria-pressed') !== 'true';
     else if (button.dataset.status === 'completed') button.disabled = !booking.full_payment_received_at;
