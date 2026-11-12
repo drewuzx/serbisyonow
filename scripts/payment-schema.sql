@@ -96,24 +96,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS provider_direct_receipt_reference
 CREATE INDEX IF NOT EXISTS provider_direct_receipt_booking
   ON provider_direct_payment_receipts (booking_id);
 
-CREATE TABLE IF NOT EXISTS booking_refund_requests (
-  id BIGSERIAL PRIMARY KEY,
-  booking_id INTEGER NOT NULL REFERENCES customer_bookings(id) ON DELETE RESTRICT,
-  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
-  provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE RESTRICT,
-  amount_centavos BIGINT NOT NULL CHECK (amount_centavos > 0),
-  reason TEXT NOT NULL CHECK (length(reason) BETWEEN 5 AND 1000),
-  status TEXT NOT NULL DEFAULT 'pending_provider' CHECK (status IN ('pending_provider','approved','rejected','refund_sent','customer_confirmed')),
-  provider_note TEXT NOT NULL DEFAULT '',
-  refund_reference TEXT NOT NULL DEFAULT '',
-  proof_mime TEXT CHECK (proof_mime IN ('image/png','image/jpeg','image/webp')),
-  proof_content BYTEA,
-  requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  reviewed_at TIMESTAMPTZ,
-  sent_at TIMESTAMPTZ,
-  customer_confirmed_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK ((proof_content IS NULL) = (proof_mime IS NULL))
-);
-CREATE INDEX IF NOT EXISTS booking_refund_requests_booking
-  ON booking_refund_requests (booking_id, id DESC);
+-- Existing refund-request tables are retained on deployed databases for historical records.

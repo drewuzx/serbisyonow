@@ -33,7 +33,7 @@ GMAIL_API_FROM=SerbisyoNow <your-gmail@gmail.com>
 
 New bookings use [direct provider QR payments](PROVIDER_QR_PAYMENTS.md). Each provider saves their receiving QR under Profile > Downpayment Account. The customer submits payment proof, and only the assigned provider's verification confirms the schedule. PayMongo keys are not needed for this direct flow.
 
-Keep the existing [PayMongo configuration](PAYMONGO_SETUP.md) while any already-started gateway checkouts or payments remain. Those bookings retain their original payment agreement and webhook/refund-review handling. No account or booking reset is needed.
+Keep the existing [PayMongo configuration](PAYMONGO_SETUP.md) while any already-started gateway checkouts or payments remain. Those bookings retain their original payment agreement and webhook/payment-review handling. No account or booking reset is needed.
 
 ## Google OAuth
 

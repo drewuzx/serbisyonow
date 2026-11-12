@@ -174,7 +174,7 @@ test('downpayment HTTP flow: ownership, confirmed price, checkout, signed settle
   bookings[0].scheduled_time = currentTime;
   assert.equal((await request('/api/provider/81/bookings/1/status', 'PATCH', { status: 'ongoing', expected_status: 'upcoming' }, providerToken)).status, 200);
  });
- await t.test('cancellation after payment is refund review, never an automatic refund', async () => {
+ await t.test('cancellation after payment requires follow-up and is never automatically reversed', async () => {
   const result = await request('/api/customer/61/bookings/1/cancel', 'PATCH');
   assert.equal(result.status, 200);
   assert.equal(result.data.booking.status, 'cancelled');

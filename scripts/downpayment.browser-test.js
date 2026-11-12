@@ -121,12 +121,12 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
   await page.screenshot({ path: path.join(os.tmpdir(), 'downpayment-provider-paid-1440.png'), fullPage: true });
   Object.assign(booking, { status: 'cancelled', deposit_status: 'refund_review' });
   await page.goto(`${base}/pages/customer/bookings/bookings.html?pay_booking_id=1`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('status').filter({ hasText: 'refund review' }).waitFor();
+  await page.getByRole('status').filter({ hasText: 'Payment follow-up required' }).waitFor();
   assert.equal(await pay.isVisible(), false);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.sn-downpayment-modal').count(), 0);
   assert.deepEqual(errors, []);
-  console.log('Downpayment browser flow passed: provider price, customer consent, missing keys, retry, verified-only confirmation, refund review, and desktop/390/320px screenshots. All payments mocked.');
+  console.log('Downpayment browser flow passed: provider price, customer consent, missing keys, retry, verified-only confirmation, payment follow-up, and desktop/390/320px screenshots. All payments mocked.');
   await context.close();
  } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

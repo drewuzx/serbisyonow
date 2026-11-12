@@ -34,15 +34,15 @@ Enable the selected payment methods in your merchant account. Supported method i
 
 The API uses PayMongo's recommended v2 hosted checkout; secrets stay on the backend. Checkout expiry uses the v1 expire endpoint. Notifications require the original request body, an HMAC signature, matching environment and booking reference, the correct amount/currency, and a unique payment receipt.
 
-## Refunds, Balances, And Provider Settlement
+## Canceled Payments, Balances, And Provider Settlement
 
-Canceled paid bookings and late/incorrect payments are marked `refund_review`, not automatically refunded. Support must review the saved receipt and carry out any approved refund in PayMongo. An additional paid receipt for an already settled checkout also remains in the receipt ledger for review. Automatic refunds and an admin refund-management screen are not included until a cancellation policy is agreed.
+The app has no refund request, provider approval, or customer confirmation workflow. Canceled paid bookings and late/incorrect payments are marked `refund_review`; no payment is automatically reversed. Resolve these payments directly with the customer or provider under the agreed cancellation policy. An additional paid receipt for an already settled checkout remains in the receipt ledger for manual review.
 
 The remaining 70% is shown as due after service and is paid directly to the provider by the selected remaining-balance method. It is not automatically charged by this integration.
 
 Downpayments enter the platform's PayMongo merchant account. This does not automatically split payments or transfer funds to individual providers. Arrange and reconcile provider settlement separately before accepting live payments.
 
-Active checkout expiry is attempted after cancellation. If PayMongo is unavailable, the record stays `expire_pending`; retry cancellation once connectivity returns. Late paid notifications still go to refund review and never restore a canceled schedule. Unpaid pending requests retain the current slot-hold behavior; there is no automatic reservation deadline.
+Active checkout expiry is attempted after cancellation. If PayMongo is unavailable, the record stays `expire_pending`; retry cancellation once connectivity returns. Late paid notifications still go to payment review and never restore a canceled schedule. Unpaid pending requests retain the current slot-hold behavior; there is no automatic reservation deadline.
 
 ## Verification
 

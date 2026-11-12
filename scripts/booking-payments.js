@@ -129,7 +129,7 @@ async function expireCancelledCheckout(db, gateway, bookingId) {
  try {
   await gateway.expire(payment.checkout_session_id);
   await db.query("UPDATE booking_payments SET status = 'expired', updated_at = NOW() WHERE id = $1 AND status = 'expire_pending'", [payment.id]);
- } catch { /* Keep expire_pending for retry; a late payment must go to refund review. */ }
+ } catch { /* Keep expire_pending for retry; a late payment must go to manual review. */ }
 }
 async function cancelBookingPayment(client, booking) {
  if (!booking.deposit_required) return;

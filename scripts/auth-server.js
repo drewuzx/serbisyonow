@@ -21,7 +21,6 @@ const { registerBookingTracking, clearBookingTracking } = require('./booking-tra
 const { issueSession, authenticateAccount, requestSessionToken, rememberSession, revokeSession } = require('./account-sessions');
 const { createPayMongo } = require('./paymongo');
 const { bookingPaymentView, transaction, confirmBookingPrice, createBookingCheckout, settleBookingPayment, expireCancelledCheckout, cancelBookingPayment, fail: paymentFail } = require('./booking-payments');
-const { refundRequestView, createRefundRequest, reviewRefundRequest, markRefundSent, confirmRefundReceived, getRefundProof } = require('./booking-refunds');
 const paymongo = createPayMongo();
 const { qrView, saveProviderQr, prepareDirectPayment, submitDirectReceipt, directPaymentDetails, reviewDirectReceipt } = require('./provider-qr-payments');
 const { feedbackRole, feedbackState, submitSystemFeedback } = require('./system-feedback');
@@ -171,13 +170,11 @@ app.use('/api/provider/:id', asyncRoute(async (req, res, next) => {
     'PATCH /api/provider/:id/location',
   ]);
   const routeKey = `${req.method} ${req.originalUrl.split('?')[0].replace(new RegExp(`^/api/provider/${providerId}`), '/api/provider/:id')}`;
-  const isRefundAction = /^\/api\/provider\/\d+\/bookings\/\d+\/refund-requests\/(?:review|sent)$/.test(req.originalUrl.split('?')[0]);
   const verified = (await db.query(
     `SELECT is_verified, verification_status FROM providers WHERE id = $1`, [providerId]
   )).rows[0];
   if (!verified) return res.status(404).json({ message: 'Provider not found.' });
   if ((verified.is_verified !== true || verified.verification_status !== 'verified')
-      && !isRefundAction
       && !allowedBeforeVerification.has(routeKey)) {
     return res.status(403).json({
       code: 'PROVIDER_VERIFICATION_REQUIRED',
@@ -205,15 +202,6 @@ app.get('/api/payment-receipts/:receiptId/image', asyncRoute(async (req, res) =>
   res.type(receipt.mime_type).send(receipt.content);
 }));
 
-app.get('/api/booking-refunds/:refundId/proof', asyncRoute(async (req, res) => {
-  const role = req.query.role;
-  if (!['customer', 'provider'].includes(role)) paymentFail(400, 'Choose a valid account role.');
-  const actor = await authenticateAccount(db, req, role);
-  const proof = await getRefundProof(db, actor, role, req.params.refundId);
-  res.set('Cache-Control', 'private, no-store');
-  res.set('X-Content-Type-Options', 'nosniff');
-  res.type(proof.proof_mime).send(proof.proof_content);
-}));
 app.use('/uploads/booking-media', express.static(path.join(uploadDir, 'booking-media')));
 app.use('/uploads/provider-payment-qrs', express.static(path.join(uploadDir, 'provider-payment-qrs')));
 
@@ -1656,7 +1644,6 @@ function feedbackRow(row) {
 function customerBookingRow(row) {
   return {
     ...bookingPaymentView(row),
-    refund_request: refundRequestView(row.refund_request),
     id: row.id,
     customer_id: row.customer_id,
     provider_id: row.provider_id,
@@ -1878,7 +1865,6 @@ function providerBookingRow(row) {
   return {
     ...bookingPaymentView(row),
     payment_receipt: row.payment_receipt || null,
-    refund_request: refundRequestView(row.refund_request),
     id: row.id,
     customer_id: row.customer_id,
     customer_name: row.customer_name,
@@ -2723,47 +2709,14 @@ app.get('/api/customer/:id/bookings', asyncRoute(async (req, res) => {
       p.latitude AS provider_latitude,
       p.longitude AS provider_longitude,
       p.location_accuracy_m AS provider_location_accuracy_m,
-      p.location_updated_at AS provider_location_updated_at,
-      rr.refund_request
+      p.location_updated_at AS provider_location_updated_at
     FROM customer_bookings b
     LEFT JOIN providers p ON p.id = b.provider_id
-    LEFT JOIN LATERAL (
-      SELECT jsonb_build_object('id', r.id, 'amount_centavos', r.amount_centavos, 'reason', r.reason, 'status', r.status,
-        'provider_note', r.provider_note, 'refund_reference', r.refund_reference,
-        'has_proof', r.proof_content IS NOT NULL, 'requested_at', r.requested_at, 'reviewed_at', r.reviewed_at,
-        'sent_at', r.sent_at, 'customer_confirmed_at', r.customer_confirmed_at) AS refund_request
-      FROM booking_refund_requests r WHERE r.booking_id = b.id ORDER BY r.id DESC LIMIT 1
-    ) rr ON TRUE
     WHERE b.customer_id = $1
     ORDER BY b.scheduled_date DESC, b.id DESC
   `, [req.params.id]);
   res.json({ bookings: result.rows.map(customerBookingRow) });
 }));
-
-app.post('/api/customer/:id/bookings/:bookingId/refund-requests', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'customer', req.params.id);
-  const refund_request = await createRefundRequest(db, req.params.id, req.params.bookingId, req.body);
-  res.status(201).json({ refund_request });
-}));
-
-app.patch('/api/customer/:id/bookings/:bookingId/refund-requests/confirm', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'customer', req.params.id);
-  const refund_request = await confirmRefundReceived(db, req.params.id, req.params.bookingId, req.body);
-  res.json({ refund_request });
-}));
-
-app.patch('/api/provider/:providerId/bookings/:bookingId/refund-requests/review', asyncRoute(async (req, res) => {
-  await authenticateAccount(db, req, 'provider', req.params.providerId);
-  const refund_request = await reviewRefundRequest(db, req.params.providerId, req.params.bookingId, req.body);
-  res.json({ refund_request });
-}));
-
-app.post('/api/provider/:providerId/bookings/:bookingId/refund-requests/sent',
-  asyncRoute(async (req, res, next) => { await authenticateAccount(db, req, 'provider', req.params.providerId); next(); }),
-  paymentImageUpload.single('proof'), asyncRoute(async (req, res) => {
-    const refund_request = await markRefundSent(db, req.params.providerId, req.params.bookingId, req.body, req.file);
-    res.json({ refund_request });
-  }));
 
 app.patch('/api/customer/:id/bookings/:bookingId/cancel', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'customer', req.params.id);
@@ -3630,17 +3583,9 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
         c.longitude AS customer_longitude,
         c.location_accuracy_m AS customer_location_accuracy_m,
         c.location_updated_at AS customer_location_updated_at,
-        rr.refund_request,
         pr.payment_receipt
       FROM customer_bookings b
       LEFT JOIN customers c ON c.id = b.customer_id
-      LEFT JOIN LATERAL (
-        SELECT jsonb_build_object('id', r.id, 'amount_centavos', r.amount_centavos, 'reason', r.reason, 'status', r.status,
-          'provider_note', r.provider_note, 'refund_reference', r.refund_reference,
-          'has_proof', r.proof_content IS NOT NULL, 'requested_at', r.requested_at, 'reviewed_at', r.reviewed_at,
-          'sent_at', r.sent_at, 'customer_confirmed_at', r.customer_confirmed_at) AS refund_request
-        FROM booking_refund_requests r WHERE r.booking_id = b.id ORDER BY r.id DESC LIMIT 1
-      ) rr ON TRUE
       LEFT JOIN LATERAL (
         SELECT jsonb_build_object('id', r.id, 'status', r.status, 'reference_number', r.reference_number,
           'amount_centavos', r.amount_centavos, 'submitted_at', r.submitted_at, 'reviewed_at', r.reviewed_at,
@@ -3693,13 +3638,12 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
   const computedBadge = providerData.badge_status;
 
   if (providerRecord.is_verified !== true || providerRecord.verification_status !== 'verified') {
-    const refundBookings = bookingRows.filter((row) => row.status === 'cancelled' && row.refund_request);
     return res.json({
       provider: providerData,
       metrics: { badge_status: computedBadge },
       services: [],
-      bookings: refundBookings.map(providerBookingRow),
-      history_bookings: refundBookings.map(providerBookingRow),
+      bookings: [],
+      history_bookings: [],
       messages: [],
       reviews: [],
       availability: [],
@@ -4395,7 +4339,7 @@ app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError && /^\/api\/provider\/[^/]+\/credentials$/.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each credential file must be 10 MB or smaller.' : 'Upload up to 10 credentials and one file per ID side.' });
   }
-  if (error instanceof multer.MulterError && /\/(payment-qr|direct-payment\/receipt|refund-requests\/sent)$/.test(_req.path)) {
+  if (error instanceof multer.MulterError && /\/(payment-qr|direct-payment\/receipt)$/.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Payment images must be 5 MB or smaller.' : 'Upload one payment image only.' });
   }
   if (error instanceof multer.MulterError && /^\/api\/customer\/[^/]+\/bookings$/.test(_req.path)) {

@@ -24,6 +24,6 @@ Receipts are stored in PostgreSQL and served only to the booking's authenticated
 
 Already-started PayMongo checkouts and paid bookings keep their original gateway flow. Untouched pending downpayment bookings switch to provider QR. Do not remove PayMongo keys/webhook while gateway payments still exist.
 
-Provider profile QR edits do not redirect payments customers already started. New payment agreements use the current QR. Cancelled bookings cannot be verified; paid or submitted transfers require direct refund review between provider and customer. Refunds are not automatic.
+Provider profile QR edits do not redirect payments customers already started. New payment agreements use the current QR. Cancelled bookings cannot be verified. The app has no refund request or confirmation workflow; customers and providers must coordinate any payment resolution directly. Transfers are never reversed automatically.
 
 The migration in `scripts/payment-schema.sql` runs on server startup. No account reset is needed.

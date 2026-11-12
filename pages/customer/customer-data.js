@@ -583,7 +583,7 @@ function renderCustomerBooking(booking) {
   const cancelButton = canCancel
   ? `<button class="sn-btn sn-btn-danger" type="button" data-booking-action="cancel" data-booking-id="${snEsc(booking.id)}">Cancel Booking</button>`
   : '';
- const paymentLabels = { awaiting_price: 'Waiting for provider price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Receipt awaiting provider verification', paid: '30% downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Downpayment refund review' };
+ const paymentLabels = { awaiting_price: 'Waiting for provider price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Receipt awaiting provider verification', paid: '30% downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Payment follow-up required' };
  const paymentSummary = booking.deposit_required ? `<span>${snEsc(paymentLabels[booking.deposit_status] || 'Downpayment pending')}</span>${booking.confirmed_price != null ? `<span>30% downpayment: ${snMoney(booking.deposit_amount)}</span><span>70% remaining balance: ${snMoney(booking.balance_due)}</span>` : ''}${booking.deposit_livemode === false ? '<span>Test payment only</span>' : ''}` : '';
  const canReviewPayment = booking.deposit_required && ((booking.status === 'pending' && booking.deposit_status === 'awaiting_payment')
   || (booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id));

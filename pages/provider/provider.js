@@ -289,26 +289,7 @@ function providerNotificationItems(data) {
       href: providerPageHref('requests'),
     }] : [];
   });
-  const refunds = [...new Map(allBookings.filter((booking) => booking.refund_request).map((booking) => {
-    const request = booking.refund_request;
-    const statusText = {
-      pending_provider: 'requested a downpayment refund',
-      approved: 'refund request was approved',
-      rejected: 'refund request was declined',
-      refund_sent: 'refund transfer was marked sent',
-      customer_confirmed: 'confirmed the refund was received',
-    }[request.status] || 'updated a refund request';
-    const item = {
-      id: `refund-${request.id}-${request.status}`,
-      kind: 'Refund',
-      title: booking.customer_name || 'Customer refund request',
-      body: `${booking.service || 'Booking'}: ${statusText} (${providerMoney(request.amount)}).`,
-      time: request.requested_at || request.updated_at || booking.created_at,
-      href: providerPageHref('requests'),
-    };
-    return [item.id, item];
-  })).values()];
-  const activity = [...messages, ...bookings, ...refunds, ...payments]
+  const activity = [...messages, ...bookings, ...payments]
     .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
     .slice(0, verificationNotice.length ? 7 : 8);
   return [...verificationNotice, ...activity];
@@ -1338,15 +1319,12 @@ function renderProviderBookingAssessment(booking) {
 
 function renderProviderBookingPayment(booking) {
   if (!booking.deposit_required) return '';
-  const labels = { awaiting_price: 'Waiting for confirmed price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Payment receipt awaiting your review', paid: 'Downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Refund review required' };
-  const refund = booking.refund_request;
-  const refundLabels = { pending_provider: 'Customer requested a refund', approved: 'Refund approved; transfer not yet recorded', rejected: 'Refund request rejected', refund_sent: 'Refund marked sent; awaiting customer confirmation', customer_confirmed: 'Customer confirmed refund received' };
+  const labels = { awaiting_price: 'Waiting for confirmed price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Payment receipt awaiting your review', paid: 'Downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Payment follow-up required' };
   return `<section class="sn-booking-payment-summary"><strong>${esc(labels[booking.deposit_status] || 'Downpayment pending')}</strong>
     ${booking.confirmed_price != null ? `<dl><div><dt>Confirmed total</dt><dd>${providerMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment</dt><dd>${providerMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${providerMoney(booking.balance_due)}</dd></div></dl>` : ''}
     ${booking.price_notes ? `<p>${esc(booking.price_notes)}</p>` : ''}
     ${booking.deposit_livemode === false ? '<p>Test payment only. No real funds received.</p>' : ''}
-    ${booking.deposit_status === 'refund_review' ? `<p>${booking.deposit_channel === 'provider_qr' ? 'Refunds are manual. Verify the original payment and send the refund from your wallet or bank.' : 'This platform payment requires support review; do not claim a manual provider refund.'}</p>` : ''}
-    ${refund ? `<div class="sn-refund-request"><strong>${esc(refundLabels[refund.status] || refund.status)}</strong><p>Requested amount: ${providerMoney(refund.amount)}</p><p>${esc(refund.reason)}</p>${refund.provider_note ? `<p>Note: ${esc(refund.provider_note)}</p>` : ''}${refund.refund_reference ? `<p>Transfer reference: ${esc(refund.refund_reference)}</p>` : ''}${refund.status === 'pending_provider' ? '<div class="sn-actions-row"><button type="button" class="btn btn-success btn-sm" data-refund-review="approve">Approve refund</button><button type="button" class="btn btn-danger btn-sm" data-refund-review="reject">Reject</button></div>' : ''}${refund.status === 'approved' ? '<button type="button" class="btn btn-primary btn-sm" data-refund-sent>Record refund sent</button>' : ''}</div>` : ''}</section>`;
+    ${booking.deposit_status === 'refund_review' ? `<p>${booking.deposit_channel === 'provider_qr' ? 'This cancelled booking has a direct downpayment that needs follow-up with the customer.' : 'This platform payment needs support review. Do not represent it as automatically reversed.'}</p>` : ''}</section>`;
 }
 
 function showProviderPrice(booking) {
@@ -1517,14 +1495,6 @@ function renderRequests(bookings, provider) {
   panel.querySelectorAll('[data-review-payment]').forEach(button => button.addEventListener('click', () => {
     const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]').dataset.bookingId);
     if (booking) showProviderDirectPayment(booking);
-  }));
-  panel.querySelectorAll('[data-refund-review]').forEach(button => button.addEventListener('click', () => {
-    const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]')?.dataset.bookingId);
-    if (booking) showProviderRefund(booking, button.dataset.refundReview);
-  }));
-  panel.querySelectorAll('[data-refund-sent]').forEach(button => button.addEventListener('click', () => {
-    const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]')?.dataset.bookingId);
-    if (booking) showProviderRefundSent(booking);
   }));
   panel.querySelectorAll('[data-close-booking]').forEach((button) => {
     button.addEventListener('click', () => closeCompletedBooking(button.closest('[data-booking-id]')?.dataset.bookingId, button.closest('[data-booking-card]')));
@@ -2102,7 +2072,7 @@ async function performProviderBookingAction(bookingId, action) {
   card?.querySelectorAll('button').forEach(button => { button.disabled = true; });
   try {
     const confirmation = action === 'cancelled'
-      ? { title: booking.status === 'pending' ? 'Decline booking?' : 'Cancel booking?', message: `The customer will see this booking as cancelled.${booking.deposit_paid_at ? ' The paid downpayment will need refund review; it is not automatically refunded.' : ''}`, confirmText: booking.status === 'pending' ? 'Decline Booking' : 'Cancel Booking', danger: true }
+      ? { title: booking.status === 'pending' ? 'Decline booking?' : 'Cancel booking?', message: `The customer will see this booking as cancelled.${booking.deposit_paid_at ? ' Contact the customer directly to resolve the paid downpayment; no payment reversal happens automatically.' : ''}`, confirmText: booking.status === 'pending' ? 'Decline Booking' : 'Cancel Booking', danger: true }
       : action === 'completed'
         ? { title: 'Complete service?', message: 'Confirm that the service is finished. The customer will be notified.', confirmText: 'Mark Completed' }
         : action === 'archive'
@@ -3402,7 +3372,7 @@ async function showProviderDirectPayment(booking) {
     overlay.querySelector('.sn-direct-review-content').innerHTML = `<p><strong>${esc(booking.customer_name || 'Customer')}</strong> &middot; ${esc(booking.service)}</p>
       <dl class="sn-direct-payment-breakdown"><div><dt>30% downpayment</dt><dd>${providerMoney(receipt.amount)}</dd></div><div><dt>Transaction reference</dt><dd>${esc(receipt.reference_number)}</dd></div><div><dt>Receiving account</dt><dd>${esc(data.recipient?.account_name || '')} (${esc(data.recipient?.wallet || '')})</dd></div></dl>
       <img class="sn-payment-receipt-image" data-payment-receipt-image alt="Customer payment receipt" hidden /><p data-receipt-error role="alert" hidden></p>
-      ${canReview ? `<form class="sn-direct-review-form"><label class="sn-payment-consent"><input name="payment_received" type="checkbox" /><span>I checked my actual wallet or bank transactions. The reference matches and I received exactly ${providerMoney(receipt.amount)}. A screenshot alone is not proof of receipt.</span></label><label class="sn-modal-field">Review note<textarea class="sn-modal-input" name="notes" maxlength="1000"></textarea></label><div class="sn-modal-actions"><button type="button" class="btn btn-danger" data-payment-decision="reject">Reject Receipt</button><button type="button" class="btn btn-success" data-payment-decision="verify" disabled>Confirm Payment</button></div></form>` : `<p>Payment status: ${esc(receipt.status.replace(/_/g, ' '))}${receipt.review_note ? '. ' + esc(receipt.review_note) : ''}</p>${data.booking.deposit_status === 'refund_review' ? '<p>Check the transfer with the customer and arrange any refund directly. No automatic refund is issued.</p>' : ''}`}`;
+      ${canReview ? `<form class="sn-direct-review-form"><label class="sn-payment-consent"><input name="payment_received" type="checkbox" /><span>I checked my actual wallet or bank transactions. The reference matches and I received exactly ${providerMoney(receipt.amount)}. A screenshot alone is not proof of receipt.</span></label><label class="sn-modal-field">Review note<textarea class="sn-modal-input" name="notes" maxlength="1000"></textarea></label><div class="sn-modal-actions"><button type="button" class="btn btn-danger" data-payment-decision="reject">Reject Receipt</button><button type="button" class="btn btn-success" data-payment-decision="verify" disabled>Confirm Payment</button></div></form>` : `<p>Payment status: ${esc(receipt.status.replace(/_/g, ' '))}${receipt.review_note ? '. ' + esc(receipt.review_note) : ''}</p>${data.booking.deposit_status === 'refund_review' ? '<p>Contact the customer directly to resolve this cancelled payment. The app does not reverse transfers.</p>' : ''}`}`;
     releaseImage = window.snDirectPayments.loadReceiptImage(overlay, PROVIDER_API_BASE, 'provider', provider.auth_token, receipt.id);
     const form = overlay.querySelector('form');
     form?.elements.payment_received.addEventListener('change', event => { form.querySelector('[data-payment-decision="verify"]').disabled = !event.target.checked; });
@@ -3430,48 +3400,6 @@ async function showProviderDirectPayment(booking) {
     }));
   } catch (error) { message.textContent = error.message; }
   overlay.querySelector('.sn-modal-close').focus();
-}
-
-async function showProviderRefund(booking, decision) {
-  const provider = getProviderUser();
-  if (!provider?.id || !['approve', 'reject'].includes(decision) || document.querySelector('.sn-refund-dialog')) return;
-  const note = window.prompt(decision === 'reject' ? 'Reason for declining this refund request:' : 'Optional note for the customer:');
-  if (note === null) return;
-  if (decision === 'reject' && note.trim().length < 3) { window.alert('Please enter a short reason for declining the request.'); return; }
-  try {
-    const result = await providerSend(`/api/provider/${provider.id}/bookings/${booking.id}/refund-requests/review`, 'PATCH', { decision, note });
-    booking.refund_request = result.refund_request;
-    setProviderRequestsNotice(decision === 'approve' ? 'Refund request approved. Send the refund manually, then record the transfer with proof.' : 'Refund request declined.', decision === 'approve' ? 'success' : 'info');
-    renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
-  } catch (error) { window.alert(error.message); }
-}
-
-function showProviderRefundSent(booking) {
-  const provider = getProviderUser();
-  if (!provider?.id || document.querySelector('.sn-refund-sent-dialog')) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'sn-modal-backdrop sn-refund-sent-dialog';
-  overlay.innerHTML = `<form class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-refund-sent-title"><div class="sn-modal-head"><h2 id="sn-refund-sent-title">Record Refund Transfer</h2><button type="button" class="sn-modal-close" aria-label="Close">x</button></div><p>Refund amount: <strong>${providerMoney(booking.refund_request?.amount)}</strong></p><p>Send the money from your bank or e-wallet first. This form only records the transfer; it does not move funds.</p><label class="sn-modal-field">Transfer reference<input class="sn-modal-input" name="reference" required minlength="3" maxlength="160" /></label><label class="sn-modal-field">Transfer proof (PNG, JPG or WebP)<input name="proof" type="file" accept="image/png,image/jpeg,image/webp" required /></label><label class="sn-payment-consent"><input name="confirm_sent" type="checkbox" required /><span>I confirm I sent this refund to the customer.</span></label><p role="alert" hidden></p><div class="sn-modal-actions"><button class="btn btn-primary" type="submit">Submit proof</button></div></form>`;
-  document.body.appendChild(overlay);
-  const form = overlay.querySelector('form');
-  const close = () => overlay.remove();
-  overlay.querySelector('.sn-modal-close').onclick = close;
-  overlay.onclick = event => { if (event.target === overlay) close(); };
-  form.onsubmit = async event => {
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const file = form.elements.proof.files[0];
-    const alertBox = form.querySelector('[role="alert"]');
-    if (file.size > 5 * 1024 * 1024) { alertBox.textContent = 'Proof image must be 5 MB or smaller.'; alertBox.hidden = false; return; }
-    const button = form.querySelector('[type="submit"]'); button.disabled = true;
-    try {
-      const result = await providerSendForm(`/api/provider/${provider.id}/bookings/${booking.id}/refund-requests/sent`, 'POST', new FormData(form));
-      booking.refund_request = result.refund_request;
-      close();
-      setProviderRequestsNotice('Refund transfer recorded. The customer can now confirm receipt.', 'success');
-      renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
-    } catch (error) { alertBox.textContent = error.message; alertBox.hidden = false; button.disabled = false; }
-  };
 }
 
 function providerUploadUrl(folder, filename) {
