@@ -39,11 +39,14 @@ async function main() {
   browser = await chromium.launch({headless:true,channel:'msedge'});
   const context = await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block',geolocation:gps,permissions:['geolocation']});
   await context.route('**/*',r=>new URL(r.request().url()).origin===f.base ? r.continue() : r.fulfill({body:'',contentType:r.request().url().includes('fonts.googleapis.com')?'text/css':'application/javascript'}));
+  await f.db.query("UPDATE customers SET is_verified=FALSE,verification_status='pending' WHERE id=61");
   const customer = (await f.request('/api/auth/customer/session')).data.user;
   await context.addInitScript(user=>{if(!localStorage.getItem('sn_customer_user')) localStorage.setItem('sn_customer_user',JSON.stringify(user));},customer);
   const page = await context.newPage(), errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`${f.base}/pages/customer/profile/profile.html`);
+  const verificationNotice = page.locator('#sn-account-verification-notice');
+  await verificationNotice.filter({hasText:'Pending review'}).filter({hasText:'24 to 48 hours'}).waitFor();
   const button = page.locator('#sn-customer-update-location');
   await button.waitFor();
   await page.locator('#sn-edit-toggle').click();

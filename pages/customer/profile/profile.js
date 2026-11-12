@@ -43,6 +43,20 @@ function populatePage(user, { preserveDraft = false } = {}) {
  const isVerified = status === 'verified';
  const isRejected = status === 'rejected';
 
+ let verificationNotice = document.getElementById('sn-account-verification-notice');
+ if (!verificationNotice) {
+  verificationNotice = document.createElement('aside');
+  verificationNotice.id = 'sn-account-verification-notice';
+  verificationNotice.className = 'sn-account-verification-notice';
+  verificationNotice.setAttribute('role', 'status');
+  verificationNotice.setAttribute('aria-live', 'polite');
+  document.querySelector('.sn-profile-hero')?.insertAdjacentElement('afterend', verificationNotice);
+ }
+ verificationNotice.hidden = isVerified || isRejected;
+ if (!verificationNotice.hidden) {
+  verificationNotice.innerHTML = '<strong>Verification status: Pending review</strong><span>Our admin team usually completes account verification within 24 to 48 hours. We will notify you when the review is complete.</span>';
+ }
+
  // Sidebar greeting
  const sidebarName = document.getElementById('sn-user-name');
  const sidebarStatus = document.getElementById('sn-user-status');

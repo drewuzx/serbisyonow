@@ -232,12 +232,20 @@ function providerPageHref(page) {
 
 function providerNotificationItems(data) {
   const verificationStatus = data.provider?.verification_status || (data.provider?.is_verified ? 'verified' : 'pending');
+  const verificationAt = data.provider?.verification_updated_at || data.provider?.updated_at || data.provider?.id || 'account';
   const verificationNotice = verificationStatus === 'rejected' ? [{
-    id: `verification-declined-${data.provider?.updated_at || data.provider?.id || 'account'}`,
+    id: `verification-declined-${verificationAt}`,
     kind: 'Verification',
     title: 'Verification declined',
     body: 'Your provider verification was declined by the admin. Open your profile to review and resubmit your documents.',
-    time: data.provider?.updated_at,
+    time: data.provider?.verification_updated_at || data.provider?.updated_at,
+    href: providerPageHref('profile'),
+  }] : verificationStatus === 'verified' && data.provider?.verification_updated_at ? [{
+    id: `verification-approved-${data.provider.verification_updated_at}`,
+    kind: 'Verification',
+    title: 'Provider account verified',
+    body: 'Your provider account has been verified. You can now access provider workspace features.',
+    time: data.provider.verification_updated_at,
     href: providerPageHref('profile'),
   }] : [];
   const messages = (data.messages || []).filter((message) => message.sender_role === 'customer').slice(0, 5).map((message) => ({
@@ -438,11 +446,11 @@ function handleProviderNotifications(data, notify = false) {
   const key = `sn_provider_latest_notice_${provider.id}`;
   const latestKey = localStorage.getItem(key) || '';
   const newest = unseenItems[0];
-  const declinedNotice = unseenItems.find((item) => item.kind === 'Verification');
-  const declineToastKey = `sn_provider_decline_toast_${provider.id}`;
-  if (declinedNotice && localStorage.getItem(declineToastKey) !== declinedNotice.id) {
-    showProviderToast(declinedNotice);
-    localStorage.setItem(declineToastKey, declinedNotice.id);
+  const verificationNotice = unseenItems.find((item) => item.kind === 'Verification');
+  const verificationToastKey = `sn_provider_verification_toast_${provider.id}`;
+  if (verificationNotice && localStorage.getItem(verificationToastKey) !== verificationNotice.id) {
+    showProviderToast(verificationNotice);
+    localStorage.setItem(verificationToastKey, verificationNotice.id);
   }
   if (newest?.id && newest.id !== latestKey) {
     if (notify && newest.kind !== 'Verification') showProviderToast(newest);
@@ -2920,10 +2928,22 @@ async function changeProviderProfilePassword(event) {
   }
 }
 
+function providerVerificationNotice(provider) {
+  if (provider.is_verified === true && provider.verification_status === 'verified') return '';
+  if (provider.verification_status === 'rejected') {
+    return '<aside class="sn-provider-verification-notice is-declined" role="status"><strong>Verification declined</strong><span>Your account is not approved yet. Update your ID or supporting documents, then submit them for another admin review.</span><a href="#sn-provider-credentials-title">Update documents</a><a href="../assessment/assessment.html">Review skill assessment</a></aside>';
+  }
+  return '<aside class="sn-provider-verification-notice" role="status" aria-live="polite"><strong>Verification status: Pending review</strong><span>Our admin team usually completes account verification within 24 to 48 hours. We will notify you when the review is complete. Provider workspace features will be available after approval.</span><a href="../assessment/assessment.html">View skill assessment</a></aside>';
+}
+
 function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   const panel = document.querySelector('.sn-panel');
   if (!panel) return;
   if (preserveDraft && document.getElementById('sn-provider-full-name')) {
+    const existingNotice = panel.querySelector('.sn-provider-verification-notice');
+    const noticeMarkup = providerVerificationNotice(provider);
+    if (existingNotice) existingNotice.outerHTML = noticeMarkup;
+    else if (noticeMarkup) panel.insertAdjacentHTML('afterbegin', noticeMarkup);
     const fields = providerProfileFields(provider);
     for (const [id, value] of Object.entries(fields)) {
       const field = document.getElementById(`sn-provider-${id}`);
@@ -2948,10 +2968,7 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
     ? `${Number(provider.latitude).toFixed(6)}, ${Number(provider.longitude).toFixed(6)}${accuracyLabel}${updatedLabel}`
     : 'GPS location not saved yet';
   const documentLinks = renderProviderCredentialLinks(provider);
-  const verificationNotice = provider.is_verified === true && provider.verification_status === 'verified' ? ''
-    : provider.verification_status === 'rejected'
-      ? '<aside class="sn-provider-verification-notice is-declined" role="status"><strong>Verification declined</strong><span>Your account is not approved yet. Update your ID or supporting documents, then submit them for another admin review.</span><a href="#sn-provider-credentials-title">Update documents</a><a href="../assessment/assessment.html">Review skill assessment</a></aside>'
-      : '<aside class="sn-provider-verification-notice" role="status"><strong>Application under review</strong><span>Provider workspace features will be available after admin approval. You can update your profile, documents, or assessment while you wait.</span><a href="../assessment/assessment.html">View skill assessment</a></aside>';
+  const verificationNotice = providerVerificationNotice(provider);
   panel.classList.add('sn-provider-account-page');
   panel.innerHTML = `
     ${verificationNotice}

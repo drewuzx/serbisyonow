@@ -1628,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  verifyBanner.style.borderLeft = '4px solid #dc2626';
  verifyBanner.style.color = '#991b1b';
  } else {
- verifyBanner.textContent = 'Your account is pending admin verification. Actions are disabled until verified.';
+ verifyBanner.textContent = 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete. Actions are disabled until verified.';
  }
  }
  } else {

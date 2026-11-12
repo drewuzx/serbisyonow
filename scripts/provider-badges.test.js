@@ -134,6 +134,7 @@ test('live API badges are consistent, review-backed and recalculate after review
     const approved = await f.request('/api/admin/providers/81/verify', 'PATCH', {}, adminToken);
     assert.equal(approved.status, 200);
     assert.equal(approved.data.provider.badge_status, 'Top-Rated');
+    assert.ok(approved.data.provider.verification_updated_at, 'provider approval timestamp is available to drive a notification');
     const questions = assessmentQuestionBanks.Cleaning.slice(0, 10);
     const answers = questions.map(q => ({ question: q.q, answer: q.o.find(a => a !== q.a), correct: q.o.find(a => a !== q.a) }));
     assert.equal((await f.request('/api/provider/81/reassessment', 'POST', { score: 100, answers }, f.otherProviderToken)).status, 403);
@@ -147,13 +148,18 @@ test('live API badges are consistent, review-backed and recalculate after review
     const rejected = await f.request('/api/admin/providers/81/reject', 'PATCH', {}, adminToken);
     assert.equal(rejected.data.provider.badge_status, 'Verification Declined');
     assert.equal(rejected.data.provider.badge_details.credential_points, 0);
+    assert.ok(rejected.data.provider.verification_updated_at, 'provider review timestamp is available for a notification');
     const rejectedProviderDashboard = await dashboard();
     assert.equal(rejectedProviderDashboard.provider.verification_status, 'rejected');
     assert.ok(rejectedProviderDashboard.provider.updated_at, 'provider decline timestamp is available for a notification');
     const rejectedCustomer = await f.request('/api/admin/customers/61/reject', 'PATCH', {}, adminToken);
     assert.equal(rejectedCustomer.status, 200);
+    assert.ok(rejectedCustomer.data.customer.verification_updated_at, 'customer review timestamp is available for a notification');
     const rejectedCustomerDashboard = await f.request('/api/customer/61/dashboard', 'GET', undefined, f.customerToken);
     assert.equal(rejectedCustomerDashboard.data.customer.verification_status, 'rejected');
     assert.ok(rejectedCustomerDashboard.data.customer.updated_at, 'customer decline timestamp is available for a notification');
+    const approvedCustomer = await f.request('/api/admin/customers/61/verify', 'PATCH', {}, adminToken);
+    assert.equal(approvedCustomer.status, 200);
+    assert.ok(approvedCustomer.data.customer.verification_updated_at, 'customer approval timestamp is available to drive a notification');
   } finally { await f.close(); }
 });

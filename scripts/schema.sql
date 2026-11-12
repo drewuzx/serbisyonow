@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS customers (
   is_verified BOOLEAN NOT NULL DEFAULT FALSE,
   verification_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (verification_status IN ('pending', 'verified', 'rejected')),
+  verification_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS providers (
   is_verified BOOLEAN NOT NULL DEFAULT FALSE,
   verification_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (verification_status IN ('pending', 'verified', 'rejected')),
+  verification_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

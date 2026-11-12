@@ -1127,6 +1127,7 @@ function customerRow(row) {
     location_updated_at: row.location_updated_at || null,
     is_verified: row.is_verified,
     verification_status: row.verification_status,
+    verification_updated_at: row.verification_updated_at || null,
     updated_at: row.updated_at,
     created_at: row.created_at,
   };
@@ -1173,6 +1174,7 @@ function providerRow(row) {
     promoted: Boolean(row.promoted),
     is_verified: row.is_verified,
     verification_status: row.verification_status,
+    verification_updated_at: row.verification_updated_at || null,
     updated_at: row.updated_at,
     created_at: row.created_at,
   };
@@ -1330,7 +1332,8 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password',
       ADD COLUMN IF NOT EXISTS google_sub TEXT,
       ADD COLUMN IF NOT EXISTS id_verification_consent_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS id_verification_consent_version TEXT;
+      ADD COLUMN IF NOT EXISTS id_verification_consent_version TEXT,
+      ADD COLUMN IF NOT EXISTS verification_updated_at TIMESTAMPTZ;
 
     ALTER TABLE providers
       ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '',
@@ -1339,7 +1342,8 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS location_accuracy_m NUMERIC(10,2),
       ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password',
-      ADD COLUMN IF NOT EXISTS google_sub TEXT;
+      ADD COLUMN IF NOT EXISTS google_sub TEXT,
+      ADD COLUMN IF NOT EXISTS verification_updated_at TIMESTAMPTZ;
 
     ALTER TABLE admin_feedback
       ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
@@ -4164,7 +4168,9 @@ app.patch('/api/admin/customers/:id/verify', asyncRoute(async (req, res) => {
   const admin = await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE customers
-     SET is_verified = TRUE, verification_status = 'verified', updated_at = NOW()
+     SET is_verified = TRUE, verification_status = 'verified',
+         verification_updated_at = CASE WHEN is_verified IS TRUE AND verification_status = 'verified' THEN verification_updated_at ELSE NOW() END,
+         updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
     [req.params.id]
@@ -4178,7 +4184,9 @@ app.patch('/api/admin/customers/:id/reject', asyncRoute(async (req, res) => {
   const admin = await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE customers
-     SET is_verified = FALSE, verification_status = 'rejected', updated_at = NOW()
+     SET is_verified = FALSE, verification_status = 'rejected',
+         verification_updated_at = CASE WHEN verification_status = 'rejected' THEN verification_updated_at ELSE NOW() END,
+         updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
     [req.params.id]
@@ -4213,7 +4221,9 @@ app.patch('/api/admin/providers/:id/verify', asyncRoute(async (req, res) => {
 
   const result = await db.query(
     `UPDATE providers
-     SET is_verified = TRUE, verification_status = 'verified', updated_at = NOW()
+     SET is_verified = TRUE, verification_status = 'verified',
+         verification_updated_at = CASE WHEN is_verified IS TRUE AND verification_status = 'verified' THEN verification_updated_at ELSE NOW() END,
+         updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
     [req.params.id]
@@ -4273,7 +4283,9 @@ app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
   const admin = await authenticateAccount(db, req, 'admin');
   const result = await db.query(
     `UPDATE providers
-     SET is_verified = FALSE, verification_status = 'rejected', updated_at = NOW()
+     SET is_verified = FALSE, verification_status = 'rejected',
+         verification_updated_at = CASE WHEN verification_status = 'rejected' THEN verification_updated_at ELSE NOW() END,
+         updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
     [req.params.id]

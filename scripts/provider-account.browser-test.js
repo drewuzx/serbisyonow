@@ -68,6 +68,7 @@ async function main() {
     await page.getByRole('heading', { name: 'Account Status', exact: true }).click();
     await f.db.query("UPDATE providers SET verification_status = 'pending', is_verified = FALSE WHERE id = 81");
     await page.locator('#sn-provider-account-status').getByText('Pending', { exact: true }).waitFor({ timeout: 12000 });
+    await page.locator('.sn-provider-verification-notice').filter({ hasText: 'Pending review' }).filter({ hasText: '24 to 48 hours' }).waitFor();
     assert.equal(await current.inputValue(), 'Original-Password');
     assert.equal(await next.inputValue(), 'Updated-Password');
     let failRequest = true;

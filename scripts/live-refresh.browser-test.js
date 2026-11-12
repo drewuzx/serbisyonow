@@ -153,6 +153,14 @@ function fixture() {
       assert.equal(await page.locator('#edit-fullname').inputValue(), 'Unsaved customer');
       assert.match(await page.locator('#sn-profile-name').textContent(), /Server customer/);
       assert.match(await page.locator('#sn-user-status').textContent(), /declined/i);
+      await page.locator('.sn-live-toast').filter({ hasText: 'Verification declined' }).waitFor();
+      data.customer.is_verified = true;
+      data.customer.verification_status = 'verified';
+      data.customer.verification_updated_at = '2026-11-12T12:00:00.000Z';
+      await tick();
+      await page.locator('.sn-live-toast').filter({ hasText: 'Account verified' }).waitFor();
+      await page.locator('#sn-notification-button').click();
+      await page.locator('#sn-notification-panel .sn-notification-item').filter({ hasText: 'Account verified' }).waitFor();
     });
     await scenario('customer/search/search.html', '.sn-result-card', async (page, data, tick) => {
       data.providers[0].full_name = 'New Search Result'; await tick();
@@ -168,14 +176,6 @@ function fixture() {
       assert.equal(await page.locator('[data-request-filter].active').getAttribute('data-request-filter'), 'cancelled');
       assert.equal(await page.locator('.sn-booking-request-card').count(), 2);
     });
-    await scenario('provider/schedule/schedule.html', '#sn-provider-availability-form', async (page, data, tick) => {
-      await page.getByLabel('Start hour', { exact: true }).selectOption('1');
-      await page.getByLabel('Start minute', { exact: true }).selectOption('30');
-      await page.getByLabel('Start AM/PM', { exact: true }).selectOption('PM');
-      data.availability.push({ ...data.availability[0], id: 2, start_time: '11:00' }); await tick();
-      assert.equal(await page.locator('#sn-availability-start').inputValue(), '13:30');
-      assert.equal(await page.locator('.sn-schedule-slot').count(), 2);
-    });
     await scenario('provider/profile/profile.html', '#sn-provider-payment-name', async (page, data, tick) => {
       await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
       await page.locator('#sn-provider-full-name').fill('Unsaved provider');
@@ -187,6 +187,22 @@ function fixture() {
       assert.equal(await page.locator('#sn-provider-payment-name').inputValue(), 'Unsaved recipient');
       assert.equal(await page.locator('#sn-provider-payment-qr').evaluate(input => input.files[0].name), 'qr.png');
       assert.match(await page.locator('#sn-user-status').textContent(), /declined/i);
+      await page.locator('.sn-live-toast').filter({ hasText: 'Verification declined' }).waitFor();
+      data.provider.is_verified = true;
+      data.provider.verification_status = 'verified';
+      data.provider.verification_updated_at = '2026-11-12T12:00:00.000Z';
+      await tick();
+      await page.locator('.sn-live-toast').filter({ hasText: 'Provider account verified' }).waitFor();
+      await page.locator('#sn-notification-button').click();
+      await page.locator('#sn-notification-panel .sn-notification-item').filter({ hasText: 'Provider account verified' }).waitFor();
+    });
+    await scenario('provider/schedule/schedule.html', '#sn-provider-availability-form', async (page, data, tick) => {
+      await page.getByLabel('Start hour', { exact: true }).selectOption('1');
+      await page.getByLabel('Start minute', { exact: true }).selectOption('30');
+      await page.getByLabel('Start AM/PM', { exact: true }).selectOption('PM');
+      data.availability.push({ ...data.availability[0], id: 2, start_time: '11:00' }); await tick();
+      assert.equal(await page.locator('#sn-availability-start').inputValue(), '13:30');
+      assert.equal(await page.locator('.sn-schedule-slot').count(), 2);
     });
     await scenario('provider/services/services.html', '.sn-provider-service-card', async (page, data, tick) => {
       data.services[0].title = 'Updated Service'; await tick();

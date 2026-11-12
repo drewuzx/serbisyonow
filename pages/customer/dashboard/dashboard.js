@@ -42,7 +42,7 @@ function applyVerificationState(user) {
     verifyBanner.style.borderLeft = '4px solid #dc2626';
     verifyBanner.style.color = '#991b1b';
   } else {
-    verifyBanner.textContent = 'Your account is pending admin verification. You can browse, but booking actions are disabled until verified.';
+    verifyBanner.textContent = 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete. You can browse, but booking actions are disabled until verified.';
     verifyBanner.style.background = '';
     verifyBanner.style.borderLeft = '';
     verifyBanner.style.color = '';

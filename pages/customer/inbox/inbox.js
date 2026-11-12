@@ -134,14 +134,33 @@ function customerSeenNoticeKey(customerId) {
   return `sn_customer_seen_notifications_${customerId}`;
 }
 
-function customerNotificationItems({ messages = [], bookings = [] } = {}) {
+function customerNotificationItems({ messages = [], bookings = [], customer = null } = {}) {
+  const verificationStatus = customer?.verification_status || (customer?.is_verified ? 'verified' : 'pending');
+  const verificationAt = customer?.verification_updated_at || customer?.updated_at || customer?.id || 'account';
+  const verificationItems = verificationStatus === 'rejected' ? [{
+    id: `verification-declined-${verificationAt}`,
+    kind: 'Verification',
+    title: 'Verification declined',
+    body: 'Your ID verification was declined by the admin. Open your profile to review and resubmit your documents.',
+    time: customer?.verification_updated_at || customer?.updated_at,
+    href: '../profile/profile.html',
+  }] : verificationStatus === 'verified' && customer?.verification_updated_at ? [{
+    id: `verification-approved-${customer.verification_updated_at}`,
+    kind: 'Verification',
+    title: 'Account verified',
+    body: 'Your account has been verified. You can now book services.',
+    time: customer.verification_updated_at,
+    href: '../profile/profile.html',
+  }] : [];
   return [
+    ...verificationItems,
     ...messages.filter((message) => message.sender_role === 'provider').slice(0, 5).map((message) => ({
       id: `message-${message.id}`,
       kind: 'Message',
       title: message.provider_name || 'Provider',
       body: message.message || 'New message received.',
       time: message.created_at,
+      href: '../dashboard/dashboard.html#messages',
     })),
     ...bookings.slice(0, 5).map((booking) => ({
       id: `booking-${booking.id}-${booking.status}`,
@@ -149,6 +168,7 @@ function customerNotificationItems({ messages = [], bookings = [] } = {}) {
       title: booking.provider_name || 'Booking',
       body: `${booking.service || 'Service'} is ${booking.status || 'pending'}.`,
       time: booking.created_at,
+      href: '../bookings/bookings.html',
     })),
   ].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0)).slice(0, 8);
 }
@@ -208,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       verifyBanner.hidden = false;
       verifyBanner.textContent = status === 'rejected'
         ? 'Your verification was declined by the admin. Please resubmit your documents.'
-        : 'Your account is pending admin verification. Actions are disabled until verified.';
+        : 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete. Actions are disabled until verified.';
       if (status === 'rejected') {
         verifyBanner.style.background = '#fef2f2';
         verifyBanner.style.borderLeft = '4px solid #dc2626';
@@ -470,7 +490,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     panel.innerHTML = `
       <div class="sn-notification-head"><strong>Notifications</strong><span>${unseenIds.size ? `${unseenIds.size} new` : `${items.length} update${items.length === 1 ? '' : 's'}`}</span></div>
       <div class="sn-notification-list">
-        ${items.map((item) => `<button class="sn-notification-item ${unseenIds.has(String(item.id)) ? 'is-unseen' : ''}" type="button"><span class="sn-notification-kind">${esc(item.kind)}</span><strong>${esc(item.title)}</strong><small>${esc(item.body)}</small></button>`).join('') || '<p class="sn-notification-empty">No notifications yet.</p>'}
+        ${items.map((item) => `<a class="sn-notification-item ${unseenIds.has(String(item.id)) ? 'is-unseen' : ''}" href="${esc(item.href || '../dashboard/dashboard.html')}"><span class="sn-notification-kind">${esc(item.kind)}</span><strong>${esc(item.title)}</strong><small>${esc(item.body)}</small></a>`).join('') || '<p class="sn-notification-empty">No notifications yet.</p>'}
       </div>
     `;
     const dot = notificationBtn.querySelector('.sn-dot');

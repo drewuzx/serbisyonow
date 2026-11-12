@@ -270,12 +270,20 @@ function snInboxHref(peerId) {
 
 function snNotificationItems(data) {
  const verificationStatus = data.customer?.verification_status || (data.customer?.is_verified ? 'verified' : 'pending');
+ const verificationAt = data.customer?.verification_updated_at || data.customer?.updated_at || data.customer?.id || 'account';
  const verificationNotice = verificationStatus === 'rejected' ? [{
-  id: `verification-declined-${data.customer?.updated_at || data.customer?.id || 'account'}`,
+  id: `verification-declined-${verificationAt}`,
   kind: 'Verification',
   title: 'Verification declined',
   body: 'Your ID verification was declined by the admin. Open your profile to review and resubmit your documents.',
-  time: data.customer?.updated_at,
+  time: data.customer?.verification_updated_at || data.customer?.updated_at,
+  href: '../profile/profile.html',
+ }] : verificationStatus === 'verified' && data.customer?.verification_updated_at ? [{
+  id: `verification-approved-${data.customer.verification_updated_at}`,
+  kind: 'Verification',
+  title: 'Account verified',
+  body: 'Your account has been verified. You can now book services.',
+  time: data.customer.verification_updated_at,
   href: '../profile/profile.html',
  }] : [];
  const messages = (data.messages || []).filter(message => message.sender_role === 'provider').slice(0, 5).map(message => ({
@@ -470,12 +478,12 @@ if (messageButton) {
   const counts = snUpdateCustomerNotificationBadges(data, unseenItems.length);
   if (dot) dot.hidden = counts.notificationCount <= 0;
   const newest = unseenItems[0];
-  const declinedNotice = unseenItems.find(item => item.kind === 'Verification');
-  const declineToastKey = `sn_customer_decline_toast_${customer.id}`;
-  if (declinedNotice && (!initialized || notify)
-      && localStorage.getItem(declineToastKey) !== declinedNotice.id) {
-   snShowToast(declinedNotice);
-   localStorage.setItem(declineToastKey, declinedNotice.id);
+  const verificationNotice = unseenItems.find(item => item.kind === 'Verification');
+  const verificationToastKey = `sn_customer_verification_toast_${customer.id}`;
+  if (verificationNotice && (!initialized || notify)
+      && localStorage.getItem(verificationToastKey) !== verificationNotice.id) {
+   snShowToast(verificationNotice);
+   localStorage.setItem(verificationToastKey, verificationNotice.id);
   }
   if (newest?.id && newest.id !== latestKey) {
    if (notify && initialized && newest.kind !== 'Verification') snShowToast(newest);
@@ -640,7 +648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const banner = document.getElementById('sn-verify-banner');
   if (banner) {
    banner.hidden = status === 'verified';
-   if (status !== 'verified') banner.textContent = status === 'rejected' ? 'Your verification was declined. Please resubmit your documents in your profile.' : 'Your account is pending admin verification.';
+   if (status !== 'verified') banner.textContent = status === 'rejected' ? 'Your verification was declined. Please resubmit your documents in your profile.' : 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete.';
   }
   document.dispatchEvent(new CustomEvent('sn:customer-account-updated', { detail: next }));
  });

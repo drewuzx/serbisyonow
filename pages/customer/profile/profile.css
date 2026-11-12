@@ -107,6 +107,21 @@
   margin: 0;
 }
 
+.sn-account-verification-notice {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 20px;
+  padding: 14px 18px;
+  border: 1px solid #f2d18a;
+  border-left: 4px solid #c88313;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #594214;
+  line-height: 1.5;
+}
+.sn-account-verification-notice[hidden] { display: none; }
+.sn-account-verification-notice strong { color: #704d08; }
+
 /* â”€â”€ Profile Grid â”€â”€ */
 .sn-profile-grid {
   display: grid;

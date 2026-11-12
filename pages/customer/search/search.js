@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       verifyBanner.hidden = false;
       verifyBanner.textContent = status === 'rejected'
         ? 'Your verification was declined by the admin. Please resubmit your documents.'
-        : 'Your account is pending admin verification. Actions are disabled until verified.';
+        : 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete. Actions are disabled until verified.';
     }
   } else if (verifyBanner) {
     verifyBanner.hidden = true;
