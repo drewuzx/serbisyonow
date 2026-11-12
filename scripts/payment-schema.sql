@@ -19,7 +19,8 @@ ALTER TABLE customer_bookings
   ADD COLUMN IF NOT EXISTS deposit_amount NUMERIC(10,2),
   ADD COLUMN IF NOT EXISTS balance_due NUMERIC(10,2),
   ADD COLUMN IF NOT EXISTS deposit_paid_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS deposit_livemode BOOLEAN;
+  ADD COLUMN IF NOT EXISTS deposit_livemode BOOLEAN,
+  ADD COLUMN IF NOT EXISTS full_payment_received_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS booking_payments (
   id BIGSERIAL PRIMARY KEY,

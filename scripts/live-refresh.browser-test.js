@@ -129,6 +129,12 @@ function fixture() {
       await tick();
       assert.match(await page.locator('.sn-providers-grid').textContent(), /Updated Cleaning Provider/);
       assert.equal(await page.locator('.sn-cat.active').getAttribute('data-category'), 'Cleaning');
+      data.bookings[0].status = 'completed';
+      data.bookings[0].updated_at = new Date().toISOString();
+      await tick();
+      await page.locator('.sn-live-toast').filter({ hasText: 'Service completed' }).waitFor();
+      await page.locator('#sn-notification-button').click();
+      await page.locator('#sn-notification-panel .sn-notification-item').filter({ hasText: 'Service completed' }).waitFor();
     });
     await scenario('customer/favorites/favorites.html', '.sn-fav-card', async (page, data, tick) => {
       data.favorites.push({ ...provider, id: 82, full_name: 'New Favorite' });

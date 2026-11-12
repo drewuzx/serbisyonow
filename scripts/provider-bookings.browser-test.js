@@ -50,6 +50,10 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
    else if (url.pathname.endsWith('/location')) {
     Object.assign(provider, request.postDataJSON());
     data = { user: provider };
+   } else if (url.pathname.includes('/bookings/') && url.pathname.endsWith('/full-payment') && request.method() === 'PATCH') {
+    const booking = bookings.find(row => String(row.id) === url.pathname.split('/').at(-2));
+    booking.full_payment_received_at = new Date().toISOString();
+    data = { booking };
    } else if (url.pathname.includes('/bookings/') && request.method() === 'PATCH') {
     actions.push({ url: url.pathname, body: request.postDataJSON() });
     const booking = bookings.find(row => String(row.id) === url.pathname.split('/').at(-2));
@@ -126,6 +130,12 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
   assert.equal(actions.at(-1).body.expected_status, 'pending');
   await card(101).getByRole('button', { name: 'Start Service' }).click();
   await settled();
+  assert.equal(await card(101).getByRole('button', { name: 'Mark Completed' }).isDisabled(), true, 'completion stays locked until payment is confirmed');
+  await card(101).getByRole('button', { name: 'Confirm Full Payment Received' }).click();
+  await page.locator('[data-modal-confirm]').click();
+  await settled();
+  assert.ok(bookings[0].full_payment_received_at, 'provider payment confirmation is saved before completion');
+  assert.equal(await card(101).getByRole('button', { name: 'Mark Completed' }).isEnabled(), true);
   await card(101).getByRole('button', { name: 'Mark Completed' }).click();
   await page.locator('[data-modal-cancel]').click();
   await settled();

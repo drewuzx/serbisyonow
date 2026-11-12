@@ -294,12 +294,14 @@ function snNotificationItems(data) {
   time: message.created_at,
   href: snInboxHref(),
  }));
- const bookings = (data.bookings || []).slice(0, 5).map(booking => ({
+ const bookings = (data.bookings || []).map(booking => ({
   id: `booking-${booking.id}-${booking.status}`,
-  kind: 'Booking',
-  title: booking.provider_name || 'Booking update',
-  body: `${booking.service || 'Service'} is ${booking.status || 'pending'}.`,
-  time: booking.created_at,
+  kind: booking.status === 'completed' ? 'Service' : 'Booking',
+  title: booking.status === 'completed' ? 'Service completed' : booking.provider_name || 'Booking update',
+  body: booking.status === 'completed'
+   ? `${booking.provider_name || 'Your provider'} marked ${booking.service || 'your service'} as completed.`
+   : `${booking.service || 'Service'} is ${booking.status || 'pending'}.`,
+  time: booking.updated_at || booking.created_at,
   href: '../bookings/bookings.html',
  }));
  const activity = [...messages, ...bookings]

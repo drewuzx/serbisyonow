@@ -72,6 +72,52 @@ function historyVisibleBookings() {
     });
 }
 
+function historySuggestions(query) {
+  const needle = String(query || '').trim().toLowerCase();
+  if (!needle) return [];
+  const matches = new Map();
+  for (const booking of historyBookings) {
+    for (const [kind, value] of [
+      ['Provider', booking.provider_name],
+      ['Service', booking.service],
+      ['Location', booking.address],
+      ['Status', historyStatus(booking.status)],
+    ]) {
+      const label = String(value || '').trim();
+      const key = label.toLowerCase();
+      if (label && key.includes(needle) && key !== needle && !matches.has(key)) matches.set(key, { kind, label });
+    }
+  }
+  return [...matches.values()].slice(0, 6);
+}
+
+function renderHistorySuggestions() {
+  const input = document.getElementById('history-search');
+  const panel = document.getElementById('sn-history-suggestions');
+  if (!input || !panel) return;
+  const suggestions = historySuggestions(input.value);
+  panel.innerHTML = suggestions.map(({ kind, label }, index) => `
+    <button class="sn-history-suggestion" id="sn-history-suggestion-${index}" type="button" role="option" aria-selected="false" data-history-suggestion="${historyEsc(label)}">
+      <span>${historyEsc(label)}</span><span>${kind}</span>
+    </button>
+  `).join('');
+  panel.hidden = suggestions.length === 0;
+  input.setAttribute('aria-expanded', String(!panel.hidden));
+  input.removeAttribute('aria-activedescendant');
+}
+
+function chooseHistorySuggestion(value) {
+  const input = document.getElementById('history-search');
+  const panel = document.getElementById('sn-history-suggestions');
+  if (!input || !panel) return;
+  input.value = value;
+  panel.hidden = true;
+  input.setAttribute('aria-expanded', 'false');
+  input.removeAttribute('aria-activedescendant');
+  renderHistoryList();
+  input.focus();
+}
+
 function renderHistoryItem(booking, index, active) {
   const avatarClass = historyAvatarClass(index);
   const reason = historyStatus(booking.status) === 'cancelled' ? '<div class="sn-hi-reason">Reason: Cancelled booking</div>' : '';
@@ -264,20 +310,83 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.sn-filter-tab').forEach((item) => item.classList.remove('active'));
       tab.classList.add('active');
       historyFilter = tab.dataset.filter || 'all';
+      updateHistoryFilterToggle();
       renderHistoryList();
     });
   });
-  document.getElementById('history-search')?.addEventListener('input', renderHistoryList);
+  const filterToggle = document.getElementById('sn-history-filter-toggle');
+  const filterPanel = document.getElementById('sn-history-filter-panel');
+  filterToggle?.addEventListener('click', () => {
+    const open = filterPanel?.hidden ?? true;
+    if (filterPanel) filterPanel.hidden = !open;
+    filterToggle.setAttribute('aria-expanded', String(open));
+    filterToggle.title = open ? 'Hide filters' : 'Show filters';
+    filterToggle.setAttribute('aria-label', open ? 'Hide filters' : 'Show filters');
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !filterPanel || filterPanel.hidden) return;
+    filterPanel.hidden = true;
+    filterToggle?.setAttribute('aria-expanded', 'false');
+    filterToggle?.setAttribute('aria-label', 'Show filters');
+    filterToggle?.setAttribute('title', 'Show filters');
+    filterToggle?.focus();
+  });
+  const historySearch = document.getElementById('history-search');
+  const historySuggestionPanel = document.getElementById('sn-history-suggestions');
+  let activeHistorySuggestion = -1;
+  historySearch?.addEventListener('input', () => {
+    activeHistorySuggestion = -1;
+    renderHistorySuggestions();
+    renderHistoryList();
+  });
+  historySearch?.addEventListener('keydown', event => {
+    const options = [...(historySuggestionPanel?.querySelectorAll('[role="option"]') || [])];
+    if (event.key === 'ArrowDown' && options.length) {
+      event.preventDefault();
+      activeHistorySuggestion = (activeHistorySuggestion + 1) % options.length;
+    } else if (event.key === 'ArrowUp' && options.length) {
+      event.preventDefault();
+      activeHistorySuggestion = (activeHistorySuggestion - 1 + options.length) % options.length;
+    } else if (event.key === 'Enter' && activeHistorySuggestion >= 0 && options[activeHistorySuggestion]) {
+      event.preventDefault();
+      chooseHistorySuggestion(options[activeHistorySuggestion].dataset.historySuggestion);
+      activeHistorySuggestion = -1;
+      return;
+    } else if (event.key === 'Escape' && historySuggestionPanel && !historySuggestionPanel.hidden) {
+      event.stopPropagation();
+      historySuggestionPanel.hidden = true;
+      historySearch.setAttribute('aria-expanded', 'false');
+      historySearch.removeAttribute('aria-activedescendant');
+      activeHistorySuggestion = -1;
+      return;
+    } else return;
+
+    options.forEach((option, index) => option.setAttribute('aria-selected', String(index === activeHistorySuggestion)));
+    historySearch.setAttribute('aria-activedescendant', `sn-history-suggestion-${activeHistorySuggestion}`);
+  });
+  historySuggestionPanel?.addEventListener('click', event => {
+    const option = event.target.closest('[data-history-suggestion]');
+    if (option) chooseHistorySuggestion(option.dataset.historySuggestion);
+  });
+  document.addEventListener('click', event => {
+    if (event.target.closest('.sn-history-search-wrap') || !historySuggestionPanel || historySuggestionPanel.hidden) return;
+    historySuggestionPanel.hidden = true;
+    historySearch?.setAttribute('aria-expanded', 'false');
+    historySearch?.removeAttribute('aria-activedescendant');
+    activeHistorySuggestion = -1;
+  });
   document.getElementById('sort-asc')?.addEventListener('click', () => {
     historySortOrder = 'asc';
     document.getElementById('sort-asc')?.classList.add('active');
     document.getElementById('sort-desc')?.classList.remove('active');
+    updateHistoryFilterToggle();
     renderHistoryList();
   });
   document.getElementById('sort-desc')?.addEventListener('click', () => {
     historySortOrder = 'desc';
     document.getElementById('sort-desc')?.classList.add('active');
     document.getElementById('sort-asc')?.classList.remove('active');
+    updateHistoryFilterToggle();
     renderHistoryList();
   });
   document.getElementById('sn-history-list')?.addEventListener('click', (event) => {
@@ -304,3 +413,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderHistoryList();
   });
 });
+
+function updateHistoryFilterToggle() {
+  const button = document.getElementById('sn-history-filter-toggle');
+  if (!button) return;
+  const active = historyFilter !== 'all' || historySortOrder !== 'desc';
+  button.dataset.active = String(active);
+  button.title = button.getAttribute('aria-expanded') === 'true' ? 'Hide filters' : active ? 'Filters active' : 'Show filters';
+  button.setAttribute('aria-label', button.title);
+}

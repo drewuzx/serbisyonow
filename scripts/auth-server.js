@@ -16,7 +16,7 @@ const personalCarePricing = require('../shared/js/personalCarePricing');
 const appliancePricing = require('../shared/js/appliancePricing');
 const installationPricing = require('../shared/js/installationPricing');
 const outdoorPricing = require('../shared/js/outdoorPricing');
-const { changeProviderBookingStatus } = require('./booking-workflow');
+const { changeProviderBookingStatus, confirmFullPaymentReceived } = require('./booking-workflow');
 const { registerBookingTracking, clearBookingTracking } = require('./booking-tracking');
 const { issueSession, authenticateAccount, requestSessionToken, rememberSession, revokeSession } = require('./account-sessions');
 const { createPayMongo } = require('./paymongo');
@@ -1684,6 +1684,7 @@ function customerBookingRow(row) {
     status: row.status,
     provider_closed: Boolean(row.provider_closed),
     created_at: row.created_at,
+    updated_at: row.updated_at,
   };
 }
 
@@ -3934,6 +3935,12 @@ app.patch('/api/provider/:providerId/bookings/:bookingId/status', asyncRoute(asy
   const actor = await authenticateAccount(db, req, 'provider', req.params.providerId);
   const booking = await changeProviderBookingStatus(db, req.params.providerId, req.params.bookingId, req.body.status, req.body.expected_status, actor);
   if (booking.status === 'cancelled') await expireCancelledCheckout(db, paymongo, booking.id);
+  res.json({ booking: providerBookingRow(booking) });
+}));
+
+app.patch('/api/provider/:providerId/bookings/:bookingId/full-payment', asyncRoute(async (req, res) => {
+  const actor = await authenticateAccount(db, req, 'provider', req.params.providerId);
+  const booking = await confirmFullPaymentReceived(db, req.params.providerId, req.params.bookingId, actor);
   res.json({ booking: providerBookingRow(booking) });
 }));
 

@@ -1448,7 +1448,7 @@ function renderRequests(bookings, provider) {
               ${booking.status === 'upcoming' ? `${SNScheduleWindow.canStartService(booking)
                 ? '<button class="btn btn-success btn-sm" data-start-service data-status="ongoing">Start Service</button>'
                 : `<p class="sn-start-service-hint">${esc(SNScheduleWindow.startServiceMessage(booking))}</p><button class="btn btn-success btn-sm" data-start-service data-status="ongoing" disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}">Start Service</button>`}<button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button>` : ''}
-              ${booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark Completed</button>' : ''}
+              ${booking.status === 'ongoing' ? `${booking.full_payment_received_at ? '<span class="sn-full-payment-confirmed" role="status">Full payment confirmed</span>' : '<button class="btn btn-outline btn-sm" data-full-payment>Confirm Full Payment Received</button>'}<button class="btn btn-success btn-sm" data-status="completed" ${booking.full_payment_received_at ? '' : 'disabled title="Confirm full payment received first"'}>Mark Completed</button>` : ''}
               ${['upcoming','ongoing'].includes(booking.status) ? `<button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false" ${SNScheduleWindow.canStartService(booking) ? '' : `disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}"`}>On the way</button>` : ''}
               ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
             </div>
@@ -1507,6 +1507,9 @@ function renderRequests(bookings, provider) {
   panel.querySelectorAll('[data-status]').forEach((button) => {
     button.addEventListener('click', () => updateBookingStatus(button.closest('[data-booking-id]')?.dataset.bookingId, button.dataset.status));
   });
+  panel.querySelectorAll('[data-full-payment]').forEach(button => button.addEventListener('click', () => {
+    confirmBookingFullPayment(button.closest('[data-booking-id]')?.dataset.bookingId);
+  }));
   panel.querySelectorAll('[data-confirm-price]').forEach(button => button.addEventListener('click', () => {
     const booking = visibleBookings.find(item => String(item.id) === button.closest('[data-booking-id]').dataset.bookingId);
     if (booking) showProviderPrice(booking);
@@ -1568,6 +1571,18 @@ function refreshStartServiceButtons(panel) {
       button.disabled = !canStart && !sharing;
       button.title = canStart || sharing ? '' : SNScheduleWindow.startServiceMessage(booking);
     }
+  });
+}
+
+function restoreProviderBookingButtons(card, booking) {
+  if (!card) return;
+  card.removeAttribute('aria-busy');
+  card.querySelectorAll('button').forEach(button => {
+    const canStart = SNScheduleWindow.canStartService(booking);
+    if (button.hasAttribute('data-start-service')) button.disabled = !canStart;
+    else if (button.hasAttribute('data-live-tracking')) button.disabled = !canStart && button.getAttribute('aria-pressed') !== 'true';
+    else if (button.dataset.status === 'completed') button.disabled = !booking.full_payment_received_at;
+    else button.disabled = false;
   });
 }
 
@@ -2045,6 +2060,37 @@ async function closeCompletedBooking(bookingId) {
   return performProviderBookingAction(bookingId, 'archive');
 }
 
+async function confirmBookingFullPayment(bookingId) {
+  const provider = getProviderUser();
+  const key = String(bookingId || '');
+  const booking = providerRequestsState.bookings.find(item => String(item.id) === key);
+  if (!provider?.id || !booking || booking.status !== 'ongoing' || booking.full_payment_received_at || providerBookingActions.has(key)) return;
+  const confirmation = await openProviderModal({
+    title: 'Confirm full payment received?',
+    message: `Confirm only after you have actually received the full agreed amount of ${providerMoney(booking.confirmed_price ?? booking.amount)}. A payment screenshot alone is not proof. You must confirm this before marking the service complete.`,
+    confirmText: 'Confirm Payment Received',
+  });
+  if (!confirmation) return;
+  providerBookingActions.add(key);
+  const card = document.querySelector(`[data-booking-card="${CSS.escape(key)}"]`);
+  card?.setAttribute('aria-busy', 'true');
+  card?.querySelectorAll('button').forEach(button => { button.disabled = true; });
+  try {
+    setProviderRequestsNotice('Saving payment confirmation...', 'info');
+    const data = await providerSend(`/api/provider/${provider.id}/bookings/${bookingId}/full-payment`, 'PATCH', {});
+    Object.assign(booking, data.booking);
+    setProviderRequestsNotice('Full payment confirmed. You can now mark the service completed.', 'success');
+    renderRequests(providerRequestsState.bookings, providerRequestsState.provider);
+    if (!await loadProviderDatabase()) setProviderRequestsNotice('Full payment confirmed. Refresh to get the latest booking list.', 'info');
+  } catch (error) {
+    if (error.status === 409) await loadProviderDatabase();
+    setProviderRequestsNotice(error.message || 'Unable to confirm full payment. Please try again.', 'error');
+  } finally {
+    providerBookingActions.delete(key);
+    restoreProviderBookingButtons(document.querySelector(`[data-booking-card="${CSS.escape(key)}"]`), booking);
+  }
+}
+
 async function performProviderBookingAction(bookingId, action) {
   const provider = getProviderUser();
   const key = String(bookingId || '');
@@ -2058,7 +2104,7 @@ async function performProviderBookingAction(bookingId, action) {
     const confirmation = action === 'cancelled'
       ? { title: booking.status === 'pending' ? 'Decline booking?' : 'Cancel booking?', message: `The customer will see this booking as cancelled.${booking.deposit_paid_at ? ' The paid downpayment will need refund review; it is not automatically refunded.' : ''}`, confirmText: booking.status === 'pending' ? 'Decline Booking' : 'Cancel Booking', danger: true }
       : action === 'completed'
-        ? { title: 'Complete service?', message: 'Confirm that the booked service has been finished.', confirmText: 'Mark Completed' }
+        ? { title: 'Complete service?', message: 'Confirm that the service is finished. The customer will be notified.', confirmText: 'Mark Completed' }
         : action === 'archive'
           ? { title: 'Move to history?', message: 'The booking will remain available in Service History.', confirmText: 'Move to History' }
           : null;
@@ -2079,8 +2125,7 @@ async function performProviderBookingAction(bookingId, action) {
   } finally {
     providerBookingActions.delete(key);
     const currentCard = document.querySelector(`[data-booking-card="${CSS.escape(key)}"]`);
-    currentCard?.removeAttribute('aria-busy');
-    currentCard?.querySelectorAll('button').forEach(button => { button.disabled = false; });
+    restoreProviderBookingButtons(currentCard, booking);
   }
 }
 

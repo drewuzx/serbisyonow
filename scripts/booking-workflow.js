@@ -48,6 +48,9 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
   if ((expectedStatus && expectedStatus !== booking.status) || !transitions[booking.status]?.includes(status)) {
    fail(409, `This booking is now ${booking.status}. Refresh the bookings before trying again.`);
   }
+  if (status === 'completed' && !booking.full_payment_received_at) {
+   fail(409, 'Confirm that the full payment was received before completing this service.');
+  }
   const result = await client.query(`
    UPDATE customer_bookings SET status = $3, updated_at = NOW()
    WHERE provider_id = $1 AND id = $2 RETURNING *
@@ -72,4 +75,33 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
  }
 }
 
-module.exports = { changeProviderBookingStatus };
+async function confirmFullPaymentReceived(db, providerId, bookingId, actor) {
+ const client = await db.pool.connect();
+ try {
+  await client.query('BEGIN');
+  const current = await client.query(`
+   SELECT * FROM customer_bookings WHERE provider_id = $1 AND id = $2 FOR UPDATE
+  `, [providerId, bookingId]);
+  const booking = current.rows[0];
+  if (!booking) fail(404, 'Booking not found.');
+  if (actor?.role !== 'provider' || String(actor.id) !== String(providerId)) fail(401, 'Please log in again before managing this booking.');
+  if (booking.provider_closed || booking.status !== 'ongoing') fail(409, 'Full payment can only be confirmed for an ongoing service.');
+  if (booking.full_payment_received_at) {
+   await client.query('COMMIT');
+   return booking;
+  }
+  const result = await client.query(`
+   UPDATE customer_bookings SET full_payment_received_at = NOW(), updated_at = NOW()
+   WHERE provider_id = $1 AND id = $2 RETURNING *
+  `, [providerId, bookingId]);
+  await client.query('COMMIT');
+  return result.rows[0];
+ } catch (error) {
+  await client.query('ROLLBACK');
+  throw error;
+ } finally {
+  client.release();
+ }
+}
+
+module.exports = { changeProviderBookingStatus, confirmFullPaymentReceived };

@@ -16,6 +16,7 @@ function bookingPaymentView(row) {
   deposit_percentage: 30, confirmed_price: amount('confirmed_price'), deposit_amount: amount('deposit_amount'), balance_due: amount('balance_due'),
   price_version: Number(row.price_version || 0), price_notes: row.price_notes || '', price_confirmed_at: row.price_confirmed_at || null,
   customer_agreed_at: row.customer_agreed_at || null, deposit_paid_at: row.deposit_paid_at || null, deposit_livemode: row.deposit_livemode ?? null,
+  full_payment_received_at: row.full_payment_received_at || null,
   deposit_channel: row.deposit_channel || 'paymongo', deposit_receipt_id: row.deposit_receipt_id || null,
  };
 }

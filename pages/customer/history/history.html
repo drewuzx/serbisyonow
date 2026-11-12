@@ -71,19 +71,22 @@
           </div>
           <div class="sn-history-search-row">
             <div class="sn-history-search-wrap">
-              <span></span>
-              <input type="search" class="sn-history-search" placeholder="Search history..." id="history-search" />
+              <span aria-hidden="true"></span>
+              <input type="search" class="sn-history-search" placeholder="Search history..." id="history-search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sn-history-suggestions" autocomplete="off" />
+              <div class="sn-history-suggestions" id="sn-history-suggestions" role="listbox" aria-label="Booking history suggestions" hidden></div>
             </div>
-            <button class="sn-history-filter-btn" type="button" title="Filter"></button>
+            <button class="sn-history-filter-btn" id="sn-history-filter-toggle" type="button" title="Show filters" aria-label="Show filters" aria-expanded="false" aria-controls="sn-history-filter-panel"></button>
           </div>
-          <div class="sn-date-sort">
-            <button class="sn-sort-btn" id="sort-asc" data-sort="asc" title="Oldest first">Ascending</button>
-            <button class="sn-sort-btn active" id="sort-desc" data-sort="desc" title="Newest first">Descending</button>
-          </div>
-          <div class="sn-filter-tabs">
-            <button class="sn-filter-tab active" type="button" data-filter="all">All</button>
-            <button class="sn-filter-tab" type="button" data-filter="completed">Completed</button>
-            <button class="sn-filter-tab" type="button" data-filter="cancelled">Cancelled</button>
+          <div class="sn-history-filter-panel" id="sn-history-filter-panel" hidden>
+            <div class="sn-date-sort">
+              <button class="sn-sort-btn" id="sort-asc" data-sort="asc" title="Oldest first">Ascending</button>
+              <button class="sn-sort-btn active" id="sort-desc" data-sort="desc" title="Newest first">Descending</button>
+            </div>
+            <div class="sn-filter-tabs">
+              <button class="sn-filter-tab active" type="button" data-filter="all">All</button>
+              <button class="sn-filter-tab" type="button" data-filter="completed">Completed</button>
+              <button class="sn-filter-tab" type="button" data-filter="cancelled">Cancelled</button>
+            </div>
           </div>
           <div class="sn-history-list" id="sn-history-list">
             <div class="sn-history-empty">Loading booking history...</div>

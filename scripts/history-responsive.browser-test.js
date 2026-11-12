@@ -34,6 +34,13 @@ async function main() {
    await page.goto(url);
    await page.getByText('No completed or cancelled bookings yet.',{exact:true}).waitFor();
    await emptyIsSeparate();
+   const filterToggle = page.locator('#sn-history-filter-toggle');
+   assert.match(await filterToggle.evaluate(el=>getComputedStyle(el,'::before').maskImage),/svg/,'filter control must render its icon');
+   assert.equal(await page.locator('#sn-history-filter-panel').isVisible(),false,'filters start collapsed');
+   await filterToggle.click();
+   assert.equal(await page.locator('#sn-history-filter-panel').isVisible(),true,'filter icon opens status and sort controls');
+   await page.keyboard.press('Escape');
+   assert.equal(await page.locator('#sn-history-filter-panel').isVisible(),false,'Escape closes filters');
    await noOverflow();
    await page.screenshot({path:path.join(os.tmpdir(),`history-empty-${width}.png`),fullPage:true});
   }
@@ -44,6 +51,7 @@ async function main() {
    await page.setViewportSize({width,height:900});
    await page.goto(url);
    await page.locator('.sn-history-item').first().waitFor();
+   await page.locator('#sn-history-filter-toggle').click();
    await page.locator('[data-filter="completed"]').click();
    await page.locator('#detail-address').filter({hasText:'building identifier'}).waitFor();
    assert.equal(await page.locator('#sn-detail-empty').isVisible(),false);
@@ -56,6 +64,10 @@ async function main() {
    assert.ok(bounds.cardsTop>=bounds.detailsBottom,'actions must not overlap booking information');
    assert.ok(bounds.bodyBottom>=bounds.cardsBottom-1,'detail panel must contain its content');
    await page.screenshot({path:path.join(os.tmpdir(),`history-details-${width}.png`),fullPage:true});
+   await page.locator('#history-search').fill('exceptionally');
+   await page.locator('#sn-history-suggestions [role="option"]').first().waitFor();
+   await page.locator('#sn-history-suggestions [role="option"]').first().click();
+   assert.equal(await page.locator('#history-search').inputValue(),'Provider with an exceptionally long display name','suggestion fills search and filters history');
    await page.locator('#history-search').fill('no matching service');
    await page.getByText('No bookings match your filter.',{exact:true}).waitFor();
    await emptyIsSeparate();
