@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
 const pricing = require('../shared/js/cleaningPricing');
+const scheduleWindow = require('../shared/js/schedule-window');
 const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
 
 (async () => {
@@ -14,12 +15,13 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:3003';
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
   await context.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   const provider = { id: 987002, full_name: 'Booking Test Provider', verification_status: 'verified', is_verified: true, latitude: 15.147, longitude: 120.58 };
+  const currentSchedule = scheduleWindow.manilaNow();
   const estimate = pricing.assessment('general house cleaning', { ...pricing.defaults('general house cleaning'), areas: ['Living room'] });
   const bookings = [
    { id: 101, status: 'pending', customer_latitude: 15.1443, customer_longitude: 120.5894 },
    { id: 102, status: 'pending', customer_latitude: null, customer_longitude: null },
    { id: 103, status: 'cancelled', customer_latitude: 15.147, customer_longitude: 120.58 },
-  ].map(booking => ({ ...booking, customer_id: 987001, customer_name: 'Test Customer', service: 'General House Cleaning', address: '109 Test Street, Angeles City', scheduled_date: '2026-10-01', scheduled_time: '10:30 AM', amount: estimate.amount, service_details: estimate.details, pricing_type: 'calculated' }));
+  ].map(booking => ({ ...booking, customer_id: 987001, customer_name: 'Test Customer', service: 'General House Cleaning', address: '109 Test Street, Angeles City', scheduled_date: currentSchedule.date, scheduled_time: '00:00', amount: estimate.amount, service_details: estimate.details, pricing_type: 'calculated' }));
   const actions = [];
   bookings[0].service_details = { ...bookings[0].service_details, booking_location: { confirmed_at:'2026-11-09T00:00:00Z', landmark:'Unit 4, blue gate' } };
   let failNext = false;

@@ -2,6 +2,7 @@
 
 const { transaction, fail } = require('./booking-payments');
 const time = require('../shared/js/time-format');
+const scheduleWindow = require('../shared/js/schedule-window');
 const { ensureRepeats, createRepeat } = require('./recurring-schedule');
 
 function dateKey(value) {
@@ -38,10 +39,13 @@ async function saveWeek(db, providerId, body) {
  if (!Array.isArray(body.dates) || !body.dates.length || body.dates.length > 7) fail(400, 'Select one to seven days.');
  const dates = [...new Set(body.dates.map(dateKey))].sort();
  if (dates.some(date => monday(date) !== monday(dates[0]))) fail(400, 'Select dates within the same week.');
- const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+ const today = scheduleWindow.manilaNow().date;
  if (dates.some(date => date < today)) fail(400, 'Availability cannot be added to a past date.');
  const start = time.minutes(body.start_time), end = time.minutes(body.end_time);
  if (start === null || end === null || end <= start) fail(400, 'End time must be later than start time.');
+ if (dates.some(date => !scheduleWindow.availabilityStartAllowed(date, body.start_time))) {
+  fail(400, 'For today, availability must start at the current time or later (Manila time).');
+ }
  if (typeof body.is_available !== 'boolean') fail(400, 'Choose whether these hours are open for booking.');
  if (body.repeat_weekly !== undefined && typeof body.repeat_weekly !== 'boolean') fail(400,'Choose whether to repeat weekly.');
  if (body.repeat_weekly) return createRepeat(db,providerId,{dates,start_time:time.to24(body.start_time),end_time:time.to24(body.end_time),is_available:body.is_available});

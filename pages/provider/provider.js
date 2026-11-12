@@ -52,6 +52,8 @@ let lastProviderRouteKey = '';
 const providerBookingActions = new Set();
 const providerProfileActions = new Set();
 const providerRequestsState = { bookings: [], provider: null, filter: 'active', notice: '', noticeType: 'info', signature: '' };
+let providerStartServiceTimer;
+let providerScheduleClockTimer;
 
 async function providerGet(path, options = {}) {
   const headers = new Headers(options.headers);
@@ -265,6 +267,28 @@ function providerNotificationItems(data) {
     href: providerPageHref('requests'),
   }));
   const allBookings = [...(data.bookings || []), ...(data.history_bookings || [])];
+  const uniqueBookings = [...new Map(allBookings.map(booking => [String(booking.id), booking])).values()];
+  const payments = uniqueBookings.flatMap(booking => {
+    if (!booking.deposit_required) return [];
+    const receipt = booking.payment_receipt;
+    if (receipt) return [{
+      id: `payment-receipt-${receipt.id}-${receipt.status}`,
+      kind: 'Payment',
+      title: receipt.status === 'pending' ? 'Downpayment receipt submitted'
+        : receipt.status === 'verified' ? 'Downpayment confirmed' : 'Receipt rejected',
+      body: `${booking.customer_name || 'Customer'} · ${booking.service || 'Booking'} · ${providerMoney(Number(receipt.amount_centavos || 0) / 100)}${receipt.reference_number ? ` · Ref ${receipt.reference_number}` : ''}${receipt.status === 'rejected' && receipt.review_note ? ` · ${receipt.review_note}` : ''}`,
+      time: receipt.status === 'pending' ? receipt.submitted_at : receipt.reviewed_at || receipt.submitted_at,
+      href: providerPageHref('requests'),
+    }];
+    return booking.deposit_status === 'paid' && booking.deposit_paid_at ? [{
+      id: `payment-${booking.id}-${booking.deposit_paid_at}`,
+      kind: 'Payment',
+      title: 'Downpayment received',
+      body: `${booking.customer_name || 'Customer'} · ${booking.service || 'Booking'} · ${providerMoney(booking.deposit_amount)}`,
+      time: booking.deposit_paid_at,
+      href: providerPageHref('requests'),
+    }] : [];
+  });
   const refunds = [...new Map(allBookings.filter((booking) => booking.refund_request).map((booking) => {
     const request = booking.refund_request;
     const statusText = {
@@ -284,7 +308,7 @@ function providerNotificationItems(data) {
     };
     return [item.id, item];
   })).values()];
-  const activity = [...messages, ...bookings, ...refunds]
+  const activity = [...messages, ...bookings, ...refunds, ...payments]
     .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
     .slice(0, verificationNotice.length ? 7 : 8);
   return [...verificationNotice, ...activity];
@@ -1421,7 +1445,9 @@ function renderRequests(bookings, provider) {
               ${booking.status === 'pending' ? `<div class="sn-actions-row">${booking.deposit_required
                 ? (!booking.customer_agreed_at && ['awaiting_price', 'awaiting_payment'].includes(booking.deposit_status) ? `<button class="btn btn-success btn-sm" data-confirm-price>${booking.confirmed_price == null ? 'Confirm Price' : 'Edit Price'}</button>` : '')
                 : '<button class="btn btn-success btn-sm" data-status="upcoming">Accept</button>'}<button class="btn btn-neutral btn-sm" data-status="cancelled">Decline</button></div>` : ''}
-              ${booking.status === 'upcoming' ? '<button class="btn btn-success btn-sm" data-status="ongoing">Start Service</button><button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button>' : ''}
+              ${booking.status === 'upcoming' ? `${SNScheduleWindow.canStartService(booking)
+                ? '<button class="btn btn-success btn-sm" data-start-service data-status="ongoing">Start Service</button>'
+                : `<p class="sn-start-service-hint">${esc(SNScheduleWindow.startServiceMessage(booking))}</p><button class="btn btn-success btn-sm" data-start-service data-status="ongoing" disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}">Start Service</button>`}<button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button>` : ''}
               ${booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark Completed</button>' : ''}
               ${['upcoming','ongoing'].includes(booking.status) ? `<button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false">On the way</button>` : ''}
               ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
@@ -1455,6 +1481,9 @@ function renderRequests(bookings, provider) {
     </div>
   `;
   setProviderRequestsNotice(providerRequestsState.notice, providerRequestsState.noticeType);
+  refreshStartServiceButtons(panel);
+  clearInterval(providerStartServiceTimer);
+  providerStartServiceTimer = setInterval(() => refreshStartServiceButtons(panel), 15000);
   window.SNProviderTracking?.render();
   panel.querySelectorAll('[data-live-tracking]').forEach(button=>button.addEventListener('click',()=>{
     const booking=visibleBookings.find(item=>String(item.id)===button.dataset.liveTracking);
@@ -1521,6 +1550,19 @@ function renderRequests(bookings, provider) {
   });
   document.addEventListener('keydown', closeBookingMapFullscreenOnEscape);
   renderBookingCustomerMap(selectedBooking, provider, { loadDirections: true });
+}
+
+function refreshStartServiceButtons(panel) {
+  if (!panel?.isConnected) return;
+  panel.querySelectorAll('[data-start-service]').forEach(button => {
+    const id = button.closest('[data-booking-card]')?.dataset.bookingCard;
+    const booking = providerRequestsState.bookings.find(item => String(item.id) === String(id));
+    const canStart = SNScheduleWindow.canStartService(booking);
+    button.disabled = !canStart;
+    button.title = canStart ? '' : SNScheduleWindow.startServiceMessage(booking);
+    const hint = button.previousElementSibling;
+    if (hint?.classList.contains('sn-start-service-hint')) hint.hidden = canStart;
+  });
 }
 
 function setProviderRequestsNotice(message, type = 'info') {
@@ -2180,6 +2222,7 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
     <article class="sn-panel sn-schedule-week"><h3>Weekly Schedule</h3><p>Loading schedule...</p></article>
     <article class="sn-panel sn-schedule-create-panel">
       <h3>Add Availability</h3>
+      <p class="sn-schedule-time-hint">For today, choose a start time that is now or later (Manila time).</p>
       <form id="sn-provider-availability-form" class="sn-form-grid sn-schedule-form">
         <div class="sn-form-field">
           <label for="sn-availability-date">Date</label>
@@ -2227,18 +2270,20 @@ function renderSchedule(availability, bookings, preserveDraft = false) {
     scheduleDayChoices();
     document.getElementById('sn-availability-date').addEventListener('change', () => {
       scheduleDayChoices();
+      updateScheduleStartOptions();
       const date = document.getElementById('sn-availability-date').value;
       if (date) { scheduleWeekStart = scheduleMonday(date); loadScheduleWeek(); }
     });
     grid.querySelectorAll('[data-availability-time]').forEach(field => {
       field.addEventListener('change', () => {
-        const hour = field.querySelector('[data-time-hour]').value;
-        const minute = field.querySelector('[data-time-minute]').value;
-        const period = field.querySelector('[data-time-period]').value;
-        field.querySelector('input[type="hidden"]').value = SNTime.to24(`${hour}:${minute} ${period}`);
+        if (field.dataset.availabilityTime === 'start') updateScheduleStartOptions();
+        updateAvailabilityTimeValue(field);
         document.getElementById('sn-provider-schedule-status').hidden = true;
       });
     });
+    updateScheduleStartOptions();
+    clearInterval(providerScheduleClockTimer);
+    providerScheduleClockTimer = setInterval(updateScheduleStartOptions, 15000);
     document.getElementById('sn-provider-availability-form')?.addEventListener('submit', saveAvailabilitySlot);
   }
   loadScheduleWeek();
@@ -2265,6 +2310,49 @@ function availabilityTimeField(key, label) {
       <select data-time-period aria-label="${label} AM/PM"><option>AM</option><option>PM</option></select>
     </div><input id="sn-availability-${key}" name="${key}_time" type="hidden">
   </fieldset>`;
+}
+
+function updateAvailabilityTimeValue(field) {
+  const hour = field.querySelector('[data-time-hour]').value;
+  const minute = field.querySelector('[data-time-minute]').value;
+  const period = field.querySelector('[data-time-period]').value;
+  field.querySelector('input[type="hidden"]').value = hour && minute && period ? SNTime.to24(`${hour}:${minute} ${period}`) : '';
+}
+
+function updateScheduleStartOptions() {
+  const date = document.getElementById('sn-availability-date')?.value;
+  const field = document.querySelector('[data-availability-time="start"]');
+  if (!field) return;
+  const hourSelect = field.querySelector('[data-time-hour]');
+  const minuteSelect = field.querySelector('[data-time-minute]');
+  const periodSelect = field.querySelector('[data-time-period]');
+  const now = SNScheduleWindow.manilaNow();
+  const today = date === now.date;
+  const previous = field.querySelector('input[type="hidden"]').value;
+  for (const periodOption of periodSelect.options) {
+    periodOption.disabled = today && !Array.from(hourSelect.options).some(hour => hour.value &&
+      Array.from(minuteSelect.options).some(minute => minute.value && SNTime.minutes(`${hour.value}:${minute.value} ${periodOption.value}`) >= now.minutes));
+  }
+  if (today && periodSelect.selectedOptions[0]?.disabled) periodSelect.value = now.minutes >= 720 ? 'PM' : 'AM';
+  for (const hour of hourSelect.options) {
+    hour.disabled = today && Boolean(hour.value) && !Array.from(minuteSelect.options).some(minute => minute.value &&
+      SNTime.minutes(`${hour.value}:${minute.value} ${periodSelect.value}`) >= now.minutes);
+  }
+  for (const minute of minuteSelect.options) {
+    minute.disabled = today && Boolean(hourSelect.value) &&
+      SNTime.minutes(`${hourSelect.value}:${minute.value} ${periodSelect.value}`) < now.minutes;
+  }
+  if (today && (!previous || SNTime.minutes(previous) < now.minutes)) {
+    const hour = now.minutes % 720;
+    hourSelect.value = String(Math.floor(hour / 60) || 12);
+    minuteSelect.value = String(now.minutes % 60).padStart(2, '0');
+    periodSelect.value = now.minutes >= 720 ? 'PM' : 'AM';
+  }
+  for (const minute of minuteSelect.options) {
+    minute.disabled = today && Boolean(hourSelect.value) &&
+      SNTime.minutes(`${hourSelect.value}:${minute.value} ${periodSelect.value}`) < now.minutes;
+  }
+  updateAvailabilityTimeValue(field);
 }
 
 async function saveAvailabilitySlot(event) {
@@ -2295,6 +2383,10 @@ async function saveAvailabilitySlot(event) {
   };
   if (!body.dates.length) {
     setScheduleStatus('Select at least one day.', 'error');
+    return;
+  }
+  if (body.dates.some(date => !SNScheduleWindow.availabilityStartAllowed(date, startTime))) {
+    setScheduleStatus('For today, availability must start at the current time or later (Manila time).', 'error');
     return;
   }
 

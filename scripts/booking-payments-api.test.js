@@ -9,14 +9,18 @@ const { createRequire } = require('node:module');
 const express = require('express');
 const { createPayMongo } = require('./paymongo');
 const { hashToken } = require('./account-sessions');
+const scheduleWindow = require('../shared/js/schedule-window');
 
 test('downpayment HTTP flow: ownership, confirmed price, checkout, signed settlement and cancellation', { timeout: 20000 }, async t => {
  const filename = path.join(__dirname, 'auth-server.js');
  const localRequire = createRequire(filename);
  const providerToken = 'a'.repeat(64);
  const customerToken = 'b'.repeat(64);
+ const now = scheduleWindow.manilaNow();
+ const currentTime = `${String(Math.floor(now.minutes / 60)).padStart(2, '0')}:${String(now.minutes % 60).padStart(2, '0')}`;
  let bookings = [1, 2, 3, 4].map(id => ({ id, customer_id: 61, provider_id: 81, service: 'Plumbing Services',
-  amount: 500, status: 'pending', deposit_required: true, deposit_status: 'awaiting_price', price_version: 0, scheduled_date: '2099-10-10', scheduled_time: '10:00 AM' }));
+  amount: 500, status: 'pending', deposit_required: true, deposit_status: 'awaiting_price', price_version: 0,
+  scheduled_date: '2099-10-10', scheduled_time: '10:00 AM' }));
  let checkouts = [];
  let receipts = [];
  let snapshot;
@@ -35,7 +39,7 @@ test('downpayment HTTP flow: ownership, confirmed price, checkout, signed settle
    if (params[0] === hashToken(providerToken)) rows = [{ account_role: 'provider', account_id: 81 }];
    if (params[0] === hashToken(customerToken)) rows = [{ account_role: 'customer', account_id: 61 }];
   } else if (q.startsWith('UPDATE account_sessions')) rows = [{ account_id: params[2] }];
-  else if (q.startsWith('SELECT is_verified')) rows = [{ is_verified: q.includes('providers') || customerVerified }];
+  else if (q.startsWith('SELECT is_verified')) rows = [{ is_verified: q.includes('providers') || customerVerified, verification_status: 'verified' }];
   else if (q.startsWith('SELECT * FROM customer_bookings')) rows = booking && (!q.includes('provider_id = $1') || booking.provider_id === Number(params[0])) && (!q.includes('customer_id = $1') || booking.customer_id === Number(params[0])) ? [booking] : [];
   else if (q.startsWith('SELECT * FROM booking_payments')) rows = checkouts.filter(item => q.includes('checkout_session_id = $1') ? item.checkout_session_id === params[0] : item.booking_id === Number(params[0])).filter(item => !q.includes("status = 'expire_pending'") || item.status === 'expire_pending');
   else if (q.startsWith('SELECT payment_id FROM booking_payment_receipts')) rows = receipts.filter(item => item.disposition === 'credited' && checkouts.find(payment => payment.id === item.checkout_id)?.booking_id === Number(params[0]));
@@ -166,6 +170,8 @@ test('downpayment HTTP flow: ownership, confirmed price, checkout, signed settle
   assert.equal((await notify(event)).status, 200);
   assert.equal(receipts.length, 1);
   assert.equal((await checkout(1)).status, 409);
+  bookings[0].scheduled_date = now.date;
+  bookings[0].scheduled_time = currentTime;
   assert.equal((await request('/api/provider/81/bookings/1/status', 'PATCH', { status: 'ongoing', expected_status: 'upcoming' }, providerToken)).status, 200);
  });
  await t.test('cancellation after payment is refund review, never an automatic refund', async () => {

@@ -2,10 +2,12 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {startQrFixture}=require('./provider-qr-test-fixture');
+const scheduleWindow=require('../shared/js/schedule-window');
 test('private booking tracking validates ownership, GPS freshness, session order and stop lifecycle',async()=>{
  const f=await startQrFixture();
  try {
-  const b=await f.createBooking({status:'upcoming',deposit_required:false,latitude:15.145,longitude:120.59});
+  const now=scheduleWindow.manilaNow();const currentTime=`${String(Math.floor(now.minutes/60)).padStart(2,'0')}:${String(now.minutes%60).padStart(2,'0')}`;
+  const b=await f.createBooking({status:'upcoming',deposit_required:false,latitude:15.145,longitude:120.59,scheduled_date:now.date,scheduled_time:currentTime});
   const url=`/api/provider/81/bookings/${b.id}/tracking`,track=`/api/customer/61/bookings/${b.id}/track`;
   const start=(token=f.providerToken)=>f.request(url,'POST',{},token);
   const read=()=>f.request(track);

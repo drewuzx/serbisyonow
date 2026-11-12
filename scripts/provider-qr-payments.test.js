@@ -5,12 +5,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { imageFile } = require('./provider-qr-payments');
 const { startQrFixture } = require('./provider-qr-test-fixture');
+const scheduleWindow = require('../shared/js/schedule-window');
 
 test('direct QR payment flow with real isolated PostgreSQL transactions', { timeout: 60000 }, async t => {
  const f = await startQrFixture();
  t.after(f.close);
  const { db, request, providerToken, otherProviderToken, otherCustomerToken } = f;
- const booking = await f.createBooking();
+ const now = scheduleWindow.manilaNow();
+ const currentTime = `${String(Math.floor(now.minutes / 60)).padStart(2, '0')}:${String(now.minutes % 60).padStart(2, '0')}`;
+ const booking = await f.createBooking({ scheduled_date: now.date, scheduled_time: currentTime });
  const customer = `/api/customer/61/bookings/${booking.id}`;
  const provider = `/api/provider/81/bookings/${booking.id}`;
  const price = () => request(provider + '/price', 'PATCH', { price: '333.35', price_version: 0 }, providerToken);

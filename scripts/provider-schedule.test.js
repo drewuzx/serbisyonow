@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { startQrFixture } = require('./provider-qr-test-fixture');
+const scheduleWindow = require('../shared/js/schedule-window');
 
 test('weekly availability: ownership, validation, atomic saves, conflicts and full week results', async () => {
  const f = await startQrFixture();
@@ -13,6 +14,12 @@ test('weekly availability: ownership, validation, atomic saves, conflicts and fu
   assert.equal((await f.request('/api/provider/81/schedule-week?start=2099-10-05', 'GET', undefined, f.customerToken)).status, 403);
   for (const patch of [{ dates:[] }, { dates:['2099-02-30'] }, { dates:['2099-10-05','2099-10-12'] }, { dates:['2000-01-01'] }, { end_time:'08:00' }, { start_time:'25:00' }, { is_available:'true' }]) {
    assert.equal((await f.request(route, 'POST', {...body,...patch}, f.providerToken)).status, 400, JSON.stringify(patch));
+  }
+  const now = scheduleWindow.manilaNow();
+  if (now.minutes > 0) {
+   const earlier = now.minutes - 1;
+   const pastTime = `${String(Math.floor(earlier / 60)).padStart(2, '0')}:${String(earlier % 60).padStart(2, '0')}`;
+   assert.equal((await f.request(route, 'POST', { ...body, dates:[now.date], start_time:pastTime, end_time:'23:59' }, f.providerToken)).status, 400);
   }
   assert.equal((await f.request(route, 'POST', body, f.providerToken)).status, 201);
   assert.equal((await f.request(route, 'POST', body, f.providerToken)).status, 409);

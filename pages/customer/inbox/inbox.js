@@ -152,6 +152,33 @@ function customerNotificationItems({ messages = [], bookings = [], customer = nu
     time: customer.verification_updated_at,
     href: '../profile/profile.html',
   }] : [];
+  const paymentUpdates = bookings.flatMap((booking) => {
+    const receipt = booking.payment_receipt;
+    if (receipt?.status === 'rejected') return [{
+      id: `payment-receipt-${receipt.id}-rejected`,
+      kind: 'Payment',
+      title: 'Payment receipt declined',
+      body: `${booking.provider_name || 'Your provider'} could not verify the receipt for ${booking.service || 'your service'}.${receipt.review_note ? ` Reason: ${receipt.review_note}` : ''}`,
+      time: receipt.reviewed_at || receipt.submitted_at,
+      href: '../bookings/bookings.html',
+    }];
+    if (receipt?.status === 'verified') return [{
+      id: `payment-receipt-${receipt.id}-verified`,
+      kind: 'Payment',
+      title: 'Downpayment verified',
+      body: `${booking.provider_name || 'Your provider'} confirmed your payment for ${booking.service || 'the service'}.`,
+      time: receipt.reviewed_at || receipt.submitted_at,
+      href: '../bookings/bookings.html',
+    }];
+    return booking.deposit_status === 'paid' && booking.deposit_paid_at ? [{
+      id: `payment-${booking.id}-${booking.deposit_paid_at}`,
+      kind: 'Payment',
+      title: 'Downpayment received',
+      body: `Your downpayment for ${booking.service || 'the service'} was confirmed.`,
+      time: booking.deposit_paid_at,
+      href: '../bookings/bookings.html',
+    }] : [];
+  });
   return [
     ...verificationItems,
     ...messages.filter((message) => message.sender_role === 'provider').slice(0, 5).map((message) => ({
@@ -170,6 +197,7 @@ function customerNotificationItems({ messages = [], bookings = [], customer = nu
       time: booking.created_at,
       href: '../bookings/bookings.html',
     })),
+    ...paymentUpdates,
   ].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0)).slice(0, 8);
 }
 

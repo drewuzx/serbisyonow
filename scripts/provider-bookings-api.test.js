@@ -7,13 +7,16 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const express = require('express');
+const scheduleWindow = require('../shared/js/schedule-window');
 
 test('provider booking HTTP workflow, GPS serialization and transaction rollback', { timeout: 15000 }, async t => {
  const filename = path.join(__dirname, 'auth-server.js');
  const localRequire = createRequire(filename);
+ const now = scheduleWindow.manilaNow();
+ const currentTime = `${String(Math.floor(now.minutes / 60)).padStart(2, '0')}:${String(now.minutes % 60).padStart(2, '0')}`;
  let bookings = Array.from({ length: 5 }, (_, index) => ({
   id: index + 1, provider_id: 81, customer_id: 61, service: 'General House Cleaning',
-  status: 'pending', provider_closed: false, scheduled_date: '2026-10-01', scheduled_time: '09:00 AM',
+  status: 'pending', provider_closed: false, scheduled_date: now.date, scheduled_time: currentTime,
   address: 'Test address, Angeles City', latitude: null, longitude: null,
  }));
  Object.assign(bookings[0], { latitude: '15.1443', longitude: '120.5894' });
@@ -28,6 +31,7 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
    let rows = [];
    const booking = bookings.find(row => row.provider_id === Number(params[0]) && row.id === Number(params[1]));
    if (query.startsWith('SELECT account_role')) rows = [{ account_role: 'provider', account_id: 81 }];
+   else if (query.startsWith('SELECT is_verified, verification_status FROM providers')) rows = [{ is_verified: true, verification_status: 'verified' }];
    else if (query.startsWith('UPDATE account_sessions')) rows = [{ account_id: 81 }];
    else if (query === 'BEGIN') snapshot = { bookings: structuredClone(bookings), available };
    else if (query === 'ROLLBACK') { bookings = snapshot.bookings; available = snapshot.available; }
@@ -89,7 +93,7 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
 
  await t.test('accept returns saved GPS and is idempotent', async () => {
   const result = await request(1, 'upcoming', 'pending');
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.booking.status, 'upcoming');
   assert.equal(result.data.booking.customer_latitude, 15.1443);
   assert.equal(result.data.booking.customer_longitude, 120.5894);
@@ -108,6 +112,10 @@ test('provider booking HTTP workflow, GPS serialization and transaction rollback
   assert.equal((await request(1, 'archive')).status, 404);
  });
  await t.test('start, complete and archive preserve history', async () => {
+  bookings[0].scheduled_date = '2099-10-01';
+  assert.equal((await request(1, 'ongoing', 'upcoming')).status, 409, 'service cannot start before its scheduled date');
+  bookings[0].scheduled_date = now.date;
+  bookings[0].scheduled_time = currentTime;
   assert.equal((await request(1, 'ongoing', 'upcoming')).data.booking.status, 'ongoing');
   assert.equal((await request(1, 'completed', 'ongoing')).data.booking.status, 'completed');
   assert.equal((await request(1, 'cancelled')).status, 409);

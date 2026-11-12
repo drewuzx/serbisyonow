@@ -2,6 +2,7 @@
 const { cancelBookingPayment } = require('./booking-payments');
 const { unoccupiedSlot } = require('./availability');
 const { clearBookingTracking } = require('./booking-tracking');
+const scheduleWindow = require('../shared/js/schedule-window');
 
 const transitions = {
  pending: ['upcoming', 'cancelled'],
@@ -40,6 +41,9 @@ async function changeProviderBookingStatus(db, providerId, bookingId, nextStatus
   if (booking.status === status) {
    await client.query('COMMIT');
    return booking;
+  }
+  if (status === 'ongoing' && !scheduleWindow.canStartService(booking)) {
+   fail(409, scheduleWindow.startServiceMessage(booking));
   }
   if ((expectedStatus && expectedStatus !== booking.status) || !transitions[booking.status]?.includes(status)) {
    fail(409, `This booking is now ${booking.status}. Refresh the bookings before trying again.`);

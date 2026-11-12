@@ -31,9 +31,10 @@ const { registerAdminProviderDetails } = require('./admin-provider-details');
 const { registerAdminReports } = require('./admin-reports');
 const { registerProfilePhotos } = require('./profile-photos');
 const { loadWeek, saveWeek } = require('./provider-schedule');
+const scheduleWindow = require('../shared/js/schedule-window');
+const scheduleTime = require('../shared/js/time-format');
 const { ensureRepeats, stopRepeat } = require('./recurring-schedule');
 const { bookableSlot, unoccupiedSlot, updateSlot } = require('./availability');
-const scheduleTime = require('../shared/js/time-format');
 const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
@@ -1676,6 +1677,7 @@ function customerBookingRow(row) {
     amount: Number(row.amount || 0),
     payment_method: row.payment_method || 'cash',
     service_details: row.service_details || {},
+    payment_receipt: row.payment_receipt || null,
     pricing_type: row.pricing_type || 'provider_quote',
     estimated_min: Number(row.estimated_min || 0),
     estimated_max: Number(row.estimated_max || 0),
@@ -1874,6 +1876,7 @@ function providerBookingRow(row) {
   const locationSource = hasBookingGps ? 'booking-gps' : hasCustomerGps ? 'customer-gps' : 'none';
   return {
     ...bookingPaymentView(row),
+    payment_receipt: row.payment_receipt || null,
     refund_request: refundRequestView(row.refund_request),
     id: row.id,
     customer_id: row.customer_id,
@@ -2524,9 +2527,18 @@ app.get('/api/customer/:id/dashboard', asyncRoute(async (req, res) => {
         p.latitude AS provider_latitude,
         p.longitude AS provider_longitude,
         p.location_accuracy_m AS provider_location_accuracy_m,
-        p.location_updated_at AS provider_location_updated_at
+        p.location_updated_at AS provider_location_updated_at,
+        pr.payment_receipt
       FROM customer_bookings b
       LEFT JOIN providers p ON p.id = b.provider_id
+      LEFT JOIN LATERAL (
+        SELECT jsonb_build_object('id', r.id, 'status', r.status, 'reference_number', r.reference_number,
+          'amount_centavos', r.amount_centavos, 'submitted_at', r.submitted_at, 'reviewed_at', r.reviewed_at,
+          'review_note', r.review_note) AS payment_receipt
+        FROM provider_direct_payment_receipts r
+        WHERE r.id = b.deposit_receipt_id AND r.booking_id = b.id
+        LIMIT 1
+      ) pr ON TRUE
       WHERE b.customer_id = $1
       ORDER BY b.scheduled_date DESC, b.id DESC
     `, [customerId]),
@@ -3617,7 +3629,8 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
         c.longitude AS customer_longitude,
         c.location_accuracy_m AS customer_location_accuracy_m,
         c.location_updated_at AS customer_location_updated_at,
-        rr.refund_request
+        rr.refund_request,
+        pr.payment_receipt
       FROM customer_bookings b
       LEFT JOIN customers c ON c.id = b.customer_id
       LEFT JOIN LATERAL (
@@ -3627,6 +3640,14 @@ app.get('/api/provider/:id/dashboard', asyncRoute(async (req, res) => {
           'sent_at', r.sent_at, 'customer_confirmed_at', r.customer_confirmed_at) AS refund_request
         FROM booking_refund_requests r WHERE r.booking_id = b.id ORDER BY r.id DESC LIMIT 1
       ) rr ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT jsonb_build_object('id', r.id, 'status', r.status, 'reference_number', r.reference_number,
+          'amount_centavos', r.amount_centavos, 'submitted_at', r.submitted_at, 'reviewed_at', r.reviewed_at,
+          'review_note', r.review_note) AS payment_receipt
+        FROM provider_direct_payment_receipts r
+        WHERE r.id = b.deposit_receipt_id AND r.booking_id = b.id
+        LIMIT 1
+      ) pr ON TRUE
       WHERE b.provider_id = $1
       ORDER BY b.scheduled_date DESC, b.id DESC
     `, [providerId]),
@@ -3877,6 +3898,11 @@ app.delete('/api/provider/:id/schedule-repeats/:repeatId', asyncRoute(async (req
 app.post('/api/provider/:id/availability', asyncRoute(async (req, res) => {
   await authenticateAccount(db, req, 'provider', req.params.id);
   requireFields(req.body, ['available_date', 'start_time', 'end_time']);
+  if (!scheduleWindow.availabilityStartAllowed(req.body.available_date, req.body.start_time)) {
+    return res.status(400).json({ message: 'For today, availability must start at the current time or later (Manila time).' });
+  }
+  const start = scheduleTime.minutes(req.body.start_time), end = scheduleTime.minutes(req.body.end_time);
+  if (start === null || end === null || end <= start) return res.status(400).json({ message: 'End time must be later than start time.' });
   const result = await db.query(`
     INSERT INTO provider_availability (provider_id, available_date, start_time, end_time, is_available)
     VALUES ($1, $2, $3, $4, COALESCE($5, TRUE))

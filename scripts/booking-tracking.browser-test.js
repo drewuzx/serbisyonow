@@ -4,10 +4,12 @@ const os=require('node:os');
 const path=require('node:path');
 const {chromium}=require('playwright');
 const {startQrFixture}=require('./provider-qr-test-fixture');
+const scheduleWindow=require('../shared/js/schedule-window');
 (async()=>{
  const f=await startQrFixture();let browser;
  try {
-  const booking=await f.createBooking({status:'upcoming',deposit_required:false,latitude:15.145,longitude:120.59});
+  const now=scheduleWindow.manilaNow();const currentTime=`${String(Math.floor(now.minutes/60)).padStart(2,'0')}:${String(now.minutes%60).padStart(2,'0')}`;
+  const booking=await f.createBooking({status:'upcoming',deposit_required:false,latitude:15.145,longitude:120.59,scheduled_date:now.date,scheduled_time:currentTime});
   await f.db.query('UPDATE providers SET latitude=15.15,longitude=120.6 WHERE id=81');
   const customer={...(await f.request('/api/auth/customer/session')).data.user,auth_token:f.customerToken};
   const provider={...(await f.request('/api/auth/provider/session','GET',undefined,f.providerToken)).data.user,auth_token:f.providerToken};
