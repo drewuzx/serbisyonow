@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const { authenticateAccount } = require('./account-sessions');
 const { transaction, fail } = require('./booking-payments');
+const scheduleWindow = require('../shared/js/schedule-window');
 const eligible = booking => ['upcoming', 'ongoing'].includes(booking.status) && !booking.provider_closed;
 const number = (value, min, max) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 
@@ -18,6 +19,7 @@ function registerBookingTracking(app, db, wrap, bookingView) {
    const { rows:[booking] } = await client.query('SELECT * FROM customer_bookings WHERE id=$1 AND provider_id=$2 FOR UPDATE', [req.params.bookingId,req.params.id]);
    if (!booking) fail(404,'Booking not found.');
    if (!eligible(booking)) fail(409,'Live tracking is available only for accepted or ongoing bookings.');
+   if (!scheduleWindow.canStartService(booking)) fail(409, scheduleWindow.startServiceMessage(booking));
    await client.query('UPDATE booking_live_locations SET active=FALSE,latitude=NULL,longitude=NULL,accuracy_m=NULL,observed_at=NULL WHERE provider_id=$1', [req.params.id]);
    const session = crypto.randomUUID();
    await client.query(`INSERT INTO booking_live_locations(booking_id,provider_id,session_id) VALUES($1,$2,$3)

@@ -11,6 +11,8 @@ test('private booking tracking validates ownership, GPS freshness, session order
   const url=`/api/provider/81/bookings/${b.id}/tracking`,track=`/api/customer/61/bookings/${b.id}/track`;
   const start=(token=f.providerToken)=>f.request(url,'POST',{},token);
   const read=()=>f.request(track);
+  const future=await f.createBooking({status:'upcoming',deposit_required:false,scheduled_date:scheduleWindow.dateKey(new Date(Date.now()+86400000)),scheduled_time:'09:00'});
+  assert.equal((await f.request(`/api/provider/81/bookings/${future.id}/tracking`,'POST',{},f.providerToken)).status,409,'tracking cannot start before the booking date');
   assert.equal((await start(f.otherProviderToken)).status,403);
   assert.equal((await start(f.customerToken)).status,403);
   assert.equal((await start('')).status,401);

@@ -5,8 +5,11 @@
  function render() {
   document.querySelectorAll('[data-live-tracking]').forEach(button=>{
    const sharing=String(active?.id)===button.dataset.liveTracking;
+   const booking=providerRequestsState.bookings.find(item=>String(item.id)===button.dataset.liveTracking);
+   const canStart=SNScheduleWindow.canStartService(booking);
    button.textContent=sharing?'Stop sharing location':'On the way';
-   button.disabled=starting;
+   button.disabled=starting||(!sharing&&!canStart);
+   button.title=sharing||canStart?'':SNScheduleWindow.startServiceMessage(booking);
    button.setAttribute('aria-pressed',String(sharing));
   });
   const notice=document.getElementById('sn-live-tracking-notice');
@@ -52,6 +55,8 @@
  async function toggle(id) {
   if(starting) return;
   if(String(active?.id)===String(id)) {stop();return;}
+  const booking=providerRequestsState.bookings.find(item=>String(item.id)===String(id));
+  if(!SNScheduleWindow.canStartService(booking)) {tell(SNScheduleWindow.startServiceMessage(booking));return;}
   if(!navigator.geolocation) {tell('Location access is unavailable in this browser.');return;}
   if(active) stop();
   starting=true;const version=++generation;tell('Requesting location permission...');

@@ -606,6 +606,10 @@ body {
 }
 
 .sn-request-filters button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 40px;
   padding: 8px 12px;
   border: 1px solid var(--border);
@@ -623,8 +627,7 @@ body {
   color: var(--white);
 }
 
-.sn-request-filters button[data-request-filter="cancelled"] { margin-left: auto; }
-.sn-request-filters span { margin-left: 5px; font-variant-numeric: tabular-nums; }
+.sn-request-filters span { font-variant-numeric: tabular-nums; }
 
 .sn-panel .sn-requests-notice {
   margin-top: 12px;
@@ -1096,6 +1099,7 @@ body {
   gap: 12px;
   padding: 20px 16px 16px;
   max-height: 100%;
+  container-type: inline-size;
 }
 
 .sn-provider-history-layout .sn-page-title {
@@ -1180,6 +1184,9 @@ body {
 }
 
 .sn-provider-history-layout .sn-filter-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   min-height: 40px;
   padding: 0 6px;
@@ -1192,6 +1199,14 @@ body {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+@container (max-width: 420px) {
+  .sn-provider-history-layout .sn-filter-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .sn-provider-history-layout .sn-filter-tab.active {

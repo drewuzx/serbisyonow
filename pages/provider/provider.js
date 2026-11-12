@@ -1449,7 +1449,7 @@ function renderRequests(bookings, provider) {
                 ? '<button class="btn btn-success btn-sm" data-start-service data-status="ongoing">Start Service</button>'
                 : `<p class="sn-start-service-hint">${esc(SNScheduleWindow.startServiceMessage(booking))}</p><button class="btn btn-success btn-sm" data-start-service data-status="ongoing" disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}">Start Service</button>`}<button class="btn btn-danger btn-sm" data-status="cancelled">Cancel Booking</button>` : ''}
               ${booking.status === 'ongoing' ? '<button class="btn btn-success btn-sm" data-status="completed">Mark Completed</button>' : ''}
-              ${['upcoming','ongoing'].includes(booking.status) ? `<button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false">On the way</button>` : ''}
+              ${['upcoming','ongoing'].includes(booking.status) ? `<button class="btn btn-outline btn-sm" data-live-tracking="${booking.id}" aria-pressed="false" ${SNScheduleWindow.canStartService(booking) ? '' : `disabled title="${esc(SNScheduleWindow.startServiceMessage(booking))}"`}>On the way</button>` : ''}
               ${['completed', 'cancelled'].includes(booking.status) ? '<button class="btn btn-outline btn-sm" data-close-booking>Move to History</button>' : ''}
             </div>
           </article>
@@ -1554,14 +1554,20 @@ function renderRequests(bookings, provider) {
 
 function refreshStartServiceButtons(panel) {
   if (!panel?.isConnected) return;
-  panel.querySelectorAll('[data-start-service]').forEach(button => {
+  panel.querySelectorAll('[data-start-service], [data-live-tracking]').forEach(button => {
     const id = button.closest('[data-booking-card]')?.dataset.bookingCard;
     const booking = providerRequestsState.bookings.find(item => String(item.id) === String(id));
     const canStart = SNScheduleWindow.canStartService(booking);
-    button.disabled = !canStart;
-    button.title = canStart ? '' : SNScheduleWindow.startServiceMessage(booking);
-    const hint = button.previousElementSibling;
-    if (hint?.classList.contains('sn-start-service-hint')) hint.hidden = canStart;
+    if (button.hasAttribute('data-start-service')) {
+      button.disabled = !canStart;
+      button.title = canStart ? '' : SNScheduleWindow.startServiceMessage(booking);
+      const hint = button.previousElementSibling;
+      if (hint?.classList.contains('sn-start-service-hint')) hint.hidden = canStart;
+    } else {
+      const sharing = button.getAttribute('aria-pressed') === 'true';
+      button.disabled = !canStart && !sharing;
+      button.title = canStart || sharing ? '' : SNScheduleWindow.startServiceMessage(booking);
+    }
   });
 }
 
