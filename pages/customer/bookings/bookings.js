@@ -774,7 +774,7 @@ function bookingConfirm(message, options = {}) {
    <h3 class="sn-modal-title">${bookingEsc(options.title || 'Confirm action')}</h3>
    <p class="sn-modal-body">${bookingEsc(message)}</p>
    <div class="sn-modal-actions">
-    <button class="btn btn-outline" type="button" data-confirm="no">Keep Booking</button>
+    <button class="btn btn-outline" type="button" data-confirm="no">${bookingEsc(options.cancelText || 'Keep Booking')}</button>
     <button class="btn btn-primary" type="button" data-confirm="yes">${bookingEsc(options.confirmText || 'Confirm')}</button>
    </div>
   </div>
@@ -946,6 +946,7 @@ function bookingServiceDetailRows(details = {}) {
 
 function closeBookingModal(modal) {
  modal?.trackingDispose?.();
+ if (modal?.refundProofUrl) URL.revokeObjectURL(modal.refundProofUrl);
  modal?.remove();
  document.body.classList.remove('sn-modal-open');
 }
@@ -954,6 +955,7 @@ async function showBookingDetails(booking) {
  if (!booking) return;
  const detail = await getBookingDetails(booking);
  const item = detail.booking || booking;
+ if (!item.refund_request && booking.refund_request) item.refund_request = booking.refund_request;
  const trackingMessage = detail.message || (item.provider_location_updated_at ? 'Provider GPS has been shared.' : 'Tracking details will appear when available.');
  const customerPin = detail.customer_pin
   ? `${Number(detail.customer_pin.lat).toFixed(5)}, ${Number(detail.customer_pin.lng).toFixed(5)}`
@@ -979,7 +981,7 @@ async function showBookingDetails(booking) {
     ${item.deposit_amount != null ? bookingDetailRow('30% downpayment', bookingMoney(item.deposit_amount)) + bookingDetailRow('70% remaining balance', bookingMoney(item.balance_due)) : ''}
     ${item.price_notes ? bookingDetailRow('Confirmed price notes', item.price_notes) : ''}
     ${item.deposit_livemode === false ? bookingDetailRow('Payment mode', 'Test payment only. No real funds received.') : ''}
-    ${item.deposit_status === 'refund_review' ? bookingDetailRow('Refund', 'Review required. Not automatically refunded; contact support.') : ''}
+    ${item.refund_request ? bookingDetailRow('Refund request', item.refund_request.status.replace(/_/g, ' ')) : item.deposit_status === 'refund_review' ? bookingDetailRow('Refund', item.deposit_channel === 'provider_qr' ? 'Request a refund from the provider below. Transfers are handled manually.' : 'Platform payment refund needs support review.') : ''}
     ${bookingDetailRow('Service address', item.address)}
     ${bookingDetailRow('Landmark / unit', item.service_details?.booking_location?.landmark)}
     ${bookingDetailRow('Customer pin', customerPin)}
@@ -991,6 +993,7 @@ async function showBookingDetails(booking) {
     <div data-live-map role="region" aria-label="Live provider and service location map"></div>
     <p data-live-eta></p>
    </section>
+   ${item.deposit_channel === 'provider_qr' && item.deposit_status === 'refund_review' ? `<section class="sn-booking-refund-panel"><h4>30% downpayment refund</h4><p>Refunds are transferred manually by the provider. Never confirm until the money is visible in your account.</p><div data-refund-content></div></section>` : ''}
    <div class="sn-modal-actions">
     ${item.provider_id ? `<a class="btn btn-outline" href="../inbox/inbox.html?provider_id=${bookingEsc(item.provider_id)}">Message</a>` : ''}
     <button class="btn btn-primary" type="button">Done</button>
@@ -1005,8 +1008,94 @@ async function showBookingDetails(booking) {
  modal.addEventListener('keydown',event=>{if(event.key==='Escape') closeBookingModal(modal);});
  modal.querySelector('.sn-modal-close')?.addEventListener('click', () => closeBookingModal(modal));
  modal.querySelector('.btn-primary')?.addEventListener('click', () => closeBookingModal(modal));
+ if (item.deposit_channel === 'provider_qr' && item.deposit_status === 'refund_review') renderCustomerRefund(modal, item);
  modal.addEventListener('click', (event) => {
   if (event.target === modal) closeBookingModal(modal);
+ });
+}
+
+async function renderCustomerRefund(modal, booking) {
+ const host = modal.querySelector('[data-refund-content]');
+ if (!host) return;
+ const request = booking.refund_request;
+ if (!request || request.status === 'rejected') {
+  host.innerHTML = `<button class="btn btn-outline" type="button" data-refund-request>${request ? 'Request again' : 'Request refund'}</button>`;
+  host.querySelector('[data-refund-request]').onclick = async event => {
+   const reason = await bookingRefundReason();
+   if (reason === null) return;
+   event.currentTarget.disabled = true;
+   try {
+    await bookingFetch(`/api/customer/${getCurrentCustomer().id}/bookings/${booking.id}/refund-requests`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
+    window.location.reload();
+   } catch (error) { await bookingAlert(error.message, { title: 'Refund Request Not Sent', type: 'warning' }); event.currentTarget.disabled = false; }
+  };
+  return;
+ }
+ const labels = { pending_provider: 'Waiting for provider review', approved: 'Approved. Waiting for the provider to send the refund.', rejected: 'Refund request declined', refund_sent: 'Provider marked the refund as sent', customer_confirmed: 'Refund received and confirmed' };
+ host.innerHTML = `<p><strong>${bookingEsc(labels[request.status] || request.status)}</strong></p><p>Amount: ${bookingMoney(request.amount)}</p><p>${bookingEsc(request.reason)}</p>${request.provider_note ? `<p>Provider note: ${bookingEsc(request.provider_note)}</p>` : ''}${request.refund_reference ? `<p>Transfer reference: ${bookingEsc(request.refund_reference)}</p>` : ''}${request.status === 'refund_sent' ? `<img data-refund-proof alt="Provider refund transfer proof" class="sn-payment-receipt-image" hidden><button type="button" class="btn btn-primary" data-refund-confirm>I received the refund</button><small>Only confirm after checking your bank or e-wallet balance.</small>` : ''}`;
+ if (request.has_proof) {
+  const image = host.querySelector('[data-refund-proof]');
+  try {
+   const customer = getCurrentCustomer();
+   const response = await fetch(`${BOOKING_API_BASE}/api/booking-refunds/${request.id}/proof?role=customer`, { headers: customer?.auth_token ? { Authorization: `Bearer ${customer.auth_token}` } : {} });
+   if (!response.ok) throw new Error('Proof image unavailable.');
+   const url = URL.createObjectURL(await response.blob());
+   image.src = url; image.hidden = false;
+   modal.refundProofUrl = url;
+  } catch {}
+ }
+ host.querySelector('[data-refund-confirm]')?.addEventListener('click', async event => {
+  const confirmed = await bookingConfirm('Only confirm after you have checked your bank or e-wallet and can see the refund. This will record that you received the money.', {
+   title: 'Confirm Refund Received', confirmText: 'Yes, I received it', cancelText: 'Not yet', type: 'warning',
+  });
+  if (!confirmed) return;
+  event.currentTarget.disabled = true;
+  try { await bookingFetch(`/api/customer/${getCurrentCustomer().id}/bookings/${booking.id}/refund-requests/confirm`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm_received: true }) }); window.location.reload(); }
+  catch (error) { await bookingAlert(error.message, { title: 'Confirmation Not Saved', type: 'warning' }); event.currentTarget.disabled = false; }
+ });
+}
+
+function bookingRefundReason() {
+ const modal = document.createElement('div');
+ modal.className = 'sn-modal sn-modal--info sn-refund-reason-dialog';
+ modal.setAttribute('role', 'dialog');
+ modal.setAttribute('aria-modal', 'true');
+ modal.setAttribute('aria-labelledby', 'sn-refund-reason-title');
+ modal.innerHTML = `<form class="sn-modal-card"><button class="sn-modal-close" type="button" aria-label="Close">x</button><div class="sn-modal-icon sn-modal-icon--info">i</div><h3 class="sn-modal-title" id="sn-refund-reason-title">Request a Downpayment Refund</h3><p class="sn-modal-body">Tell the provider why you are requesting a refund of your 30% downpayment.</p><label class="sn-refund-reason-label" for="sn-refund-reason">Reason for request</label><textarea id="sn-refund-reason" class="sn-refund-reason-input" name="reason" rows="4" minlength="5" maxlength="1000" required placeholder="Enter your reason"></textarea><p class="sn-refund-reason-hint">5 to 1,000 characters</p><p class="sn-refund-reason-error" role="alert" hidden></p><div class="sn-modal-actions"><button class="btn btn-outline" type="button" data-refund-cancel>Cancel</button><button class="btn btn-primary" type="submit">Send request</button></div></form>`;
+ document.body.appendChild(modal);
+ document.body.classList.add('sn-modal-open');
+ const form = modal.querySelector('form');
+ const input = form.elements.reason;
+ const error = form.querySelector('[role="alert"]');
+ const previousFocus = document.activeElement;
+ return new Promise(resolve => {
+  let finished = false;
+  const finish = value => {
+   if (finished) return;
+   finished = true;
+   modal.remove();
+   document.body.classList.remove('sn-modal-open');
+   document.removeEventListener('keydown', onKey);
+   previousFocus?.focus?.();
+   resolve(value);
+  };
+  const onKey = event => { if (event.key === 'Escape') finish(null); };
+  document.addEventListener('keydown', onKey);
+  form.querySelector('.sn-modal-close').onclick = () => finish(null);
+  form.querySelector('[data-refund-cancel]').onclick = () => finish(null);
+  modal.addEventListener('click', event => { if (event.target === modal) finish(null); });
+  form.onsubmit = event => {
+   event.preventDefault();
+   const reason = input.value.trim();
+   if (reason.length < 5 || reason.length > 1000) {
+    error.textContent = 'Please enter a reason between 5 and 1,000 characters.';
+    error.hidden = false;
+    input.focus();
+    return;
+   }
+   finish(reason);
+  };
+  requestAnimationFrame(() => input.focus());
  });
 }
 

@@ -2249,6 +2249,11 @@ body {
 .sn-booking-payment-summary dt { color: #52647c; }
 .sn-booking-payment-summary dd { margin: 0; font-weight: 700; text-align: right; white-space: nowrap; }
 .sn-booking-payment-summary p { margin: 7px 0; overflow-wrap: anywhere; }
+.sn-refund-request { border-top: 1px solid #d8e4f7; margin-top: 10px; padding-top: 10px; }
+.sn-refund-request p { overflow-wrap: anywhere; }
+.sn-refund-request .sn-actions-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sn-refund-sent-dialog .sn-modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.sn-refund-sent-dialog .sn-modal-field { display: grid; gap: 6px; margin: 12px 0; }
 .sn-price-dialog { z-index: 10050; }
 .sn-price-dialog [hidden] { display: none !important; }
 .sn-price-dialog .sn-modal { border-radius: 8px; max-height: calc(100dvh - 44px); overflow-y: auto; }
