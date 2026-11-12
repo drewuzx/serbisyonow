@@ -1332,18 +1332,13 @@ body {
 .sn-provider-history-layout .sn-provider-info-avatar {
   display: block;
   border-radius: 16px;
-  background: linear-gradient(135deg, #4f8ef7, #2563eb);
+  background: #fff url('/shared/images/default-profile.svg') center / cover no-repeat;
 }
 
 .sn-provider-history-layout .sn-hi-avatar {
   width: 50px;
   height: 50px;
 }
-
-.sn-provider-history-layout .sn-hi-avatar--2 { background: linear-gradient(135deg, #f97316, #dc2626); }
-.sn-provider-history-layout .sn-hi-avatar--3 { background: linear-gradient(135deg, #22c55e, #16a34a); }
-.sn-provider-history-layout .sn-hi-avatar--4 { background: linear-gradient(135deg, #a855f7, #7c3aed); }
-.sn-provider-history-layout .sn-hi-avatar--5 { background: linear-gradient(135deg, #f59e0b, #d97706); }
 
 .sn-provider-history-layout .sn-hi-info {
   min-width: 0;
