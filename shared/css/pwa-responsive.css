@@ -1196,26 +1196,26 @@ body.sn-payment-dialog-open { overflow: hidden; }
 
 /* Consistent page rhythm across customer, provider, and admin workspaces. */
 .sn-shell,
-.sn-shell--provider { gap: 24px; }
+.sn-shell--provider { gap: 18px; }
 
 .sn-main,
-.sn-shell--provider .sn-main { gap: 24px; }
+.sn-shell--provider .sn-main { gap: 18px; }
 
 .admin-wrap {
-  gap: 24px;
-  padding: 28px 24px 40px;
+  gap: 18px;
+  padding: 20px 20px 28px;
 }
 
-.admin-module-nav { gap: 12px; padding: 14px; }
+.admin-module-nav { gap: 10px; padding: 12px; }
 
 .metrics-grid,
-.admin-grid { gap: 18px; }
+.admin-grid { gap: 14px; }
 
 .admin-card,
-.admin-panel { padding: 22px; }
+.admin-panel { padding: 18px; }
 
-.admin-panel-head { margin-bottom: 18px; }
-.admin-list { gap: 14px; margin-top: 18px; }
+.admin-panel-head { margin-bottom: 14px; }
+.admin-list { gap: 10px; margin-top: 14px; }
 
 @media (max-width: 680px) {
   .sn-shell,
@@ -1225,21 +1225,21 @@ body.sn-payment-dialog-open { overflow: hidden; }
   .sn-shell--provider .sn-main { gap: 18px; }
 
   .admin-wrap {
-    gap: 18px;
-    padding: 20px 16px 32px;
+    gap: 14px;
+    padding: 16px 14px 24px;
   }
 
   .admin-module-nav { gap: 8px; padding: 12px; }
   .metrics-grid,
-  .admin-grid { gap: 14px; }
+  .admin-grid { gap: 12px; }
   .admin-card,
-  .admin-panel { padding: 18px; }
-  .admin-panel-head { margin-bottom: 14px; }
-  .admin-list { gap: 12px; margin-top: 14px; }
+  .admin-panel { padding: 16px; }
+  .admin-panel-head { margin-bottom: 12px; }
+  .admin-list { gap: 10px; margin-top: 12px; }
 }
 
 @media (max-width: 380px) {
-  .admin-wrap { gap: 16px; padding: 16px 12px 28px; }
+  .admin-wrap { gap: 12px; padding: 12px 10px 20px; }
   .admin-card,
-  .admin-panel { padding: 16px; }
+  .admin-panel { padding: 14px; }
 }

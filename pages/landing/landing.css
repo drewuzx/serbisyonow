@@ -161,7 +161,7 @@
 
 /* ── Service Categories ── */
 #services {
-  padding-block: 80px;
+  padding-block: 56px;
 }
 
 #services .section-title {
@@ -409,7 +409,7 @@
 
 @media (max-width: 480px) {
   .footer-inner { grid-template-columns: 1fr; }
-  #services { padding-block: 56px; }
+  #services { padding-block: 40px; }
   #services .section-title { margin-bottom: 8px; }
   .service-categories {
     grid-template-columns: repeat(2, minmax(0, 1fr));

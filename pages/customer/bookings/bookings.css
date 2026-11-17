@@ -678,7 +678,7 @@
 }
 
 /* â”€â”€ Booking Groups â”€â”€ */
-.sn-bookings { display: flex; flex-direction: column; gap: 24px; }
+.sn-bookings { display: flex; flex-direction: column; gap: 16px; }
 .sn-booking-group { display: flex; flex-direction: column; gap: 14px; }
 .sn-group-label {
   display: flex;

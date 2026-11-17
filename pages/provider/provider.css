@@ -153,8 +153,8 @@ body {
 
 .sn-shell--provider .sn-topbar {
   min-height: 88px;
-  padding: 18px 26px;
-  gap: 28px;
+  padding: 14px 20px;
+  gap: 18px;
   border-radius: 26px;
   border: 1px solid rgba(149, 164, 186, 0.35);
   box-shadow: 0 10px 30px rgba(31, 55, 88, 0.08);
@@ -2068,7 +2068,7 @@ body {
 
 .sn-panel.sn-provider-account-page { border-radius: 0; box-shadow: none; padding: 24px; }
 .sn-provider-account-page [hidden] { display: none !important; }
-.sn-provider-account-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.8fr); gap: 32px; align-items: start; }
+.sn-provider-account-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.8fr); gap: 22px; align-items: start; }
 .sn-provider-account-grid > * { min-width: 0; }
 .sn-provider-account-side { padding-left: 28px; border-left: 1px solid var(--border); }
 .sn-provider-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }

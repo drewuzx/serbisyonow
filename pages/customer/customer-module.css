@@ -376,8 +376,8 @@ body {
 
 .sn-topbar {
   min-height: 88px;
-  padding: 18px 26px;
-  gap: 28px;
+  padding: 14px 20px;
+  gap: 18px;
   border-radius: 26px;
   border: 1px solid rgba(149, 164, 186, 0.35);
   box-shadow: 0 10px 30px rgba(31, 55, 88, 0.08);
