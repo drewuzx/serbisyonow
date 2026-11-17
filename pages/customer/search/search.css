@@ -199,7 +199,7 @@
 
 .sn-filter-tab:hover {
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--orange-dark);
 }
 .sn-filter-tab.active {
   background: #fff7ed;
@@ -208,7 +208,6 @@
 }
 
 .sn-filter-tab.active strong {
-  color: var(--orange);
   color: var(--text-secondary);
 }
 

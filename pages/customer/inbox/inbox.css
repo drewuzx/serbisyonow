@@ -95,8 +95,8 @@
   cursor: pointer;
   transition: all var(--transition-fast);
 }
-.sn-inbox-tab:hover { border-color: var(--orange); color: var(--orange); }
-.sn-inbox-tab.active { background: var(--orange); border-color: var(--orange); color: var(--white); }
+.sn-inbox-tab:hover { border-color: var(--orange); color: var(--orange-dark); }
+.sn-inbox-tab.active { background: var(--orange-dark); border-color: var(--orange-dark); color: var(--white); }
 
 /* Conversation List */
 .sn-convo-list {
@@ -322,7 +322,7 @@
   font-size: 0.75rem;
   font-weight: 700;
 }
-.sn-status--upcoming { background: #fff4e0; color: #d97706; border: 1px solid #f9c97c; }
+.sn-status--upcoming { background: #fff4e0; color: #92400e; border: 1px solid #f9c97c; }
 
 /* Responsive */
 @media (max-width: 860px) {

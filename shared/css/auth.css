@@ -127,7 +127,7 @@
   font-weight: 900; font-size: 1.75rem; line-height: 1;
 }
 .auth-logo-text .part1 { color: var(--blue-dark); }
-.auth-logo-text .part2 { color: var(--orange); }
+.auth-logo-text .part2 { color: var(--orange-dark); }
 
 /* ── Heading ── */
 .auth-heading {
@@ -509,7 +509,7 @@
 }
 
 .provider-flow-card .auth-heading.compact p {
-  color: #9aa3ad;
+  color: #586477;
   font-size: 0.82rem;
 }
 
@@ -854,7 +854,7 @@
 
 .submitted-card strong {
   display: block;
-  color: #f4820a;
+  color: var(--orange-dark);
   font-size: 0.92rem;
   margin-bottom: 8px;
 }

@@ -22,7 +22,7 @@
 .report-legend span { display: flex; gap: 6px; align-items: center; }
 .report-legend i { height: 9px; width: 9px; background: #2b55cc; }
 .report-legend i.completed { background: #15803d; }
-.report-trend { display: flex; gap: 3px; height: 210px; align-items: stretch; margin-top: 18px; border-bottom: 1px solid var(--border); background: repeating-linear-gradient(to top,transparent 0,transparent 49px,#edf0f6 49px,#edf0f6 50px); }
+.report-trend { display: flex; gap: 3px; height: 210px; align-items: stretch; margin-top: 18px; border-bottom: 1px solid var(--border); background: linear-gradient(to top, transparent calc(25% - .5px), #edf0f6 25%, #edf0f6 calc(25% + .5px), transparent calc(25% + 1px), transparent calc(50% - .5px), #edf0f6 50%, #edf0f6 calc(50% + .5px), transparent calc(50% + 1px), transparent calc(75% - .5px), #edf0f6 75%, #edf0f6 calc(75% + .5px), transparent calc(75% + 1px)); }
 .report-bar-button { appearance: none; flex: 1 1 0; min-width: 0; border: 0; background: transparent; padding: 0 1px; position: relative; display: flex; align-items: end; gap: 1px; cursor: pointer; }
 .report-bar-button span { flex: 1; min-width: 0; background: #2b55cc; pointer-events: none; }
 .report-bar-button span.completed { background: #15803d; }

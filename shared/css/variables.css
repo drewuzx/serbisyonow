@@ -29,7 +29,7 @@
   --blue-pale:     #D6E4FF;
   --blue-bg:       #EAF0FB;
 
-  --orange-dark:   #C96A00;
+  --orange-dark:   #A34B00;
   --orange:        #F4820A;
   --orange-light:  #FFA940;
   --orange-pale:   #FFF0DB;
@@ -45,12 +45,12 @@
   /* Text Colors */
   --text-primary:  #1C2B4A;
   --text-secondary:#4A5568;
-  --text-muted:    #718096;
-  --text-light:    #9AA5B4;
+  --text-muted:    #586477;
+  --text-light:    #586477;
   --text-white:    #FFFFFF;
 
   /* Status Colors */
-  --success:       #22C55E;
+  --success:       #15803D;
   --success-bg:    #DCFCE7;
   --warning:       #F59E0B;
   --warning-bg:    #FEF3C7;
@@ -60,7 +60,7 @@
   --info-bg:       #DBEAFE;
   --pending:       #F59E0B;
   --pending-bg:    #FEF3C7;
-  --approved:      #22C55E;
+  --approved:      #15803D;
   --approved-bg:   #DCFCE7;
   --rejected:      #EF4444;
   --rejected-bg:   #FEE2E2;
@@ -240,6 +240,7 @@ ul, ol { list-style: none; }
 }
 .btn-outline:hover {
   background: var(--blue-pale);
+  color: var(--blue-dark);
 }
 
 .btn-ghost {

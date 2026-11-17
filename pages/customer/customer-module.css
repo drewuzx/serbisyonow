@@ -311,7 +311,7 @@ body {
 }
 
 .sn-notification-kind {
-  color: var(--orange);
+  color: var(--orange-dark);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -396,7 +396,7 @@ body {
 }
 
 .sn-topbar-search input::placeholder {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .sn-topbar-search-ico,
@@ -593,6 +593,7 @@ body {
 
 .sn-hero {
   background: linear-gradient(rgba(26, 58, 143, 0.9), rgba(26, 58, 143, 0.96)), var(--blue-dark);
+  color: var(--white);
   border-radius: 18px;
   box-shadow: 0 16px 34px rgba(31, 55, 88, 0.16);
 }
@@ -656,8 +657,8 @@ body {
 }
 
 .sn-filter-tab.active {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--orange-dark);
+  border-color: var(--orange-dark);
   color: var(--white);
 }
 

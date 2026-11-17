@@ -55,7 +55,7 @@
   line-height: 1;
 }
 .sn-topbar-title span:first-child { color: var(--blue-dark); }
-.sn-topbar-title span:last-child  { color: var(--orange); }
+.sn-topbar-title span:last-child  { color: var(--orange-dark); }
 
 .sn-topbar-search {
   flex: 1;
@@ -147,7 +147,7 @@
 
 .sn-topbar-user-name {
   font-weight: 800;
-  color: var(--orange);
+  color: var(--orange-dark);
   font-size: var(--text-sm);
 }
 

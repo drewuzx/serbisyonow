@@ -11,7 +11,7 @@
   --sn-action-red-dark: #B91C1C;
   --sn-action-red-soft: #FEE2E2;
   --sn-action-orange: #F4820A;
-  --sn-action-orange-dark: #C96A00;
+  --sn-action-orange-dark: #A34B00;
   --sn-action-orange-soft: #FFF0DB;
 }
 
@@ -64,6 +64,7 @@ body {
 
 .sn-shell--provider .sn-hero {
   background: linear-gradient(rgba(26,58,143,0.88), rgba(26,58,143,0.95)), var(--blue-dark);
+  color: var(--white);
 }
 
 .sn-shell--provider .stats-grid {
@@ -489,7 +490,7 @@ body {
 }
 
 .sn-notification-kind {
-  color: var(--orange);
+  color: var(--orange-dark);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -1120,7 +1121,6 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
   background: var(--white);
   border: 2px solid var(--border);
   border-radius: 20px;
@@ -1131,8 +1131,11 @@ body {
   gap: 12px;
   padding: 20px 16px 16px;
   max-height: 100%;
+  overflow: visible;
   container-type: inline-size;
 }
+
+.sn-provider-history-layout .sn-history-right { overflow: hidden; }
 
 .sn-provider-history-layout .sn-page-title {
   margin: 0 0 6px;
@@ -1383,7 +1386,7 @@ body {
 }
 
 .sn-provider-history-layout .sn-hi-amount strong {
-  color: var(--orange);
+  color: var(--orange-dark);
   font-family: var(--font-heading);
   font-weight: 800;
 }
@@ -1522,7 +1525,7 @@ body {
 }
 
 .sn-provider-history-layout .sn-dr-amount {
-  color: var(--orange);
+  color: var(--orange-dark);
   font-family: var(--font-heading);
   font-weight: 900;
 }

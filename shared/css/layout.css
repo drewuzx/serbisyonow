@@ -59,7 +59,7 @@
   line-height: 1;
 }
 .sidebar-logo-text .part1 { color: var(--blue-dark); }
-.sidebar-logo-text .part2 { color: var(--orange); }
+.sidebar-logo-text .part2 { color: var(--orange-dark); }
 
 .sidebar-menu {
   flex: 1;
@@ -100,7 +100,7 @@
   border-left: 3px solid var(--orange);
 }
 
-.sidebar-menu-item.active svg { color: var(--orange); }
+.sidebar-menu-item.active svg { color: var(--orange-dark); }
 
 /* ── Topbar ── */
 .topbar {
@@ -143,7 +143,7 @@
 .topbar-user-info .name {
   font-weight: 700;
   font-size: var(--text-sm);
-  color: var(--orange);
+  color: var(--orange-dark);
 }
 
 .topbar-user-info .location {
