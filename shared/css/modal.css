@@ -32,7 +32,7 @@
   width: min(480px, 100%);
   background: var(--white);
   border-radius: var(--radius-xl);
-  box-shadow: 0 24px 60px rgba(13, 34, 96, 0.22), 0 4px 16px rgba(43, 85, 204, 0.12);
+  box-shadow: 0 24px 60px rgba(13, 34, 96, 0.22);
   padding: 28px 28px 24px;
   position: relative;
   animation: sn-card-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -98,33 +98,33 @@
 .sn-modal-actions .btn-danger {
   background: var(--danger);
   color: var(--white);
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 
 .sn-modal-actions .btn-danger:hover {
   transform: translateY(-2px);
   filter: brightness(0.94);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.34);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
 }
 
 /* ── Danger variant (decline / delete) ── */
 .sn-modal--danger .sn-modal-card {
-  border-top: 4px solid var(--danger);
+  border-top: 0;
 }
 
 /* ── Warning variant ── */
 .sn-modal--warning .sn-modal-card {
-  border-top: 4px solid var(--warning);
+  border-top: 0;
 }
 
 /* ── Success variant ── */
 .sn-modal--success .sn-modal-card {
-  border-top: 4px solid var(--success);
+  border-top: 0;
 }
 
 /* ── Info / neutral variant (default) ── */
 .sn-modal--info .sn-modal-card {
-  border-top: 4px solid var(--blue-main);
+  border-top: 0;
 }
 
 /* ── Close button ── */
@@ -160,7 +160,7 @@
   gap: 10px;
   background: var(--warning-bg);
   border: 1.5px solid #f5c842;
-  border-left: 4px solid var(--warning);
+  border-left: 1px solid #f5c842;
   border-radius: var(--radius-md);
   padding: 12px 16px;
   font-size: var(--text-sm);
@@ -224,9 +224,9 @@
   max-width: 360px;
   background: var(--white);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(13, 26, 64, 0.18), 0 2px 8px rgba(43, 85, 204, 0.10);
+  box-shadow: 0 8px 32px rgba(13, 26, 64, 0.18);
   padding: 14px 16px;
-  border-left: 4px solid var(--blue-main);
+  border: 1px solid var(--border);
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -235,9 +235,9 @@
   transition: opacity var(--transition-base);
 }
 
-.sn-toast--success { border-left-color: var(--success); }
-.sn-toast--danger  { border-left-color: var(--danger);  }
-.sn-toast--warning { border-left-color: var(--warning); }
+.sn-toast--success { border-color: #b8dfc5; }
+.sn-toast--danger  { border-color: #f1c1c1; }
+.sn-toast--warning { border-color: #f0d89a; }
 
 .sn-toast-icon {
   font-size: 1.25rem;
@@ -295,13 +295,13 @@
   background: linear-gradient(135deg, #f87171, var(--danger));
   color: var(--white);
   border: none;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 
 .btn.btn-danger:hover {
   filter: brightness(1.07);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
 }
 
 .btn.btn-outline {

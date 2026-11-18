@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         : 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete. Actions are disabled until verified.';
       if (status === 'rejected') {
         verifyBanner.style.background = '#fef2f2';
-        verifyBanner.style.borderLeft = '4px solid #dc2626';
+        verifyBanner.style.borderLeft = '1px solid #f1b8b8';
         verifyBanner.style.color = '#991b1b';
       }
     }

@@ -325,7 +325,7 @@
   border-radius: 10px;
   background: var(--white);
   border: 1.5px solid #c8d8f6;
-  border-left: 4px solid var(--orange);
+  border-left: 1px solid var(--orange);
   padding: 12px 14px;
 }
 
@@ -624,7 +624,7 @@
   overscroll-behavior: contain;
 }
 
-.sn-booking-downpayment-terms { border-left: 3px solid #17815d; padding: 8px 12px; font-size: 13px; color: #3b5368; margin: 0; }
+.sn-booking-downpayment-terms { border-left: 1px solid #17815d; padding: 8px 12px; font-size: 13px; color: #3b5368; margin: 0; }
 .sn-downpayment-modal { z-index: 10050; }
 .sn-downpayment-modal [hidden] { display: none !important; }
 .sn-downpayment-modal .sn-modal-card { width: min(540px, 100%); border-radius: 8px; max-height: calc(100dvh - 32px); overflow-y: auto; }
@@ -791,11 +791,11 @@
 
 /* â”€â”€ Booking Section (category header + card) â”€â”€ */
 .sn-booking-section {
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
 }
 .sn-booking-section-head {
   display: flex;
@@ -843,7 +843,7 @@
 .sn-booking-img--1 { background: linear-gradient(135deg, #4f8ef7, #2563eb); }
 .sn-booking-img--2 { background: linear-gradient(135deg, #f97316, #dc2626); }
 .sn-booking-img--3 { background: linear-gradient(135deg, #22c55e, #16a34a); }
-.sn-booking-img--4 { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+.sn-booking-img--4 { background: linear-gradient(135deg, #f5a54a, #e8750a); }
 .sn-booking-img--5 { background: linear-gradient(135deg, #f59e0b, #d97706); }
 
 .sn-booking-provider-name {
@@ -854,7 +854,7 @@
   margin-bottom: 4px;
 }
 .sn-booking-service-type {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-secondary);
   letter-spacing: 0.04em;
@@ -903,7 +903,7 @@
   color: var(--orange-dark);
 }
 .sn-amount-note {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   margin-bottom: 8px;
 }

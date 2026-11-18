@@ -116,7 +116,7 @@
   position: relative;
 }
 .sn-convo-item:hover { background: var(--bg-input, #f8f9fb); }
-.sn-convo-item.active { background: #fff4e8; border-left: 3px solid var(--orange); }
+.sn-convo-item.active { background: #fff4e8; border-left: 0; box-shadow: inset 3px 0 var(--orange); }
 
 .sn-convo-avatar {
   width: 42px; height: 42px;
@@ -126,7 +126,7 @@
 .sn-convo-avatar--1 { background: linear-gradient(135deg, #4f8ef7, #2563eb); }
 .sn-convo-avatar--2 { background: linear-gradient(135deg, #f97316, #dc2626); }
 .sn-convo-avatar--3 { background: linear-gradient(135deg, #22c55e, #16a34a); }
-.sn-convo-avatar--4 { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+.sn-convo-avatar--4 { background: linear-gradient(135deg, #f5a54a, #e8750a); }
 .sn-convo-avatar--5 { background: linear-gradient(135deg, #f59e0b, #d97706); }
 .sn-convo-avatar--6 { background: linear-gradient(135deg, #06b6d4, #0284c7); }
 

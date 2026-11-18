@@ -326,8 +326,8 @@
 
 /* ── CTA ── */
 .cta-section {
-  background: var(--gradient-hero);
-  padding: var(--space-16) 0;
+  background: linear-gradient(135deg, var(--blue-dark), #2449a9);
+  padding: var(--space-16) clamp(16px, 4vw, 48px);
   text-align: center;
   color: var(--white);
 }
@@ -345,7 +345,7 @@
 }
 
 .cta-buttons { display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap; }
-.provider-entry-button { --control-bg: #f4820a; --control-hover: #dc7208; --control-text: #fff; --control-border: #f4820a; }
+.provider-entry-button { --control-bg: var(--orange-dark); --control-hover: #813b00; --control-text: #fff; --control-border: var(--orange-dark); }
 
 /* ── Footer ── */
 .footer {

@@ -26,7 +26,7 @@
 .auth-card {
   background: var(--white);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.2);
   padding: 40px;
   max-width: 400px;
   align-items: center; justify-content: center;
@@ -471,7 +471,7 @@
   margin: 0 auto;
   padding: 30px 76px 24px;
   border-radius: 18px;
-  box-shadow: 0 18px 38px rgba(31, 55, 88, 0.18);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.16);
 }
 
 .provider-flow-card .auth-heading.compact {
@@ -819,9 +819,8 @@
 .submitted-card {
   width: min(100%, 360px);
   padding: 28px 30px 32px;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 16px 34px rgba(31, 55, 88, 0.18);
+  background: transparent;
+  box-shadow: none;
   text-align: center;
 }
 
@@ -847,8 +846,8 @@
 
 .submitted-card p {
   color: #115fc6;
-  font-size: 0.74rem;
-  line-height: 1.35;
+  font-size: 0.875rem;
+  line-height: 1.55;
   margin-bottom: 18px;
 }
 
@@ -951,7 +950,7 @@
   width: min(100%, 420px);
   padding: 34px 42px 38px;
   border-radius: 14px;
-  box-shadow: 0 22px 42px rgba(31, 55, 88, 0.22);
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.2);
 }
 
 .provider-flow-card.is-success-card .submitted-check {

@@ -127,28 +127,28 @@ body {
   background: var(--sn-action-green);
   color: var(--white);
   border: 1.5px solid var(--sn-action-green);
-  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 
 .sn-shell--provider .btn-success:hover {
   background: var(--sn-action-green-dark);
   border-color: var(--sn-action-green-dark);
   transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(22, 163, 74, 0.28);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
 }
 
 .sn-shell--provider .btn-danger {
   background: var(--sn-action-red);
   color: var(--white);
   border: 1.5px solid var(--sn-action-red);
-  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 
 .sn-shell--provider .btn-danger:hover {
   background: var(--sn-action-red-dark);
   border-color: var(--sn-action-red-dark);
   transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(220, 38, 38, 0.28);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
 }
 
 .sn-shell--provider .sn-topbar {
@@ -157,7 +157,7 @@ body {
   gap: 18px;
   border-radius: 26px;
   border: 1px solid rgba(149, 164, 186, 0.35);
-  box-shadow: 0 10px 30px rgba(31, 55, 88, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 .sn-shell--provider .sn-topbar.no-search {
@@ -372,7 +372,7 @@ body {
   border: 1.5px solid var(--border);
   border-radius: 20px;
   background: var(--white);
-  box-shadow: 0 22px 56px rgba(31, 55, 88, 0.18);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.18);
 }
 
 .sn-shell--provider .sn-nav-item {
@@ -395,12 +395,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.7rem;
   font-weight: 900;
   line-height: normal;
   text-align: center;
-  box-shadow: 0 6px 14px rgba(239, 68, 68, 0.28);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
 }
 
 .sn-shell--provider .sn-topbar .sn-badge-count,
@@ -485,7 +485,8 @@ body {
 }
 
 .sn-notification-item.is-unseen {
-  border-left: 4px solid #ef4444;
+  border-left: 0;
+  box-shadow: none;
   background: #eef4ff;
 }
 
@@ -528,12 +529,11 @@ body {
   display: grid;
   gap: 5px;
   width: 100%;
-  border: 1.5px solid #bfd4fb;
-  border-left: 5px solid var(--blue-main);
+  border: 1px solid #bfd4fb;
   border-radius: 16px;
   background: var(--white);
   color: var(--blue-dark);
-  box-shadow: 0 18px 42px rgba(31, 55, 88, 0.18);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
   padding: 14px 16px;
   text-align: left;
 }
@@ -633,7 +633,7 @@ body {
 .sn-panel .sn-requests-notice {
   margin-top: 12px;
   padding: 10px 12px;
-  border-left: 3px solid var(--blue-main);
+  border-left: 1px solid var(--blue-main);
   background: #eff6ff;
   color: #1e40af;
 }
@@ -840,7 +840,7 @@ body {
   display: flex;
   flex-direction: column;
   border-radius: 24px;
-  box-shadow: 0 24px 70px rgba(10, 37, 92, 0.28);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
 }
 
 .sn-booking-customer-map-panel.is-fullscreen::before {
@@ -954,7 +954,7 @@ body {
   border-radius: 16px 16px 16px 4px;
   transform: rotate(-45deg);
   border: 3px solid var(--white);
-  box-shadow: 0 15px 28px rgba(22, 48, 120, 0.25);
+  box-shadow: 0 15px 28px rgba(0, 0, 0, 0.25);
 }
 
 .sn-booking-map-pin--customer {
@@ -1310,7 +1310,7 @@ body {
 .sn-provider-history-layout .sn-filter-tab.active {
   background: var(--orange);
   color: var(--white);
-  box-shadow: 0 10px 22px rgba(244, 130, 10, 0.22);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
 }
 
 .sn-provider-history-layout .sn-history-list {
@@ -1976,8 +1976,8 @@ body {
 .sn-week-day h4 { margin:0 0 8px; font-size:14px; color:var(--blue-dark); }
 .sn-week-day h4 span { display:block; font-size:12px; font-weight:400; margin-top:4px; }
 .sn-week-slot, .sn-week-appointment { display:flex; flex-direction:column; align-items:flex-start; gap:8px; border:1px solid var(--border); border-radius:8px; padding:10px; font-size:12px; overflow-wrap:anywhere; background:white; }
-.sn-week-slot { border-left:3px solid #288064; }
-.sn-week-appointment { border-left:3px solid #dda329; background:#fffcf3; }
+.sn-week-slot { border-left:1px solid #288064; }
+.sn-week-appointment { border-left:1px solid #dda329; background:#fffcf3; }
 .sn-week-slot .sn-schedule-slot-actions { justify-content:flex-start; gap:6px; }
 .sn-week-day .btn-sm { padding:8px; font-size:12px; min-height:36px; white-space:normal; }
 .sn-week-day .sn-status-pill { font-size:11px; padding:4px 8px; max-width:100%; }
@@ -2373,18 +2373,10 @@ body {
   border: 1.5px solid #d8e4f7;
   border-radius: 22px;
   background: var(--white);
-  box-shadow: 0 24px 60px rgba(31, 55, 88, 0.2);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
   padding: 22px;
   position: relative;
   overflow: hidden;
-}
-
-.sn-modal::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 5px;
-  background: var(--gradient-blue);
 }
 
 .sn-provider-modal-icon {
@@ -2669,7 +2661,7 @@ textarea.sn-modal-input {
   margin: 0 0 20px;
   padding: 16px 18px;
   border: 1px solid #b7d5ff;
-  border-left: 4px solid #3159cf;
+  border-left: 1px solid #b7d5ff;
   border-radius: 8px;
   background: #eff5ff;
   color: #243b73;

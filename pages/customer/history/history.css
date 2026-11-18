@@ -255,7 +255,7 @@
 .sn-hi-avatar--1 { background: linear-gradient(135deg, #4f8ef7, #2563eb); }
 .sn-hi-avatar--2 { background: linear-gradient(135deg, #f97316, #dc2626); }
 .sn-hi-avatar--3 { background: linear-gradient(135deg, #22c55e, #16a34a); }
-.sn-hi-avatar--4 { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+.sn-hi-avatar--4 { background: linear-gradient(135deg, #f5a54a, #e8750a); }
 .sn-hi-avatar--5 { background: linear-gradient(135deg, #f59e0b, #d97706); }
 .sn-hi-avatar,
 .sn-detail-avatar,
@@ -326,11 +326,11 @@
 .sn-history-right {
   display: flex;
   flex-direction: column;
-  background: var(--white);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
   min-height: 0;
 }
 
@@ -499,10 +499,10 @@
 }
 
 .sn-provider-info-card {
-  background: var(--bg-input);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   min-width: 0;
 }
 .sn-provider-info-title {
@@ -564,10 +564,10 @@
 
 /* â”€â”€ Customer Actions â”€â”€ */
 .sn-cust-actions {
-  background: var(--bg-input);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;

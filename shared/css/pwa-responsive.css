@@ -94,7 +94,7 @@ button {
     border: 1px solid rgba(149, 164, 186, 0.35);
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 12px 28px rgba(31, 55, 88, 0.14);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
   }
 
   body > .sn-topbar .sn-topbar-brand {
@@ -174,7 +174,7 @@ button {
   }
 
   .cta-section {
-    padding: 52px 0;
+    padding: 52px 16px;
   }
 
   .footer-inner {
@@ -269,7 +269,7 @@ button {
   .step-card {
     max-width: none;
     width: 100%;
-    padding: 22px 18px 26px;
+    padding: 22px 10px 26px;
     border-radius: 18px;
   }
 
@@ -285,12 +285,12 @@ button {
   }
 
   .step-card p {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     line-height: 1.55;
   }
 
   .cta-section {
-    padding: 44px 0;
+    padding: 44px 16px;
   }
 
   .cta-section h2 {
@@ -363,7 +363,7 @@ button {
   body > .sn-topbar .sn-topbar-actions .btn {
     min-height: 32px;
     padding: 7px 8px;
-    font-size: 0.62rem;
+    font-size: max(11px, 0.72rem);
   }
 
   .hero {

@@ -76,7 +76,7 @@
 .promotion-order { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:16px; align-items:center; border-bottom:1px solid #dce4ee; padding:16px 0; }
 .promotion-order p { margin:4px 0 0; color:#52667e; }
 .promotion-order strong { overflow-wrap:anywhere; }
-.promotion-notice { border-left:3px solid #cc8b25; padding:10px 14px; background:#fff9ec; margin:12px 0; }
+.promotion-notice { border:1px solid #ead59e; border-radius:6px; padding:12px 14px; background:#fff9ec; margin:12px 0; }
 .promotion-muted { color:#52667e; font-size:12px; }
 .promotion-error { color:#a92727; font-size:13px; min-height:20px; white-space:pre-wrap; }
 .promotion-pagination { margin:18px 0 0; }

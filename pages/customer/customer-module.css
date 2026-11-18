@@ -171,8 +171,8 @@ body {
 .sn-nav-item.active {
   background: #dbe8ff;
   color: var(--blue-main);
-  border-left: 4px solid var(--blue-main);
-  padding-left: 8px;
+  border-left: 0;
+  box-shadow: inset 3px 0 var(--blue-main);
 }
 
 .sn-ico {
@@ -306,7 +306,8 @@ body {
 }
 
 .sn-notification-item.is-unseen {
-  border-left: 4px solid #ef4444;
+  border-left: 0;
+  box-shadow: none;
   background: #eef4ff;
 }
 
@@ -349,12 +350,11 @@ body {
   display: grid;
   gap: 5px;
   width: 100%;
-  border: 1.5px solid #bfd4fb;
-  border-left: 5px solid var(--blue-main);
+  border: 1px solid #bfd4fb;
   border-radius: 16px;
   background: var(--white);
   color: var(--blue-dark);
-  box-shadow: 0 18px 42px rgba(31, 55, 88, 0.18);
+  box-shadow: 0 12px 30px rgba(31, 55, 88, 0.15);
   padding: 14px 16px;
   text-align: left;
 }
@@ -509,7 +509,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.7rem;
   font-weight: 900;
   line-height: normal;
@@ -628,6 +628,10 @@ body {
   background: var(--white);
   padding: 18px;
 }
+
+.sn-profile-hero { padding: 24px 28px; }
+
+.sn-booking-section { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 
 .sn-page-header {
   align-items: center;

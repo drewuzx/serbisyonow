@@ -109,7 +109,7 @@ body {
 .sn-nav-item:hover { background: var(--blue-pale); color: var(--blue-main); }
 .sn-nav-item.active {
   background: var(--blue-pale); color: var(--blue-main);
-  border-left: 3px solid var(--blue-main); padding-left: 9px;
+  border-left: 0; box-shadow: inset 3px 0 var(--blue-main);
 }
 .sn-ico {
   width: 32px; height: 32px; border-radius: 10px;
@@ -409,7 +409,7 @@ body {
 .sn-provider-img--2 { background: linear-gradient(135deg, #f9a8d4, #db2777); }
 .sn-provider-img--3 { background: linear-gradient(135deg, #6ee7b7, #059669); }
 .sn-provider-img--4 { background: linear-gradient(135deg, #fcd34d, #d97706); }
-.sn-provider-img--5 { background: linear-gradient(135deg, #a5b4fc, #7c3aed); }
+.sn-provider-img--5 { background: linear-gradient(135deg, #f5a54a, #e8750a); }
 .sn-provider-img--6 { background: linear-gradient(135deg, #fdba74, #ea580c); }
 
 .sn-provider-info { padding: 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }

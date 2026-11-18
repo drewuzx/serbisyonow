@@ -39,7 +39,7 @@ function applyVerificationState(user) {
   if (status === 'rejected') {
     verifyBanner.textContent = 'Your verification was declined by the admin. Please resubmit your documents in your profile.';
     verifyBanner.style.background = '#fef2f2';
-    verifyBanner.style.borderLeft = '4px solid #dc2626';
+    verifyBanner.style.borderLeft = '1px solid #f1b8b8';
     verifyBanner.style.color = '#991b1b';
   } else {
     verifyBanner.textContent = 'Verification status: Pending review. Our admin team usually completes verification within 24 to 48 hours. We will notify you when the review is complete. You can browse, but booking actions are disabled until verified.';

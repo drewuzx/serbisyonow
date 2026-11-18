@@ -130,7 +130,7 @@ body {
 }
 
 /* Table */
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: var(--text-sm); }
 th {

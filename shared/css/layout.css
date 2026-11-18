@@ -97,7 +97,7 @@
   background: var(--orange-pale);
   color: var(--blue-dark);
   font-weight: 700;
-  border-left: 3px solid var(--orange);
+  border-left: 0;
 }
 
 .sidebar-menu-item.active svg { color: var(--orange-dark); }

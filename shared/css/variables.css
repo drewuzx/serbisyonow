@@ -76,10 +76,10 @@
   --radius-full:   9999px;
 
   /* Shadows */
-  --shadow-sm:     0 2px 8px rgba(43, 85, 204, 0.08);
-  --shadow-md:     0 4px 16px rgba(43, 85, 204, 0.12);
-  --shadow-lg:     0 8px 32px rgba(43, 85, 204, 0.16);
-  --shadow-xl:     0 16px 48px rgba(43, 85, 204, 0.20);
+  --shadow-sm:     0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md:     0 4px 16px rgba(0, 0, 0, 0.09);
+  --shadow-lg:     0 8px 28px rgba(0, 0, 0, 0.12);
+  --shadow-xl:     0 16px 42px rgba(0, 0, 0, 0.16);
 
   /* Typography */
   --font-heading:  'Nunito', sans-serif;
@@ -214,22 +214,22 @@ ul, ol { list-style: none; }
 .btn-primary {
   background: var(--gradient-blue);
   color: var(--white);
-  box-shadow: 0 4px 14px rgba(43, 85, 204, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(43, 85, 204, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
   filter: brightness(1.06);
 }
 
 .btn-orange {
   background: var(--gradient-orange);
   color: var(--white);
-  box-shadow: 0 4px 14px rgba(244, 130, 10, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 .btn-orange:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(244, 130, 10, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
   filter: brightness(1.06);
 }
 
