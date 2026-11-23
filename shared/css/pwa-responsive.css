@@ -136,14 +136,6 @@ button {
   }
 }
 
-@media (max-width: 560px) {
-  body > .sn-topbar:has(.sn-topbar-brand) .sn-topbar-inner {
-    background: #10245f;
-    border-color: #10245f;
-    box-shadow: 0 12px 28px rgba(9, 25, 70, 0.2);
-  }
-}
-
 /* Landing page */
 .sn-topbar .container,
 .sn-topbar-inner,

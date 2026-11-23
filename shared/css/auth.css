@@ -127,7 +127,7 @@
   font-weight: 900; font-size: 1.75rem; line-height: 1;
 }
 .auth-logo-text .part1 { color: var(--blue-dark); }
-.auth-logo-text .part2 { color: var(--orange-dark); }
+.auth-logo-text .part2 { color: var(--orange); }
 
 /* ── Heading ── */
 .auth-heading {

@@ -345,7 +345,7 @@
 }
 
 .cta-buttons { display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap; }
-.provider-entry-button { --control-bg: var(--orange-dark); --control-hover: #813b00; --control-text: #fff; --control-border: var(--orange-dark); }
+.provider-entry-button { --control-bg: var(--orange); --control-hover: #e57500; --control-text: #fff; --control-border: var(--orange); }
 
 /* ── Footer ── */
 .footer {

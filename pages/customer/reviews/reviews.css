@@ -50,7 +50,7 @@
   transition: all var(--transition-fast);
 }
 .sn-filter-tab:hover { border-color: var(--orange); color: var(--orange-dark); }
-.sn-filter-tab.active { background: var(--orange-dark); border-color: var(--orange-dark); color: var(--white); }
+.sn-filter-tab.active { background: var(--orange); border-color: var(--orange); color: var(--white); }
 
 /* â”€â”€ Reviews List â”€â”€ */
 .sn-reviews-list {

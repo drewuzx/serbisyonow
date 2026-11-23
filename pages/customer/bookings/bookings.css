@@ -486,7 +486,7 @@
   transition: all var(--transition-fast);
 }
 .sn-filter-tab:hover { border-color: var(--orange); color: var(--orange-dark); }
-.sn-filter-tab.active { background: var(--orange-dark); border-color: var(--orange-dark); color: var(--white); }
+.sn-filter-tab.active { background: var(--orange); border-color: var(--orange); color: var(--white); }
 
 .sn-booking-calendar {
   margin: 0 0 22px;

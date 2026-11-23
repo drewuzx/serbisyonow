@@ -201,14 +201,18 @@
   border-color: var(--orange);
   color: var(--orange-dark);
 }
-.sn-filter-tab.active {
-  background: #fff7ed;
+.sn-filter-tabs .sn-filter-tab.active {
+  background: var(--orange);
   border-color: var(--orange);
-  box-shadow: 0 10px 24px rgba(244, 130, 10, 0.14);
+  box-shadow: 0 6px 16px rgba(244, 130, 10, 0.14);
 }
 
-.sn-filter-tab.active strong {
-  color: var(--text-secondary);
+.sn-filter-tabs .sn-filter-tab.active strong {
+  color: var(--blue-darkest);
+}
+
+.sn-filter-tabs .sn-filter-tab.active span {
+  color: var(--blue-darkest);
 }
 
 .sn-sort-summary {

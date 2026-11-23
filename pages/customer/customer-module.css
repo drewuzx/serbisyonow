@@ -661,8 +661,8 @@ body {
 }
 
 .sn-filter-tab.active {
-  background: var(--orange-dark);
-  border-color: var(--orange-dark);
+  background: var(--orange);
+  border-color: var(--orange);
   color: var(--white);
 }
 

@@ -96,7 +96,7 @@
   transition: all var(--transition-fast);
 }
 .sn-inbox-tab:hover { border-color: var(--orange); color: var(--orange-dark); }
-.sn-inbox-tab.active { background: var(--orange-dark); border-color: var(--orange-dark); color: var(--white); }
+.sn-inbox-tab.active { background: var(--orange); border-color: var(--orange); color: var(--white); }
 
 /* Conversation List */
 .sn-convo-list {
