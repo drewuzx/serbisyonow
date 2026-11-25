@@ -45,6 +45,8 @@
 .sn-photo-review-images figcaption { margin: 6px 0; font-weight: 600; }
 .sn-photo-queue article { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; border-bottom: 1px solid #d7e1f2; }
 .sn-photo-queue strong { overflow-wrap: anywhere; }
+.sn-photo-queue .admin-panel-head [data-photo-refresh],
+.sn-photo-queue [data-photo-review] { box-sizing: border-box; display: inline-flex; width: 248px; max-width: 100%; min-height: 56px; flex: 0 1 248px; align-items: center; justify-content: center; padding: 10px 14px; }
 @media(max-width: 560px) {
  .sn-photo-dialog { padding: 18px; }
  .sn-photo-dialog h2 { font-size: 20px; }

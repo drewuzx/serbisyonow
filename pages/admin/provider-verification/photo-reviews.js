@@ -15,7 +15,7 @@
    for (const review of data.reviews) {
     const item = document.createElement('article');
     const name = document.createElement('strong'); name.textContent = review.full_name;
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline'; button.textContent = 'Review ID & Selfie'; button.onclick = () => open(review, button);
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline'; button.dataset.photoReview = ''; button.textContent = 'Review ID & Selfie'; button.onclick = () => open(review, button);
     item.append(name, button); list.append(item);
    }
   } catch (error) { status.textContent = error.message; }
