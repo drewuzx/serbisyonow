@@ -78,7 +78,7 @@ async function main() {
   const downloadEvent=page.waitForEvent('download');
   await page.getByRole('button',{name:'Export Report',exact:true}).click();
   const download=await downloadEvent,csv=await fs.readFile(await download.path(),'utf8');
-  assert.match(csv,/"Verified system earnings \(PHP\)","300.00"/);
+  assert.match(csv,/"Verified System Earnings","₱ 300\.00"/);
   assert.match(csv,/"Cleaning","2"/);
   await page.getByLabel('Rank by',{exact:true}).selectOption('rating');
   await page.waitForFunction(()=>document.querySelector('#top-providers tr')?.textContent.includes('Marco Santos'));

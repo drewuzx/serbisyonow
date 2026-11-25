@@ -6,7 +6,7 @@ function priceParts(value) {
  const [whole, fraction = ''] = String(value).split('.');
  const total = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
  const deposit = Math.round(total * 30 / 100);
- if (!Number.isSafeInteger(total) || deposit < 100 || deposit > 10000000) fail(400, 'The 30% e-wallet downpayment must be from PHP 1 to PHP 100,000.');
+ if (!Number.isSafeInteger(total) || deposit < 100 || deposit > 10000000) fail(400, 'The 30% e-wallet downpayment must be from ₱ 1.00 to ₱ 100,000.00.');
  return { total, deposit, balance: total - deposit };
 }
 function bookingPaymentView(row) {

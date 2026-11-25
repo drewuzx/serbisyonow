@@ -1615,7 +1615,7 @@ function validateServiceOptions(body, current = { is_active: true, accepts_cash:
   }
   const next = { ...current, ...body };
   if (body.accepts_other === true || (next.is_active && !next.accepts_cash && !next.accepts_gcash)) {
-    const error = new Error(body.accepts_other === true ? 'Only Cash and QR payments are supported.' : 'Select Cash or QR before enabling this service.');
+    const error = new Error(body.accepts_other === true ? 'Only Cash and Online Payment methods are supported.' : 'Select Cash or Online Payment before enabling this service.');
     error.statusCode = 400;
     throw error;
   }
@@ -3812,7 +3812,7 @@ app.patch('/api/provider/:providerId/services/:serviceId', asyncRoute(async (req
     massageTypes,
     req.body.pricing_config === undefined ? null : JSON.stringify(pricingConfig),
   ]);
-  if (!result.rowCount) return res.status(409).json({ message: 'Select Cash or QR for an active service. Refresh and try again.' });
+  if (!result.rowCount) return res.status(409).json({ message: 'Select Cash or Online Payment for an active service. Refresh and try again.' });
   await upsertServiceCategory(result.rows[0].category, result.rows[0].title);
   res.json({ service: providerServiceRow(result.rows[0]) });
 }));

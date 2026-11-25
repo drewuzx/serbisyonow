@@ -13,7 +13,7 @@ function favEsc(value) {
 }
 
 function favMoney(value) {
- return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+ return `₱ ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function favBadge(provider) {

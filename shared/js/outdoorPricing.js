@@ -153,7 +153,7 @@
    details: { category: CATEGORY, service_type: config.title, pricing_type: pricingType, inputs, answers, breakdown,
     pricing_basis: config.perVisit ? 'per_visit' : 'per_job', requires_safety_assessment: requiresSafetyAssessment,
     ...(requiresSafetyAssessment ? { safety_note: SAFETY_NOTE } : {}),
-    estimate_label: `Sample estimated ${pricingType === 'provider_quote' ? 'range' : 'price'}${config.perVisit ? ' per visit' : ''}: PHP ${min.toLocaleString('en-PH')}${pricingType === 'provider_quote' ? ` - PHP ${max.toLocaleString('en-PH')}` : ''}`,
+    estimate_label: `Sample estimated ${pricingType === 'provider_quote' ? 'range' : 'price'}${config.perVisit ? ' per visit' : ''}: ₱ ${min.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${pricingType === 'provider_quote' ? ` - ₱ ${max.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}`,
     note, rate_version: VERSION, sample_rates: true },
   };
  }

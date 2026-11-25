@@ -58,7 +58,7 @@ async function main() {
   for (const width of [390, 1440]) {
    await page.setViewportSize({ width, height: 900 });
    await page.goto(f.base + '/pages/customer/provider-profile/provider-profile.html?id=81');
-   await page.locator('.sn-rate-card strong').filter({ hasText: 'PHP 500' }).waitFor();
+   await page.locator('.sn-rate-card strong').filter({ hasText: '₱ 500.00' }).waitFor();
    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
    await page.screenshot({ path: path.join(os.tmpdir(), `starting-rate-${width}.png`) });
   }
@@ -66,11 +66,11 @@ async function main() {
    ['favorites/favorites.html', '.sn-fav-price'], ['search/search.html', '.sn-result-price'], ['dashboard/dashboard.html', '.sn-provider-price'],
   ]) {
    await page.goto(`${f.base}/pages/customer/${route}`);
-   await page.locator(selector).filter({ hasText: 'PHP 500' }).first().waitFor();
+   await page.locator(selector).filter({ hasText: '₱ 500.00' }).first().waitFor();
   }
   await update({ ...config, min: 725.5 });
   await page.goto(f.base + '/pages/customer/provider-profile/provider-profile.html?id=81');
-  await page.locator('.sn-rate-card strong').filter({ hasText: 'PHP 725.5' }).waitFor();
+  await page.locator('.sn-rate-card strong').filter({ hasText: '₱ 725.50' }).waitFor();
   await f.request(`/api/provider/81/services/${serviceId}`, 'PATCH', { is_active: false }, f.providerToken);
   await checkRates(null);
   await page.reload(); await page.locator('.sn-rate-card strong').filter({ hasText: 'Price not set' }).waitFor();

@@ -18,7 +18,7 @@ const { chromium } = require('playwright');
     await page.route('**/shared/js/pwa-register.js', route => route.fulfill({ body: '', contentType: 'application/javascript' }));
     await page.goto(`http://127.0.0.1:${server.address().port}/pages/landing/index.html`);
     await page.setContent(`
-      <section class="stats-grid"><div class="stat-info"><div class="value">PHP 0</div></div></section>
+      <section class="stats-grid"><div class="stat-info"><div class="value">₱ 0.00</div></div></section>
       <article class="metric-card"><h2 id="metric-users">0</h2></article>
       <div class="report-metrics"><div class="report-metric"><strong id="report-total">0</strong></div></div>
       <div class="sn-provider-chart-bars"><div class="sn-bar" style="height:120px"></div></div>
@@ -31,7 +31,7 @@ const { chromium } = require('playwright');
     await page.waitForFunction(() => Boolean(window.snAnalyticsMotion));
 
     await page.evaluate(() => {
-      document.querySelector('.stats-grid .value').textContent = 'PHP 1,250';
+      document.querySelector('.stats-grid .value').textContent = '₱ 1,250.00';
       document.querySelector('#metric-users').textContent = '42';
       document.querySelector('#report-total').textContent = '18';
       document.querySelector('.sn-badge-calculation').innerHTML = '<progress id="badge-progress" value="65" max="100"></progress>';
@@ -39,7 +39,7 @@ const { chromium } = require('playwright');
     });
 
     await page.waitForFunction(() => document.querySelector('#metric-users').textContent === '42'
-      && document.querySelector('.stats-grid .value').textContent === 'PHP 1,250'
+      && document.querySelector('.stats-grid .value').textContent === '₱ 1,250.00'
       && document.querySelector('#report-total').textContent === '18'
       && Math.round(document.querySelector('#badge-progress').value) === 65
       && document.querySelector('#badge-progress').classList.contains('sn-motion-ready'), null, { timeout: 5000 });
@@ -49,7 +49,7 @@ const { chromium } = require('playwright');
       progress: [document.querySelector('#badge-progress').value, document.querySelector('#badge-progress').dataset.snProgressValue, document.querySelector('#badge-progress').className],
       reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
     }));
-    assert.deepEqual(state.counters, ['PHP 1,250', '42', '18']);
+    assert.deepEqual(state.counters, ['₱ 1,250.00', '42', '18']);
     assert.equal(Math.round(state.progress[0]), 65);
     assert.equal(state.progress[1], '65/100');
     assert.ok(state.progress[2].includes('sn-motion-ready'));

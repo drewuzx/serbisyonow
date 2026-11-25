@@ -28,7 +28,7 @@ function snEsc(value) {
 }
 
 function snMoney(value) {
- return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+ return `₱ ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function snCategoryLabel(value) {
@@ -297,7 +297,7 @@ function snNotificationItems(data) {
  const bookings = (data.bookings || []).map(booking => ({
   id: `booking-${booking.id}-${booking.status}`,
   kind: booking.status === 'completed' ? 'Service' : 'Booking',
-  title: booking.status === 'completed' ? 'Service completed' : booking.provider_name || 'Booking update',
+  title: booking.status === 'completed' ? 'Service Completed' : booking.provider_name || 'Booking Update',
   body: booking.status === 'completed'
    ? `${booking.provider_name || 'Your provider'} marked ${booking.service || 'your service'} as completed.`
    : `${booking.service || 'Service'} is ${booking.status || 'pending'}.`,
@@ -583,7 +583,7 @@ function renderCustomerBooking(booking) {
   const cancelButton = canCancel
   ? `<button class="sn-btn sn-btn-danger" type="button" data-booking-action="cancel" data-booking-id="${snEsc(booking.id)}">Cancel Booking</button>`
   : '';
- const paymentLabels = { awaiting_price: 'Waiting for provider price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Receipt awaiting provider verification', paid: '30% downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Payment follow-up required' };
+ const paymentLabels = { awaiting_price: 'Waiting for Provider Price', awaiting_payment: 'Waiting for 30% Downpayment', awaiting_verification: 'Receipt Awaiting Provider Verification', paid: '30% Downpayment Verified', cancelled: 'Payment Request Cancelled', refund_review: 'Payment Follow-Up Required' };
  const paymentSummary = booking.deposit_required ? `<span>${snEsc(paymentLabels[booking.deposit_status] || 'Downpayment pending')}</span>${booking.confirmed_price != null ? `<span>30% downpayment: ${snMoney(booking.deposit_amount)}</span><span>70% remaining balance: ${snMoney(booking.balance_due)}</span>` : ''}${booking.deposit_livemode === false ? '<span>Test payment only</span>' : ''}` : '';
  const canReviewPayment = booking.deposit_required && ((booking.status === 'pending' && booking.deposit_status === 'awaiting_payment')
   || (booking.deposit_channel === 'provider_qr' && booking.deposit_receipt_id));
@@ -591,7 +591,7 @@ function renderCustomerBooking(booking) {
  const payButton = canReviewPayment
   ? `<a class="sn-btn sn-btn-primary" data-booking-action="pay" data-booking-id="${snEsc(booking.id)}" href="../bookings/bookings.html?pay_booking_id=${encodeURIComponent(booking.id)}">${paymentActionLabel}</a>` : '';
  return `
- <div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon sn-photo-avatar" data-photo-target="provider/${Number(booking.provider_id) || 0}" aria-hidden="true"></div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(SNTime.format(booking.scheduled_time))}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Remaining balance method: ${snEsc(({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[booking.payment_method || 'cash'] || booking.payment_method)}</span><span>Status: ${snEsc(statusInfo.description)}</span>${paymentSummary}</div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.confirmed_price ?? booking.amount)}</strong><div class="sn-booking-status-wrap">${snStatusPill(booking.status)}<small>${snEsc(statusInfo.description)}</small></div>${payButton}<button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div>
+ <div class="sn-customer-booking-card" data-booking-id="${snEsc(booking.id)}"><div class="sn-customer-booking-main"><div class="sn-customer-booking-icon sn-photo-avatar" data-photo-target="provider/${Number(booking.provider_id) || 0}" aria-hidden="true"></div><div><strong class="sn-booking-provider-name">${snEsc(booking.provider_name || 'Provider')}</strong><div class="sn-provider-badge sn-badge--verified">${snEsc(booking.provider_category || 'Service Booking')}</div><div class="sn-booking-service-type">${snEsc(booking.service)}</div></div></div><div class="sn-customer-booking-meta"><span>Date: ${snDate(booking.scheduled_date)}</span><span>Time: ${snEsc(SNTime.format(booking.scheduled_time))}</span><span>Location: ${snEsc(booking.address || '-')}</span><span>Remaining balance method: ${snEsc(({ cash: 'Cash', gcash: 'Online Payment', qr: 'Online Payment' })[booking.payment_method || 'cash'] || booking.payment_method)}</span><span>Status: ${snEsc(statusInfo.description)}</span>${paymentSummary}</div><div class="sn-customer-booking-amount"><strong>${snMoney(booking.confirmed_price ?? booking.amount)}</strong><div class="sn-booking-status-wrap">${snStatusPill(booking.status)}<small>${snEsc(statusInfo.description)}</small></div>${payButton}<button class="sn-btn sn-btn-outline" type="button" data-booking-action="details" data-booking-id="${snEsc(booking.id)}">View Details</button>${cancelButton}</div></div>
  `;
 }
 

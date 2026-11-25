@@ -3,7 +3,7 @@
  const el = id => document.getElementById(id);
  el('report-days').setAttribute('aria-label','Period');
  el('provider-ranking').setAttribute('aria-label','Rank by');
- const money = cents => new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(Number(cents)/100);
+ const money = cents => `₱ ${(Number(cents || 0) / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
  const count = n => Number(n).toLocaleString('en-PH');
  const date = value => new Date(value).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:'Asia/Manila'});
  const percent = (n,total) => total ? Math.round(n/total*100) : 0;
@@ -81,11 +81,11 @@
   if(!latest) return;
   const d=latest,b=d.bookings,r=d.revenue;
   const rows=[['SerbisyoNow Reports & Analytics'],['Period (Asia/Manila)',date(d.period.start),date(new Date(new Date(d.period.finish).getTime()-1))],[],
-   ['Metric','Value'],['Bookings',b.total],['Previous period bookings',b.previous_total],['Completed',b.completed],['Active',b.active],['Cancelled',b.cancelled],['Verified system earnings (PHP)',(r.total_centavos/100).toFixed(2)],['Previous earnings (PHP)',(r.previous_centavos/100).toFixed(2)],['Average provider rating',d.reviews.average || 'Not rated'],['Customer reviews',d.reviews.count],[],
-   ['Daily trend','Bookings','Completed (current status)','Verified earnings (PHP)'],...d.trend.map(t=>[t.date,t.bookings,t.completed,(t.revenue_centavos/100).toFixed(2)]),[],
+   ['Metric','Value'],['Bookings',b.total],['Previous period bookings',b.previous_total],['Completed',b.completed],['Active',b.active],['Cancelled',b.cancelled],['Verified System Earnings',money(r.total_centavos)],['Previous Earnings',money(r.previous_centavos)],['Average provider rating',d.reviews.average || 'Not rated'],['Customer reviews',d.reviews.count],[],
+   ['Daily trend','Bookings','Completed (current status)','Verified Earnings'],...d.trend.map(t=>[t.date,t.bookings,t.completed,money(t.revenue_centavos)]),[],
    ['Category','Non-cancelled bookings'],...d.categories.map(c=>[c.name,c.bookings]),[],
    ['Top providers',d.sort],['Provider','Non-cancelled bookings','Completed','Rating','Reviews'],...d.providers.map(p=>[p.full_name,p.bookings,p.completed,p.rating || 'Not rated',p.reviews]),[],
-   ['Subscription / Promotion','Verified payments','Revenue (PHP)'],...d.plans.map(p=>[p.plan_name,p.payments,(p.revenue_centavos/100).toFixed(2)])];
+   ['Subscription / Promotion','Verified payments','Revenue'],...d.plans.map(p=>[p.plan_name,p.payments,money(p.revenue_centavos)])];
   const cell=value=>{ let text=String(value); if(/^[\s]*[=+@-]/.test(text)) text="'"+text; return '"'+text.replace(/"/g,'""')+'"'; };
   const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob),link=document.createElement('a'); link.href=url; link.download=`serbisyonow-report-${d.days}-days.csv`; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);

@@ -119,7 +119,7 @@ function renderRows(users) {
     tr.innerHTML = `
       <td data-label="ID">${user.id}</td>
       <td data-label="User type"><span class="role-badge ${role}">${roleLabel}</span></td>
-      <td data-label="Full name">${user.full_name}</td>
+      <td data-label="Full name"><span class="admin-user-name">${role === 'provider' ? `<span class="admin-user-avatar"><img src="${AUTH_API_BASE}/api/profile-photos/provider/${Number(user.id)}" alt="${user.full_name} profile photo" loading="lazy" data-admin-provider-photo /></span>` : ''}<span>${user.full_name}</span></span></td>
       <td data-label="Email">${user.email}</td>
       <td data-label="Contact">${user.contact || '-'}</td>
       <td data-label="Account detail">${getAccountDetail(user)}</td>
@@ -128,6 +128,7 @@ function renderRows(users) {
       <td data-label="Action">${actionContent}</td>
     `;
     body.appendChild(tr);
+    tr.querySelector('[data-admin-provider-photo]')?.addEventListener('error', event => event.currentTarget.remove(), { once: true });
   });
 }
 

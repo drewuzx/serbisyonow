@@ -29,7 +29,7 @@ async function main() {
   const toggle = card.getByRole('switch');
   await toggle.waitFor();
   assert.equal(await card.getByLabel('Other', { exact: true }).count(), 0);
-  assert.equal(await card.getByLabel('QR', { exact: true }).isChecked(), false);
+  assert.equal(await card.getByLabel('Online Payment', { exact: true }).isChecked(), false);
   await toggle.click();
   await card.getByRole('status').filter({ hasText: 'Service is off.' }).waitFor();
   assert.equal(await toggle.isChecked(), false);
@@ -43,13 +43,13 @@ async function main() {
   await toggle.focus();
   await toggle.press('Space');
   await card.getByRole('status').filter({ hasText: 'Service is on.' }).waitFor();
-  await card.getByLabel('QR', { exact: true }).check();
+  await card.getByLabel('Online Payment', { exact: true }).check();
   await card.getByRole('status').filter({ hasText: 'Payment options saved.' }).waitFor();
   await card.getByLabel('Cash', { exact: true }).uncheck();
   await card.getByRole('status').filter({ hasText: 'Payment options saved.' }).waitFor();
   await page.reload();
   await toggle.waitFor();
-  assert.equal(await card.getByLabel('QR', { exact: true }).isChecked(), true);
+  assert.equal(await card.getByLabel('Online Payment', { exact: true }).isChecked(), true);
   assert.equal(await card.getByLabel('Cash', { exact: true }).isChecked(), false);
   // Failed saves roll the switch back without claiming the new state was saved.
   await page.route(`**/api/provider/81/services/${service.id}`, route => route.fulfill({ status: 503, json: { message: 'Test connection interrupted.' } }));
@@ -102,7 +102,7 @@ async function main() {
   assert.equal((await f.request(`/api/provider/81/bookings/${booking.id}/direct-payment`, 'PATCH', { decision: 'verify', receipt_id: proof.data.receipt.id, price_version: 1, payment_received: true }, f.providerToken)).status, 200);
   const paymentUrl = `${f.base}/pages/customer/bookings/bookings.html?pay_booking_id=${booking.id}`;
   await page.goto(paymentUrl);
-  await page.getByRole('heading', { name: 'Remaining Balance - QR' }).waitFor();
+  await page.getByRole('heading', { name: 'Remaining Balance - Online Payment' }).waitFor();
   assert.match(await page.locator('.sn-direct-balance').textContent(), /700/);
   assert.equal(await page.locator('.sn-direct-receipt-form').count(), 0, 'Balance QR must not reuse the deposit receipt submission');
   await page.waitForFunction(() => document.querySelector('.sn-direct-balance img')?.naturalWidth > 0);

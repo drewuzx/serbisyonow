@@ -151,7 +151,7 @@
   }
   return inputs;
  }
- const money = value => `PHP ${Number(value).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`;
+ const money = value => `₱ ${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
  const round = value => Math.round((value + Number.EPSILON) * 100) / 100;
 
  function assessment(key, raw, context = {}) {

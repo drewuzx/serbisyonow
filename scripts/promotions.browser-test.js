@@ -21,14 +21,14 @@ async function main() {
   const adminUrl = f.base+'/pages/admin/revenue/revenue.html', providerUrl=f.base+'/pages/provider/promotions/promotions.html';
   await page.goto(adminUrl);
   await page.getByRole('button',{name:'Edit 14-day Profile Boost',exact:true}).click();
-  await page.getByLabel('Price (PHP)',{exact:true}).fill('199');
+  await page.getByLabel('Price (₱)',{exact:true}).fill('199');
   await page.getByLabel('Available for purchase',{exact:true}).check();
   await page.getByRole('button',{name:'Save Plan',exact:true}).click();
   await page.locator('dialog').waitFor({state:'detached'});
-  await page.getByRole('button',{name:'Edit Receiving QR',exact:true}).click();
+  await page.getByRole('button',{name:'Edit Online Payment Details',exact:true}).click();
   await page.getByLabel('Account name',{exact:true}).fill('SerbisyoNow Test Platform');
   await page.getByLabel('Account number',{exact:true}).fill('09123456789');
-  await page.getByLabel('Receiving QR',{exact:false}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
+  await page.getByLabel('Payment image',{exact:false}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
   await page.getByRole('checkbox').check();
   await page.getByRole('button',{name:'Save Receiving Account',exact:true}).click();
   await page.locator('dialog').waitFor({state:'detached'});
@@ -58,10 +58,10 @@ async function main() {
   await page.getByRole('tab',{name:'Subscriptions',exact:true}).press('ArrowRight');
   assert.equal(await page.getByRole('tab',{name:'Promotions',exact:true}).getAttribute('aria-selected'),'true');
   await page.getByRole('button',{name:'Choose Plan',exact:true}).click();
-  await page.getByText('Admin QR',{exact:true}).waitFor();
+  await page.getByText('Online Payment',{exact:true}).waitFor();
   await page.getByRole('checkbox').check();
-  await page.getByRole('button',{name:'Continue to Admin QR',exact:true}).click();
-  await page.getByLabel('Transaction reference',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Continue to Online Payment',exact:true}).click();
+  await page.getByLabel('Transaction Reference',{exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('[data-order-qr]')?.naturalWidth>0);
   await page.setViewportSize({width:390,height:1000});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
@@ -75,8 +75,8 @@ async function main() {
   assert.ok(Math.abs(receiptSubmitBox.width-receiptCancelBox.width)<1,'Receipt actions should share the same width');
   assert.ok(Math.abs(receiptSubmitBox.height-receiptCancelBox.height)<1,'Receipt actions should share the same height');
   await page.screenshot({path:path.join(os.tmpdir(),'promotion-payment-mobile.png'),fullPage:true});
-  await page.getByLabel('Transaction reference',{exact:true}).fill('PROMOTION-BROWSER-ONE');
-  await page.getByLabel('Payment receipt',{exact:true}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
+  await page.getByLabel('Transaction Reference',{exact:true}).fill('PROMOTION-BROWSER-ONE');
+  await page.getByLabel('Payment Receipt',{exact:true}).setInputFiles(path.join(__dirname,'../image_logo/pwa/icon-192.png'));
   await page.getByRole('button',{name:'Submit Receipt',exact:true}).click();
   await page.getByRole('heading',{name:'Awaiting verification',exact:true}).waitFor();
   assert.equal(await page.getByRole('heading',{name:'Payment verified',exact:true}).count(),0);
@@ -98,7 +98,7 @@ async function main() {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`Admin overflow at ${width}`);
    await page.screenshot({path:path.join(os.tmpdir(),`promotion-admin-${width}.png`),fullPage:true});
   }
-  await page.getByRole('button',{name:'Edit Receiving QR',exact:true}).click();
+  await page.getByRole('button',{name:'Edit Online Payment Details',exact:true}).click();
   await page.getByLabel('Account name',{exact:true}).fill('Unsaved platform name');
   await page.getByRole('checkbox').check();
   await page.route('**/api/admin/promotions/payment-qr',route=>route.fulfill({status:503,json:{message:'Test connection interrupted.'}}));

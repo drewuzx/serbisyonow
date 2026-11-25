@@ -35,15 +35,15 @@ async function main() {
   await page.goto(url);
   await page.getByRole('button',{name:'Choose Plan',exact:true}).click();
   await page.getByRole('checkbox').check();
-  await page.getByRole('button',{name:'Continue to QR Ph',exact:true}).click();
-  await page.getByRole('button',{name:'Pay with QR Ph',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Continue to Online Payment',exact:true}).click();
+  await page.getByRole('button',{name:'Pay with Online Payment',exact:true}).waitFor();
   assert.equal(await page.locator('[data-receipt-form]').count(),0);
   for (const width of [1440,390,320]) {
    await page.setViewportSize({width,height:900});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
    await page.screenshot({path:path.join(os.tmpdir(),`promotion-qrph-${width}.png`),fullPage:true});
   }
-  await page.getByRole('button',{name:'Pay with QR Ph',exact:true}).click();
+  await page.getByRole('button',{name:'Pay with Online Payment',exact:true}).click();
   await page.waitForURL('https://checkout.paymongo.com/cs_browser');
   const id = session.attributes.metadata.promotion_order_id;
   await page.goto(url+`?payment_return=success&order_id=${id}`);
@@ -58,8 +58,8 @@ async function main() {
   await page.getByText('Payment confirmed. Your promotion is active.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Close',exact:true}).click();
   await page.goto(f.base+'/pages/admin/revenue/revenue.html');
-  await page.getByRole('heading',{name:'PayMongo QR Ph',exact:true}).waitFor();
-  assert.equal(await page.getByRole('button',{name:'Edit Receiving QR',exact:true}).count(),0);
+  await page.getByRole('heading',{name:'Online Payment (PayMongo)',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Edit Online Payment Details',exact:true}).count(),0);
   await page.locator('.promotion-metric').filter({hasText:'Verified platform revenue'}).getByText(/199/).waitFor();
   await page.getByRole('button',{name:'Payment Details',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Verify & Activate',exact:true}).count(),0);

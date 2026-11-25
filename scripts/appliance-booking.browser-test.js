@@ -115,7 +115,7 @@ function multipart(request) {
   assert.equal(await page.locator('#sn-create-booking-form').evaluate(form => form.checkValidity()), false);
   assert.doesNotMatch(await page.locator('.sn-appliance-price-summary').innerText(), /NaN/);
   await page.locator('[name="appliance_units"]').fill('2');
-  assert.match(await page.locator('.sn-appliance-total').innerText(), /PHP 2,000/);
+  assert.match(await page.locator('.sn-appliance-total').innerText(), /₱ 2,000\.00/);
   await screenshots('aircon');
   await page.locator('#sn-booking-pin-center').click();
   await page.locator('#sn-confirm-booking-location').click();

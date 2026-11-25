@@ -130,9 +130,9 @@ function multipart(request) {
   await input('area_m2').fill('80');
   await input('grass_height').selectOption('Tall (over 30 cm)');
   await input('cleanup').selectOption('Bag grass clippings');
-  assert.match(await page.locator('.sn-outdoor-total').innerText(), /PHP 1,304/);
+  assert.match(await page.locator('.sn-outdoor-total').innerText(), /₱ 1,304\.00/);
   await input('frequency').selectOption('Weekly');
-  assert.match(await page.locator('.sn-outdoor-total').innerText(), /PHP 1,173.6/);
+  assert.match(await page.locator('.sn-outdoor-total').innerText(), /₱ 1,173\.60/);
   assert.match(await page.locator('.sn-outdoor-price-summary').innerText(), /does not include future visits/);
   await screenshots('lawn');
   await input('area_m2').fill('');
@@ -148,7 +148,7 @@ function multipart(request) {
   await input('maintenance_type').selectOption('Soil and garden bed care');
   await input('condition').selectOption('Overgrown');
   await input('frequency').selectOption('Weekly');
-  assert.match(await page.locator('.sn-outdoor-total').innerText(), /PHP 2,106 - PHP 4,212/);
+  assert.match(await page.locator('.sn-outdoor-total').innerText(), /₱ 2,106\.00 - ₱ 4,212\.00/);
   assert.equal(await page.locator('.sn-calculated-head > span').innerText(), 'Assessment / Quote');
   await input('maintenance_type').selectOption('Other');
   assert.equal(await page.locator('#sn-create-booking-form').evaluate(form => form.checkValidity()), false);
@@ -163,7 +163,7 @@ function multipart(request) {
   await input('sections').fill('3');
   await input('problem').selectOption('Broken panel');
   await input('height_m').fill('2.5');
-  assert.match(await page.locator('.sn-outdoor-total').innerText(), /PHP 2,160 - PHP 4,470/);
+  assert.match(await page.locator('.sn-outdoor-total').innerText(), /₱ 2,160\.00 - ₱ 4,470\.00/);
   await input('material').selectOption('Other');
   await input('problem').selectOption('Other');
   assert.equal(await page.locator('#sn-create-booking-form').evaluate(form => form.checkValidity()), false);
@@ -174,7 +174,7 @@ function multipart(request) {
   await input('area_m2').fill('50');
   await input('plants').fill('10');
   await input('frequency').selectOption('Weekly');
-  assert.match(await page.locator('.sn-outdoor-total').innerText(), /PHP 720/);
+  assert.match(await page.locator('.sn-outdoor-total').innerText(), /₱ 720\.00/);
   await page.locator('#sn-booking-pin-center').click();
   await page.locator('#sn-confirm-booking-location').click();
   await page.locator('#sn-create-booking-form [type="submit"]').click();
@@ -208,7 +208,7 @@ function multipart(request) {
   await input('branch_condition').selectOption('Damaged / dead');
   await input('access').selectOption('Limited access');
   await input('near_power_lines').selectOption('Yes');
-  assert.match(await page.locator('.sn-outdoor-total').innerText(), /PHP 5,760 - PHP 11,520/);
+  assert.match(await page.locator('.sn-outdoor-total').innerText(), /₱ 5,760\.00 - ₱ 11,520\.00/);
   assert.match(await page.locator('.sn-outdoor-price-summary').innerText(), /safety assessment is required/);
   const media = page.locator('#sn-outdoor-media');
   const photo = { name: 'tree.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z1hYAAAAASUVORK5CYII=', 'base64') };

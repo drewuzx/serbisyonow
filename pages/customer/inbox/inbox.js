@@ -157,7 +157,7 @@ function customerNotificationItems({ messages = [], bookings = [], customer = nu
     if (receipt?.status === 'rejected') return [{
       id: `payment-receipt-${receipt.id}-rejected`,
       kind: 'Payment',
-      title: 'Payment receipt declined',
+      title: 'Payment Receipt Declined',
       body: `${booking.provider_name || 'Your provider'} could not verify the receipt for ${booking.service || 'your service'}.${receipt.review_note ? ` Reason: ${receipt.review_note}` : ''}`,
       time: receipt.reviewed_at || receipt.submitted_at,
       href: '../bookings/bookings.html',

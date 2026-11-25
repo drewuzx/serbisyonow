@@ -41,7 +41,7 @@ async function main() {
    }));
    assert.deepEqual(issues, [], `${width}px`);
    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${width}px page overflow`);
-   assert.match(await card.locator('.sn-result-price').textContent(), /PHP 500/);
+   assert.match(await card.locator('.sn-result-price').textContent(), /₱ 500\.00/);
    assert.match(await card.getByRole('link', { name: 'View Profile' }).getAttribute('href'), /id=81$/);
    assert.match(await card.getByRole('link', { name: 'Book Now' }).getAttribute('href'), /provider_id=81$/);
    await card.screenshot({ path: path.join(os.tmpdir(), `search-result-aligned-${width}.png`) });

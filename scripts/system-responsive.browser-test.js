@@ -68,7 +68,7 @@ async function main() {
     ['customer/profile/profile.html','#sn-edit-toggle','#sn-profile-form'],
     ['provider/services/services.html','[data-action="edit-service"]','#sn-service-editor'],
     ['provider/services/services.html','[data-action="set-price"]','#sn-price-editor'],
-    ['admin/revenue/revenue.html','button:has-text("Edit Receiving QR")','dialog'],
+    ['admin/revenue/revenue.html','button:has-text("Edit Online Payment Details")','dialog'],
    ]) {
     await page.goto(`${f.base}/pages/${route}`);
     await page.locator(control).first().click();

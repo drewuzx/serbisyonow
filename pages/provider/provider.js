@@ -117,7 +117,7 @@ function esc(value) {
 }
 
 function money(value) {
-  return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+  return `₱ ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function providerCategoryLabel(value) {
@@ -280,7 +280,7 @@ function providerNotificationItems(data) {
     if (receipt) return [{
       id: `payment-receipt-${receipt.id}-${receipt.status}`,
       kind: 'Payment',
-      title: receipt.status === 'pending' ? 'Downpayment receipt submitted'
+      title: receipt.status === 'pending' ? 'Downpayment Receipt Submitted'
         : receipt.status === 'verified' ? 'Downpayment confirmed' : 'Receipt rejected',
       body: `${booking.customer_name || 'Customer'} · ${booking.service || 'Booking'} · ${providerMoney(Number(receipt.amount_centavos || 0) / 100)}${receipt.reference_number ? ` · Ref ${receipt.reference_number}` : ''}${receipt.status === 'rejected' && receipt.review_note ? ` · ${receipt.review_note}` : ''}`,
       time: receipt.status === 'pending' ? receipt.submitted_at : receipt.reviewed_at || receipt.submitted_at,
@@ -1015,7 +1015,8 @@ function renderProviderDashboardLists(activeBookings, allBookings, availability)
 function statusPill(status, label) {
   const normalized = String(status || 'pending').toLowerCase();
   const cls = normalized === 'completed' ? 'active' : normalized === 'cancelled' ? 'declined' : normalized === 'upcoming' || normalized === 'ongoing' ? 'info' : 'pending';
-  return `<span class="sn-status-pill ${cls}">${esc(label || normalized)}</span>`;
+  const statusLabel = label || (normalized === 'completed' ? 'Completed' : normalized === 'cancelled' ? 'Cancelled' : normalized.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase()));
+  return `<span class="sn-status-pill ${cls}">${esc(statusLabel)}</span>`;
 }
 
 function renderServices(services) {
@@ -1039,7 +1040,7 @@ function renderServices(services) {
         <div class="sn-provider-payment-row">
           <span>Payment Options</span>
           <label><input type="checkbox" data-service-field="accepts_cash" ${service.accepts_cash ? 'checked' : ''}> Cash</label>
-          <label><input type="checkbox" data-service-field="accepts_gcash" ${service.accepts_gcash ? 'checked' : ''}> QR</label>
+          <label><input type="checkbox" data-service-field="accepts_gcash" ${service.accepts_gcash ? 'checked' : ''}> Online Payment</label>
           <label class="sn-provider-availability-toggle"><span>On / Off Service</span><span class="sn-provider-switch"><input type="checkbox" role="switch" aria-label="${esc(service.title)} availability" data-service-field="is_active" ${service.is_active ? 'checked' : ''}><span class="sn-provider-toggle"></span></span></label>
         </div>
         <p class="sn-service-save-status" role="status" aria-live="polite"></p>
@@ -1278,7 +1279,7 @@ async function removeService(serviceId) {
 }
 
 function providerMoney(value) {
-  return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+  return `₱ ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function providerBookingEstimateLabel(booking) {
@@ -1327,7 +1328,7 @@ function renderProviderBookingAssessment(booking) {
 
 function renderProviderBookingPayment(booking) {
   if (!booking.deposit_required) return '';
-  const labels = { awaiting_price: 'Waiting for confirmed price', awaiting_payment: 'Waiting for 30% downpayment', awaiting_verification: 'Payment receipt awaiting your review', paid: 'Downpayment verified', cancelled: 'Payment request cancelled', refund_review: 'Payment follow-up required' };
+  const labels = { awaiting_price: 'Waiting for Confirmed Price', awaiting_payment: 'Waiting for 30% Downpayment', awaiting_verification: 'Payment Receipt Awaiting Your Review', paid: 'Downpayment Verified', cancelled: 'Payment Request Cancelled', refund_review: 'Payment Follow-Up Required' };
   return `<section class="sn-booking-payment-summary"><strong>${esc(labels[booking.deposit_status] || 'Downpayment pending')}</strong>
     ${booking.confirmed_price != null ? `<dl><div><dt>Confirmed total</dt><dd>${providerMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment</dt><dd>${providerMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${providerMoney(booking.balance_due)}</dd></div></dl>` : ''}
     ${booking.price_notes ? `<p>${esc(booking.price_notes)}</p>` : ''}
@@ -1344,7 +1345,7 @@ function showProviderPrice(booking) {
   overlay.innerHTML = `<form class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-price-title">
     <div class="sn-modal-head"><h2 id="sn-price-title">Confirm Service Price</h2><button type="button" class="sn-modal-close" aria-label="Close">x</button></div>
     <p>${esc(booking.service)} &middot; ${esc(booking.customer_name || 'Customer')}</p>
-    <label class="sn-modal-field">Total service price (PHP)<input class="sn-modal-input" name="price" type="number" min="3.34" max="333333.33" step="0.01" value="${esc(booking.confirmed_price ?? booking.amount ?? '')}" required /></label>
+    <label class="sn-modal-field">Total Service Price (₱)<input class="sn-modal-input" name="price" type="number" min="3.34" max="333333.33" step="0.01" value="${esc(booking.confirmed_price ?? booking.amount ?? '')}" required /></label>
     <label class="sn-modal-field">Scope / price notes<textarea class="sn-modal-input" name="notes" maxlength="1000">${esc(booking.price_notes || '')}</textarea></label>
     <p class="sn-price-preview" aria-live="polite"></p><p>The customer must agree and pay 30% before the schedule is confirmed.</p>
     <p class="sn-price-error" role="alert" hidden></p><div class="sn-modal-actions"><button type="submit" class="btn btn-primary">Request Downpayment</button></div>
@@ -2891,7 +2892,8 @@ function providerHistoryStatusPill(status) {
     : normalized === 'cancelled' ? 'sn-pill--cancelled'
       : normalized === 'ongoing' || normalized === 'upcoming' ? 'sn-pill--ongoing'
         : 'sn-pill--pending';
-  return `<span class="sn-status-pill ${cls}">${esc(normalized)}</span>`;
+  const label = normalized === 'completed' ? 'Completed' : normalized === 'cancelled' ? 'Cancelled' : normalized.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+  return `<span class="sn-status-pill ${cls}">${esc(label)}</span>`;
 }
 
 function renderProviderHistoryItem(booking, active = false) {
@@ -2945,7 +2947,7 @@ function renderProviderHistoryDetail(booking) {
           <div class="sn-dr"><span class="sn-dr-label">Service</span><span class="sn-dr-value">${esc(booking.service || '-')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Address</span><span class="sn-dr-value">${esc(booking.address || '-')}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Amount</span><span class="sn-dr-value sn-dr-amount">${money(booking.amount)}</span></div>
-          <div class="sn-dr"><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value">${esc(({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[booking.payment_method || 'cash'] || booking.payment_method)}</span></div>
+          <div class="sn-dr"><span class="sn-dr-label">Payment Method</span><span class="sn-dr-value">${esc(({ cash: 'Cash', gcash: 'Online Payment', qr: 'Online Payment' })[booking.payment_method || 'cash'] || booking.payment_method)}</span></div>
           <div class="sn-dr"><span class="sn-dr-label">Status</span><span class="sn-dr-value">${providerHistoryStatusPill(booking.status)}</span></div>
         </div>
         ${renderProviderBookingPayment(booking)}
@@ -3285,15 +3287,15 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   paymentSection.className = 'sn-provider-payment-settings';
   paymentSection.innerHTML = `<h2>Downpayment Account</h2><form id="sn-provider-payment-form">
     <div class="sn-form-grid">
-      <div class="sn-form-field"><label for="sn-provider-payment-wallet">Payment app</label><select id="sn-provider-payment-wallet" name="wallet"><option>GCash</option><option>Maya</option><option>Bank / Other QR Ph</option></select></div>
+      <div class="sn-form-field"><label for="sn-provider-payment-wallet">Payment app</label><select id="sn-provider-payment-wallet" name="wallet"><option>GCash</option><option>Maya</option><option>Bank / Other</option></select></div>
       <div class="sn-form-field"><label for="sn-provider-payment-name">Account name</label><input id="sn-provider-payment-name" name="account_name" maxlength="120" required /></div>
       <div class="sn-form-field"><label for="sn-provider-payment-number">Account / mobile number</label><input id="sn-provider-payment-number" name="account_number" maxlength="60" required /></div>
-      <div class="sn-form-field"><label for="sn-provider-payment-qr">Receiving QR image</label><input id="sn-provider-payment-qr" name="qr" type="file" accept="image/png,image/jpeg,image/webp" /></div>
+      <div class="sn-form-field"><label for="sn-provider-payment-qr">Payment image</label><input id="sn-provider-payment-qr" name="qr" type="file" accept="image/png,image/jpeg,image/webp" /></div>
     </div>
-    <div class="sn-provider-qr-preview" hidden><img class="sn-payment-qr-image" alt="Your saved receiving QR" /></div>
-    <label class="sn-payment-consent"><input type="checkbox" name="confirm_account" value="true" required /><span>This reusable QR belongs to my receiving account, and the account details match it.</span></label>
+    <div class="sn-provider-qr-preview" hidden><img class="sn-payment-qr-image" alt="Your saved payment image" /></div>
+    <label class="sn-payment-consent"><input type="checkbox" name="confirm_account" value="true" required /><span>This payment image belongs to my receiving account, and these details match it.</span></label>
     <p id="sn-provider-payment-status" role="status">Loading payment account...</p>
-    <div class="sn-actions-row"><button type="submit" class="btn btn-primary" disabled>Save Payment QR</button></div>
+    <div class="sn-actions-row"><button type="submit" class="btn btn-primary" disabled>Save Online Payment Details</button></div>
   </form>`;
   panel.appendChild(paymentSection);
   paymentSection.querySelector('form').addEventListener('input', () => { paymentSection.dataset.dirty = 'true'; });
@@ -3321,7 +3323,7 @@ async function loadProviderPaymentSettings(provider, section, { background = fal
     section.querySelector('.sn-provider-qr-preview').hidden = !url;
     if (url) section.querySelector('img').src = url;
     form.elements.qr.required = !url;
-    status.textContent = url ? 'Payment QR saved.' : 'No payment QR saved yet.';
+    status.textContent = url ? 'Online Payment details saved.' : 'No online payment details saved yet.';
     form.querySelector('[type="submit"]').disabled = false;
   } catch (error) { if (!background) status.textContent = error.message; }
 }
@@ -3332,7 +3334,7 @@ async function saveProviderPaymentSettings(event, provider, section) {
   if (!form.reportValidity()) return;
   const status = section.querySelector('[role="status"]');
   const file = form.elements.qr.files[0];
-  if (file && file.size > 5 * 1024 * 1024) { status.textContent = 'QR image must be 5 MB or smaller.'; return; }
+  if (file && file.size > 5 * 1024 * 1024) { status.textContent = 'Payment image must be 5 MB or smaller.'; return; }
   const button = form.querySelector('[type="submit"]');
   button.disabled = true;
   try {
@@ -3340,7 +3342,7 @@ async function saveProviderPaymentSettings(event, provider, section) {
     form.reset();
     delete section.dataset.dirty;
     await loadProviderPaymentSettings(provider, section);
-    status.textContent = 'Payment QR saved. Payments already started keep their original receiving account.';
+    status.textContent = 'Online Payment details saved. Payments already started keep their original receiving account.';
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -3351,7 +3353,7 @@ async function showProviderDirectPayment(booking) {
   const previousFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'sn-modal-backdrop sn-direct-review-dialog';
-  overlay.innerHTML = `<div class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-direct-review-title"><div class="sn-modal-head"><h2 id="sn-direct-review-title">Review Downpayment</h2><button type="button" class="sn-modal-close" aria-label="Close">x</button></div><div class="sn-direct-review-content">Loading payment receipt...</div><p role="status"></p></div>`;
+  overlay.innerHTML = `<div class="sn-modal" role="dialog" aria-modal="true" aria-labelledby="sn-direct-review-title"><div class="sn-modal-head"><h2 id="sn-direct-review-title">Review Downpayment</h2><button type="button" class="sn-modal-close" aria-label="Close">x</button></div><div class="sn-direct-review-content">Loading Payment Receipt...</div><p role="status"></p></div>`;
   document.body.appendChild(overlay);
   document.body.classList.add('sn-payment-dialog-open');
   let busy = false;
@@ -3376,9 +3378,9 @@ async function showProviderDirectPayment(booking) {
     if (!receipt) throw new Error('No payment receipt has been submitted.');
     const canReview = data.booking.status === 'pending' && data.booking.deposit_status === 'awaiting_verification' && receipt.status === 'pending';
     overlay.querySelector('.sn-direct-review-content').innerHTML = `<p><strong>${esc(booking.customer_name || 'Customer')}</strong> &middot; ${esc(booking.service)}</p>
-      <dl class="sn-direct-payment-breakdown"><div><dt>30% downpayment</dt><dd>${providerMoney(receipt.amount)}</dd></div><div><dt>Transaction reference</dt><dd>${esc(receipt.reference_number)}</dd></div><div><dt>Receiving account</dt><dd>${esc(data.recipient?.account_name || '')} (${esc(data.recipient?.wallet || '')})</dd></div></dl>
-      <img class="sn-payment-receipt-image" data-payment-receipt-image alt="Customer payment receipt" hidden /><p data-receipt-error role="alert" hidden></p>
-      ${canReview ? `<form class="sn-direct-review-form"><label class="sn-payment-consent"><input name="payment_received" type="checkbox" /><span>I checked my actual wallet or bank transactions. The reference matches and I received exactly ${providerMoney(receipt.amount)}. A screenshot alone is not proof of receipt.</span></label><label class="sn-modal-field">Review note<textarea class="sn-modal-input" name="notes" maxlength="1000"></textarea></label><div class="sn-modal-actions"><button type="button" class="btn btn-danger" data-payment-decision="reject">Reject Receipt</button><button type="button" class="btn btn-success" data-payment-decision="verify" disabled>Confirm Payment</button></div></form>` : `<p>Payment status: ${esc(receipt.status.replace(/_/g, ' '))}${receipt.review_note ? '. ' + esc(receipt.review_note) : ''}</p>${data.booking.deposit_status === 'refund_review' ? '<p>Contact the customer directly to resolve this cancelled payment. The app does not reverse transfers.</p>' : ''}`}`;
+      <dl class="sn-direct-payment-breakdown"><div><dt>30% Downpayment</dt><dd>${providerMoney(receipt.amount)}</dd></div><div><dt>Transaction Reference</dt><dd>${esc(receipt.reference_number)}</dd></div><div><dt>Receiving Account</dt><dd>${esc(data.recipient?.account_name || '')} (${esc(data.recipient?.wallet || '')})</dd></div></dl>
+      <img class="sn-payment-receipt-image" data-payment-receipt-image alt="Customer Payment Receipt" hidden /><p data-receipt-error role="alert" hidden></p>
+      ${canReview ? `<form class="sn-direct-review-form"><label class="sn-payment-consent"><input name="payment_received" type="checkbox" /><span>I checked my actual wallet or bank transactions. The reference matches and I received exactly ${providerMoney(receipt.amount)}. A screenshot alone is not proof of receipt.</span></label><label class="sn-modal-field">Review Note<textarea class="sn-modal-input" name="notes" maxlength="1000"></textarea></label><div class="sn-modal-actions"><button type="button" class="btn btn-danger" data-payment-decision="reject">Reject Receipt</button><button type="button" class="btn btn-success" data-payment-decision="verify" disabled>Confirm Payment</button></div></form>` : `<p>Payment Status: ${esc(receipt.status.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase()))}${receipt.review_note ? '. ' + esc(receipt.review_note) : ''}</p>${data.booking.deposit_status === 'refund_review' ? '<p>Contact the customer directly to resolve this cancelled payment. The app does not reverse transfers.</p>' : ''}`}`;
     releaseImage = window.snDirectPayments.loadReceiptImage(overlay, PROVIDER_API_BASE, 'provider', provider.auth_token, receipt.id);
     const form = overlay.querySelector('form');
     form?.elements.payment_received.addEventListener('change', event => { form.querySelector('[data-payment-decision="verify"]').disabled = !event.target.checked; });

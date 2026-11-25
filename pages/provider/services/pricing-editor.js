@@ -10,7 +10,7 @@ function openServicePricing(service) {
  draft = { ...fallback, ...draft };
  let step = 0, roomIndex = 0, dirty = false, busy = false;
  const icon = name => `<img src="/shared/icons/lucide/${name}.svg" alt="" width="18" height="18">`;
- const price = (name, value, label, minimum = 0) => `<label class="sn-price-input"><span class="sn-sr-only">${esc(label)}</span><span aria-hidden="true">PHP</span><input name="${name}" aria-label="${esc(label)}" type="number" inputmode="decimal" min="${minimum}" max="1000000" step="0.01" required value="${esc(value)}"></label>`;
+ const price = (name, value, label, minimum = 0) => `<label class="sn-price-input"><span class="sn-sr-only">${esc(label)}</span><span aria-hidden="true">₱</span><input name="${name}" aria-label="${esc(label)}" type="number" inputmode="decimal" min="${minimum}" max="1000000" step="0.01" required value="${esc(value)}"></label>`;
  const options = (values, current) => values.map(value => `<option${value === current ? ' selected' : ''}>${esc(value)}</option>`).join('');
  function read() {
   const form = host.querySelector('form');

@@ -133,9 +133,9 @@ function multipart(request) {
   await input('package').selectOption('Mesh setup');
   await input('devices').fill('8');
   await input('access_points').fill('3');
-  assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 1,245/);
+  assert.match(await page.locator('.sn-installation-total').innerText(), /₱ 1,245\.00/);
   await input('new_wiring').selectOption('Yes');
-  assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 1,695 - PHP 2,595/);
+  assert.match(await page.locator('.sn-installation-total').innerText(), /₱ 1,695\.00 - ₱ 2,595\.00/);
   assert.equal(await page.locator('.sn-calculated-head > span').innerText(), 'Assessment / Quote');
 
   await selectService('curtain / blinds installation');
@@ -144,11 +144,11 @@ function multipart(request) {
   await input('windows').fill('3');
   await input('window_size').selectOption('Medium');
   await input('installation_type').selectOption('New brackets / track');
-  assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 1,425/);
+  assert.match(await page.locator('.sn-installation-total').innerText(), /₱ 1,425\.00/);
   await input('window_size').selectOption('Custom width');
   assert.equal(await input('width_m').isDisabled(), false);
   await input('width_m').fill('2.5');
-  assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 2,175/);
+  assert.match(await page.locator('.sn-installation-total').innerText(), /₱ 2,175\.00/);
   await input('windows').fill('');
   assert.equal(await page.locator('#sn-create-booking-form').evaluate(form => form.checkValidity()), false);
   assert.doesNotMatch(await page.locator('.sn-installation-price-summary').innerText(), /NaN/);
@@ -159,7 +159,7 @@ function multipart(request) {
   await input('existing_wiring').selectOption('No');
   await input('storage').selectOption('New DVR / NVR setup');
   await input('floors').fill('2');
-  assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 4,750/);
+  assert.match(await page.locator('.sn-installation-total').innerText(), /₱ 4,750\.00/);
   await screenshots('cctv');
   await page.locator('#sn-booking-pin-center').click();
   await page.locator('#sn-confirm-booking-location').click();
@@ -199,7 +199,7 @@ function multipart(request) {
   assert.match(await page.locator('.sn-installation-price-summary').innerText(), /http:\/\/ or https:\/\//);
   await input('product_url').fill('https://example.com/furniture/chair');
   await input('ready_to_assemble').selectOption('No');
-  assert.match(await page.locator('.sn-installation-total').innerText(), /PHP 1,000 - PHP 1,900/);
+  assert.match(await page.locator('.sn-installation-total').innerText(), /₱ 1,000\.00 - ₱ 1,900\.00/);
   const media = page.locator('#sn-installation-media');
   const photo = { name: 'furniture.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z1hYAAAAASUVORK5CYII=', 'base64') };
   await media.setInputFiles({ name: 'invalid.txt', mimeType: 'text/plain', buffer: Buffer.from('not a photo') });

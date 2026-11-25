@@ -153,7 +153,7 @@
   return {
    amount, estimatedMin: amount, estimatedMax: amount, pricingType: 'calculated', mediaFiles: [],
    details: { category: 'Personal Care', service_type: configs[key].title, pricing_type: 'calculated', inputs, answers, breakdown,
-    estimate_label: `Sample estimated price: PHP ${amount.toLocaleString('en-PH')}`, note: NOTE, rate_version: VERSION, sample_rates: true },
+    estimate_label: `Sample estimated price: ₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, note: NOTE, rate_version: VERSION, sample_rates: true },
   };
  }
  function forBooking(serviceName, details, providerService) {

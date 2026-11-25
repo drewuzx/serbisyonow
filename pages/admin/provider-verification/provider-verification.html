@@ -89,6 +89,8 @@
       document.getElementById('provider-list').innerHTML = (providers.length ? providers : [{ full_name: allProviders.length ? 'No providers match this search' : 'No provider registrations yet', category: '-', service: '-', verification_status: 'pending' }]).map(provider => `
         ${(() => { const status = adminVerificationStatus(provider.verification_status); return `
         <div class="admin-list-item">
+          <div class="admin-provider-identity">
+          ${provider.id ? `<div class="admin-provider-avatar"><img src="${ADMIN_API_BASE}/api/profile-photos/provider/${Number(provider.id)}" alt="${adminEscape(provider.full_name)} profile photo" loading="lazy" data-provider-avatar /></div>` : ''}
           <div class="admin-provider-main">
             ${provider.id ? `<button class="admin-provider-profile-link" type="button" data-provider-details="${provider.id}" aria-label="View profile of ${adminEscape(provider.full_name)}">${adminEscape(provider.full_name)}</button>` : `<strong>${adminEscape(provider.full_name)}</strong>`}
             <span>${adminEscape(adminCategoryLabel(provider.category) || '-')} - ${adminEscape(provider.service || '-')} - ${adminEscape(provider.email || '')}</span>
@@ -99,6 +101,7 @@
               ${providerDocumentLinks(provider)}
             </div>
           </div>
+          </div>
           <div class="admin-actions">
             <span class="status-badge ${status.className}">${status.label}</span>
             ${providerActions(provider)}
@@ -106,6 +109,9 @@
         </div>
         `; })()}
         `).join('');
+      document.querySelectorAll('[data-provider-avatar]').forEach(image => {
+        image.addEventListener('error', () => image.remove(), { once: true });
+      });
     }
 
     function applyProviderSearch() {

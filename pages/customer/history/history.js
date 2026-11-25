@@ -26,7 +26,7 @@ function historyEsc(value) {
 }
 
 function historyMoney(value) {
-  return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+  return `₱ ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function historyDate(value) {
@@ -50,7 +50,8 @@ function historyStatusPill(status) {
   const cls = normalized === 'completed' ? 'sn-pill--completed'
     : normalized === 'cancelled' ? 'sn-pill--cancelled'
       : 'sn-pill--active';
-  return `<span class="sn-status-pill ${cls}">${historyEsc(normalized)}</span>`;
+  const label = normalized === 'completed' ? 'Completed' : normalized === 'cancelled' ? 'Cancelled' : normalized.replace(/-/g, ' ').replace(/^./, letter => letter.toUpperCase());
+  return `<span class="sn-status-pill ${cls}">${historyEsc(label)}</span>`;
 }
 
 function historyAvatarClass(index) {
@@ -194,7 +195,7 @@ function populateDetail(booking, index = 0) {
   document.getElementById('detail-service').textContent = booking.service || '-';
   document.getElementById('detail-address').textContent = booking.address || '-';
   document.getElementById('detail-amount').textContent = historyMoney(booking.amount);
-  document.getElementById('detail-payment').textContent = ({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[booking.payment_method || 'cash'] || booking.payment_method;
+  document.getElementById('detail-payment').textContent = ({ cash: 'Cash', gcash: 'Online Payment', qr: 'Online Payment' })[booking.payment_method || 'cash'] || booking.payment_method;
   document.getElementById('detail-status-badge').innerHTML = historyStatusPill(booking.status);
   document.getElementById('detail-card-avatar').className = `sn-provider-info-avatar ${avatarClass}`;
   document.getElementById('detail-card-avatar').dataset.photoTarget = `provider/${Number(booking.provider_id)}`;
@@ -291,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const list = document.getElementById('sn-history-list');
   if (list) list.innerHTML = '<div class="sn-history-empty">Loading booking history...</div>';
-  showHistoryEmpty('Loading history', 'Your completed and cancelled bookings will appear here.');
+  showHistoryEmpty('Loading History', 'Your completed and cancelled bookings will appear here.');
 
   try {
     const statusData = await historyFetch(`/api/auth/customer/status/${currentCustomer.id}`);

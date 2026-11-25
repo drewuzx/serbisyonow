@@ -124,7 +124,7 @@
   if (max > 99999999.99) fail('Total price exceeds the booking limit.');
   const repairQuote = normalize(service.category) === 'repair services' && normalize(estimate?.details?.service_type || service.title) !== 'painting services';
   const pricingType = max !== min || estimate?.pricingType === 'provider_quote' || repairQuote ? 'provider_quote' : 'calculated';
-  const label = `Provider estimated ${min === max ? 'price' : 'range'}: PHP ${min.toLocaleString('en-PH')}${max !== min ? ` - PHP ${max.toLocaleString('en-PH')}` : ''}`;
+  const label = `Provider estimated ${min === max ? 'price' : 'range'}: ₱ ${min.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${max !== min ? ` - ₱ ${max.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}`;
   return { ...estimate, amount: min, estimatedMin: min, estimatedMax: max, pricingType, mediaFiles: estimate?.mediaFiles || [],
    details: { ...estimate?.details, service_type: estimate?.details?.service_type || service.title, category: estimate?.details?.category || service.category,
     pricing_type: pricingType, sample_rates: false, rate_version: 'provider-v1', breakdown, estimate_label: label,

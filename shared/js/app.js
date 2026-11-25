@@ -255,7 +255,7 @@ const SN = {
     isValidEmail: (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e),
     isValidPhone:  (p) => /^(\+63|0)[0-9]{10}$/.test(p.replace(/\s/g, '')),
     formatDate: (d) => new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }),
-    formatCurrency: (n) => '₱' + Number(n).toLocaleString('en-PH'),
+    formatCurrency: (n) => `₱ ${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     debounce(fn, ms = 300) {
       let t;
       return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };

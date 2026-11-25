@@ -50,12 +50,12 @@ async function main() {
 
   await provider.goto(`${f.base}/pages/provider/profile/profile.html`);
   const profileForm = provider.locator('#sn-provider-payment-form');
-  await profileForm.getByRole('button', { name: 'Save Payment QR' }).waitFor();
+  await profileForm.getByRole('button', { name: 'Save Online Payment Details' }).waitFor();
   await provider.getByLabel('Account name', { exact: true }).fill('QR Test Provider');
   await provider.getByLabel('Account / mobile number').fill('09123456789');
-  await provider.getByLabel('Receiving QR image').setInputFiles(imageFile);
+  await provider.getByLabel('Payment image').setInputFiles(imageFile);
   await profileForm.getByRole('checkbox').check();
-  await profileForm.getByRole('button', { name: 'Save Payment QR' }).click();
+  await profileForm.getByRole('button', { name: 'Save Online Payment Details' }).click();
   await provider.getByRole('status').filter({ hasText: 'Payments already started' }).waitFor();
   await imageLoaded(profileForm.locator('img'));
   await screenshots(provider, 'profile');
@@ -72,7 +72,7 @@ async function main() {
   await customer.getByRole('link', { name: 'Review & Pay 30%' }).click();
   const payment = customer.locator('.sn-downpayment-modal');
   await payment.getByRole('checkbox').check();
-  await payment.getByRole('button', { name: 'Show Provider QR' }).click();
+  await payment.getByRole('button', { name: 'Show Online Payment' }).click();
   await imageLoaded(payment.locator('.sn-payment-qr-image'));
   await screenshots(customer, 'customer-qr', payment);
   await customer.setViewportSize({ width: 390, height: 850 });

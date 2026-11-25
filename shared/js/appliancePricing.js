@@ -111,7 +111,7 @@
   return {
    amount: min, estimatedMin: min, estimatedMax: max, pricingType: config.pricingType, mediaFiles: [],
    details: { category: 'Appliance Maintenance', service_type: config.title, pricing_type: config.pricingType, inputs, answers, breakdown,
-    estimate_label: calculated ? `Sample estimated price: PHP ${min.toLocaleString('en-PH')}` : `Sample diagnostic estimate: PHP ${min.toLocaleString('en-PH')} - PHP ${max.toLocaleString('en-PH')}`,
+    estimate_label: calculated ? `Sample estimated price: ₱ ${min.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Sample diagnostic estimate: ₱ ${min.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - ₱ ${max.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     note: calculated ? NOTE : QUOTE_NOTE, rate_version: VERSION, sample_rates: true },
   };
  }

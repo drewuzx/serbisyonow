@@ -30,7 +30,7 @@ function createPayMongo({ env = process.env, fetcher = globalThis.fetch, now = (
 
  async function checkout({ bookingId, priceVersion, amountCentavos, reference, service, returnBase, promotionOrderId }) {
   if (!ready) fail(503, 'PayMongo checkout is not available yet. Please contact support.');
-  if (!Number.isSafeInteger(amountCentavos) || amountCentavos < 100 || amountCentavos > 10000000) fail(400, 'The payment amount must be from PHP 1 to PHP 100,000.');
+  if (!Number.isSafeInteger(amountCentavos) || amountCentavos < 100 || amountCentavos > 10000000) fail(400, 'The payment amount must be from ₱ 1.00 to ₱ 100,000.00.');
   let url;
   try { url = new URL(returnBase); } catch { fail(503, 'The payment return address is not configured.'); }
   if (!['http:', 'https:'].includes(url.protocol) || (livemode && url.protocol !== 'https:') || url.username || url.password) fail(503, 'Configure a valid payment return address; live payments require HTTPS.');

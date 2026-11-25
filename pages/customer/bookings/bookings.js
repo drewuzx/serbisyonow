@@ -159,7 +159,7 @@ function bookingSlotLabel(slot) {
 }
 
 function bookingMoney(value) {
- return `PHP ${Number(value || 0).toLocaleString('en-PH')}`;
+ return `₱ ${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function normalizeBookingText(value) {
@@ -709,7 +709,7 @@ function updateBookingPaymentChoices() {
  const previousPayment = payment.value;
  const methods = [];
  if (service?.accepts_cash) methods.push(['cash', 'Cash']);
- if (service?.accepts_gcash) methods.push(['gcash', 'QR']);
+ if (service?.accepts_gcash) methods.push(['gcash', 'Online Payment']);
  payment.innerHTML = methods.length ? methods.map(([value, label]) => `<option value="${value}">${label}</option>`).join('') : '<option value="">No payment options available</option>';
  if (methods.some(([value]) => value === previousPayment)) payment.value = previousPayment;
  payment.disabled = !methods.length;
@@ -741,7 +741,7 @@ function updateBookingPaymentNote() {
  const value = document.getElementById('sn-booking-payment')?.value;
  const note = document.getElementById('sn-booking-payment-note');
  if (note) note.textContent = value === 'gcash'
-  ? "Remaining 70% is paid using the provider's QR after service."
+  ? "Remaining 70% is paid using the provider's online payment method after service."
   : value === 'cash' ? 'Remaining 70% is paid directly to the provider in cash after service.'
    : 'This service cannot accept new bookings right now.';
 }
@@ -974,7 +974,7 @@ async function showBookingDetails(booking) {
     ${bookingDetailRow('Date', bookingDisplayDate(item.scheduled_date))}
     ${bookingDetailRow('Time', SNTime.format(item.scheduled_time))}
     ${bookingDetailRow('Amount / estimate', bookingEstimateLabel(item))}
-    ${bookingDetailRow(item.deposit_required ? 'Remaining balance method' : 'Payment', ({ cash: 'Cash', gcash: 'QR', qr: 'QR' })[item.payment_method || 'cash'] || item.payment_method)}
+    ${bookingDetailRow(item.deposit_required ? 'Remaining balance method' : 'Payment', ({ cash: 'Cash', gcash: 'Online Payment', qr: 'Online Payment' })[item.payment_method || 'cash'] || item.payment_method)}
     ${item.deposit_required ? bookingDetailRow('Downpayment', item.deposit_status === 'refund_review' ? 'Payment follow-up required' : item.deposit_status.replace(/_/g, ' ')) : ''}
     ${item.deposit_amount != null ? bookingDetailRow('30% downpayment', bookingMoney(item.deposit_amount)) + bookingDetailRow('70% remaining balance', bookingMoney(item.balance_due)) : ''}
     ${item.price_notes ? bookingDetailRow('Confirmed price notes', item.price_notes) : ''}
@@ -1066,13 +1066,13 @@ async function showBookingPayment(bookingId, returnState = '') {
    modal.querySelector('.sn-downpayment-content').innerHTML = `<p><strong>${bookingEsc(booking.service)}</strong></p>
     ${booking.confirmed_price != null ? `<dl class="sn-downpayment-breakdown"><div><dt>Confirmed service total</dt><dd>${bookingMoney(booking.confirmed_price)}</dd></div><div><dt>30% downpayment due now</dt><dd>${bookingMoney(booking.deposit_amount)}</dd></div><div><dt>70% remaining balance</dt><dd>${bookingMoney(booking.balance_due)}</dd></div></dl>` : '<p>Waiting for the provider to confirm the service price.</p>'}
     ${booking.price_notes ? `<p>${bookingEsc(booking.price_notes)}</p>` : ''}
-    ${direct && qrUrl ? `<section class="sn-direct-recipient"><h4>Pay ${bookingEsc(data.recipient.wallet)} directly</h4><p><strong>${bookingEsc(data.recipient.account_name)}</strong><br>${bookingEsc(data.recipient.account_number)}</p>${awaiting ? `<img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider payment QR" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">Open QR</a><p>Send exactly <strong>${bookingMoney(booking.deposit_amount)}</strong>. Check the recipient name in your payment app before confirming.</p>` : ''}</section>` : ''}
-    ${balanceQr && qrUrl ? `<section class="sn-direct-balance"><h4>Remaining Balance - QR</h4><img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider QR for remaining balance" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">Open QR</a><p>${bookingMoney(booking.balance_due)} is due after service. Confirm the recipient with your provider before paying. Pay only once; the provider must verify the transfer. Balance payment is not automatically tracked here.</p></section>` : ''}
-    ${direct && data.receipt ? `<section class="sn-direct-receipt"><h4>Submitted payment</h4><p>Reference: <strong>${bookingEsc(data.receipt.reference_number)}</strong></p><p>${bookingEsc(data.receipt.status.replace(/_/g, ' '))}${data.receipt.review_note ? ': ' + bookingEsc(data.receipt.review_note) : ''}</p><img class="sn-payment-receipt-image" data-payment-receipt-image alt="Your submitted receipt" hidden /><p data-receipt-error role="alert" hidden></p></section>` : ''}
+    ${direct && qrUrl ? `<section class="sn-direct-recipient"><h4>Pay ${bookingEsc(data.recipient.wallet)} directly</h4><p><strong>${bookingEsc(data.recipient.account_name)}</strong><br>${bookingEsc(data.recipient.account_number)}</p>${awaiting ? `<img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider Online Payment" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">View Payment Image</a><p>Send exactly <strong>${bookingMoney(booking.deposit_amount)}</strong>. Check the recipient name in your payment app before confirming.</p>` : ''}</section>` : ''}
+    ${balanceQr && qrUrl ? `<section class="sn-direct-balance"><h4>Remaining Balance - Online Payment</h4><img class="sn-payment-qr-image" src="${bookingEsc(qrUrl)}" alt="Provider Online Payment for remaining balance" /><a class="btn btn-outline btn-sm" href="${bookingEsc(qrUrl)}" target="_blank" rel="noopener">View Payment Image</a><p>${bookingMoney(booking.balance_due)} is due after service. Confirm the recipient with your provider before paying. Pay only once; the provider must verify the transfer. Balance payment is not automatically tracked here.</p></section>` : ''}
+    ${direct && data.receipt ? `<section class="sn-direct-receipt"><h4>Submitted Payment</h4><p>Transaction Reference: <strong>${bookingEsc(data.receipt.reference_number)}</strong></p><p>${bookingEsc(data.receipt.status.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase()))}${data.receipt.review_note ? ': ' + bookingEsc(data.receipt.review_note) : ''}</p><img class="sn-payment-receipt-image" data-payment-receipt-image alt="Your Payment Receipt" hidden /><p data-receipt-error role="alert" hidden></p></section>` : ''}
     ${awaiting && (!direct || !booking.customer_agreed_at) ? '<label class="sn-payment-consent"><input type="checkbox" data-payment-consent /> <span>I agree to this service price and the 30% downpayment. The remaining balance is due after service. If the booking is cancelled after payment, I will contact the provider or support to resolve the payment.</span></label>' : ''}
-    ${direct && awaiting && qrUrl ? `<form class="sn-direct-receipt-form"><label>Transaction reference<input name="reference_number" minlength="4" maxlength="120" required autocomplete="off" /></label><label>Payment receipt<input name="receipt" type="file" accept="image/png,image/jpeg,image/webp" required /></label><button class="btn btn-primary" type="submit">Submit Payment Receipt</button></form>` : ''}`;
+    ${direct && awaiting && qrUrl ? `<form class="sn-direct-receipt-form"><label>Transaction Reference<input name="reference_number" minlength="4" maxlength="120" required autocomplete="off" /></label><label>Payment Receipt<input name="receipt" type="file" accept="image/png,image/jpeg,image/webp" required /></label><button class="btn btn-primary" type="submit">Submit Payment Receipt</button></form>` : ''}`;
    if (direct && data.receipt) releaseReceiptImage = window.snDirectPayments.loadReceiptImage(modal, BOOKING_API_BASE, 'customer', customer.auth_token, data.receipt.id);
-   pay.textContent = direct ? 'Show Provider QR' : 'Pay 30%';
+   pay.textContent = direct ? 'Show Online Payment' : 'Pay 30%';
    pay.hidden = !awaiting || (direct && Boolean(booking.customer_agreed_at));
    pay.disabled = true;
    modal.querySelector('[data-payment-consent]')?.addEventListener('change', event => { pay.disabled = !event.target.checked || (!direct && !data.checkout_configured); });
@@ -1100,7 +1100,7 @@ async function showBookingPayment(bookingId, returnState = '') {
     : direct ? (booking.deposit_status === 'awaiting_verification' ? 'Receipt submitted. The provider must check their wallet before your schedule is confirmed.'
       : data.receipt?.status === 'rejected' ? 'Payment was not verified. Review the provider note and contact them before paying again.'
       : !awaiting ? 'Waiting for the provider to confirm the service price.'
-      : qrUrl ? 'Payment goes directly to your provider. Submit the receipt after paying; do not pay twice.' : 'Review the price to view your provider\'s payment QR.')
+      : qrUrl ? 'Payment goes directly to your provider. Submit the receipt after paying; do not pay twice.' : 'Review the price to view your provider\'s online payment method.')
     : !data.checkout_configured ? 'E-wallet checkout is not configured yet. Please contact support.'
     : returnState === 'success' ? 'Waiting for PayMongo payment verification. Your schedule is not confirmed yet.'
     : returnState === 'cancelled' ? 'Checkout was closed. The booking remains pending until a payment is verified.'
@@ -1337,7 +1337,7 @@ async function renderBookingRequestForm(customer) {
    <label><span>Date</span><input id="sn-booking-date" name="scheduled_date" type="date" value="${todayInputValue()}" required /></label>
    <label><span>Available Time</span><select id="sn-booking-time" name="scheduled_time" required><option value="">Loading slots...</option></select></label>
   <label><span>Remaining Balance Method</span><select id="sn-booking-payment" name="payment_method" required></select><small id="sn-booking-payment-note" class="sn-booking-payment-note"></small></label>
-   <p class="sn-booking-downpayment-terms full">A 30% downpayment is paid directly using the provider's payment QR after the price is confirmed. Submit your payment receipt; your schedule is confirmed only after the provider verifies the transfer. The remaining 70% is due after service.</p>
+   <p class="sn-booking-downpayment-terms full">A 30% downpayment is paid directly using the provider's online payment method after the price is confirmed. Submit your payment receipt; your schedule is confirmed only after the provider verifies the transfer. The remaining 70% is due after service.</p>
    <section class="sn-provider-price-options full" id="sn-provider-price-options" hidden></section>
    <section class="sn-repair-assessment full" id="sn-repair-assessment" hidden></section>
    <section class="sn-calculated-assessment full" id="sn-cleaning-assessment" hidden></section>

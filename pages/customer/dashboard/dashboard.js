@@ -227,7 +227,7 @@ function attachDashboardSearch() {
         const name = document.createElement('strong'); name.textContent = provider.full_name || 'Service provider';
         const details = document.createElement('span');
         details.textContent = (provider.matched_services || [provider.service || provider.category]).filter(Boolean).join(' / ');
-        const rate = document.createElement('small'); rate.textContent = Number(provider.starting_price) > 0 ? `Starts at PHP ${Number(provider.starting_price).toLocaleString('en-PH')}` : 'Price not set';
+        const rate = document.createElement('small'); rate.textContent = Number(provider.starting_price) > 0 ? `Starts at ₱ ${Number(provider.starting_price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Price not set';
         link.append(name, details, rate); item.append(link); list.append(item);
       }
       all.href = searchUrl(query); all.hidden = !providers.length;

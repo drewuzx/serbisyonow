@@ -178,7 +178,7 @@
    amount: min, estimatedMin: min, estimatedMax: max, pricingType, mediaFiles: [],
    details: { category: 'Installation Services', service_type: configs[key].title, pricing_type: pricingType, inputs, answers, breakdown,
     ...(inputs.product_url ? { product_url: inputs.product_url } : {}),
-    estimate_label: `Sample estimated ${range ? 'range' : 'price'}: PHP ${min.toLocaleString('en-PH')}${range ? ` - PHP ${max.toLocaleString('en-PH')}` : ''}`,
+    estimate_label: `Sample estimated ${range ? 'range' : 'price'}: ₱ ${min.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${range ? ` - ₱ ${max.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}`,
     note: range ? QUOTE_NOTE : NOTE, rate_version: VERSION, sample_rates: true },
   };
  }

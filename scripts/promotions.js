@@ -30,7 +30,7 @@ function planInput(body) {
  if (!['promotion', 'subscription'].includes(body.kind) || typeof body.enabled !== 'boolean') fail(400, 'Choose a plan type and availability.');
  if (!/^\d+(\.\d{1,2})?$/.test(String(body.price))) fail(400, 'Enter a price with up to two decimal places.');
  const cents = Math.round(Number(body.price) * 100);
- if (!Number.isSafeInteger(cents) || cents > 10000000 || (body.enabled && cents < 100)) fail(400, 'Enabled plans require a price from PHP 1 to PHP 100,000.');
+ if (!Number.isSafeInteger(cents) || cents > 10000000 || (body.enabled && cents < 100)) fail(400, 'Enabled plans require a price from ₱ 1.00 to ₱ 100,000.00.');
  return [name, description, body.kind, days, cents, body.enabled];
 }
 async function orders(db, providerId, query) {

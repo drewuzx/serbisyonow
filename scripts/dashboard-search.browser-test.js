@@ -32,7 +32,7 @@ async function main() {
   await input.waitFor();
   for (const q of ['Drew', 'Repair Services', 'Appliance']) {
    await input.fill(q); await panel.getByText('Drew Wu', { exact: true }).waitFor();
-   assert.match(await panel.textContent(), /Appliance repair/); assert.match(await panel.textContent(), /PHP 500/);
+   assert.match(await panel.textContent(), /Appliance repair/); assert.match(await panel.textContent(), /₱ 500\.00/);
   }
   for (const width of [320, 390, 768, 1440]) {
    await page.setViewportSize({ width, height: 900 });
