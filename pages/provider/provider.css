@@ -1240,6 +1240,9 @@ body {
 }
 
 .sn-provider-history-layout .sn-history-filter-panel[hidden] { display: none; }
+.sn-provider-history-layout .sn-history-date-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sn-provider-history-layout .sn-history-date-range label { display: grid; gap: 4px; color: var(--text-secondary); font-size: 0.72rem; font-weight: 700; }
+.sn-provider-history-layout .sn-history-date-range input { min-width: 0; width: 100%; min-height: 38px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--white); color: var(--text-primary); font: inherit; }
 
 .sn-provider-history-layout .sn-history-suggestions {
   position: absolute;

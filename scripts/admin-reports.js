@@ -2,12 +2,17 @@
 const { authenticateAccount } = require('./account-sessions');
 const { fail } = require('./booking-payments');
 
-async function buildReport(db, days, sort, aliases) {
+async function buildReport(db, days, sort, aliases, customRange) {
  const categoryNames=Object.fromEntries(Object.entries(aliases).flatMap(([key,value])=>[[key,value],[value.toLowerCase(),value]]));
  const client = await db.pool.connect();
  try {
   await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-  const period = (await client.query(`SELECT
+  const period = customRange
+   ? (await client.query(`SELECT
+   ($1::date::timestamp AT TIME ZONE 'Asia/Manila') AS start,
+   (($2::date + 1)::timestamp AT TIME ZONE 'Asia/Manila') AS finish,
+   (($1::date - (($2::date - $1::date) + 1))::timestamp AT TIME ZONE 'Asia/Manila') AS previous_start`,[customRange.from,customRange.to])).rows[0]
+   : (await client.query(`SELECT
    (date_trunc('day',NOW() AT TIME ZONE 'Asia/Manila') - ($1-1)*INTERVAL '1 day') AT TIME ZONE 'Asia/Manila' AS start,
    (date_trunc('day',NOW() AT TIME ZONE 'Asia/Manila') + INTERVAL '1 day') AT TIME ZONE 'Asia/Manila' AS finish,
    (date_trunc('day',NOW() AT TIME ZONE 'Asia/Manila') - ($1*2-1)*INTERVAL '1 day') AT TIME ZONE 'Asia/Manila' AS previous_start`,[days])).rows[0];
@@ -61,7 +66,7 @@ async function buildReport(db, days, sort, aliases) {
    FROM promotion_orders WHERE status='paid' AND paid_at >= $1 AND paid_at < $2
    GROUP BY plan_name ORDER BY revenue_centavos DESC,plan_name`,bounds.slice(0,2))).rows;
   await client.query('COMMIT');
-  return {days,sort,period,bookings,revenue,reviews,trend,categories,providers,plans};
+  return {days,sort,period,customRange:customRange || null,bookings,revenue,reviews,trend,categories,providers,plans};
  } catch(error) { await client.query('ROLLBACK'); throw error; }
  finally { client.release(); }
 }
@@ -70,10 +75,20 @@ function registerAdminReports(app,db,aliases) {
  app.get('/api/admin/reports',(req,res,next)=>Promise.resolve().then(async()=>{
   await authenticateAccount(db,req,'admin');
   res.set('Cache-Control','private, no-store');
-  if((req.query.days !== undefined && typeof req.query.days !== 'string') || (req.query.sort !== undefined && typeof req.query.sort !== 'string')) fail(400,'Choose a valid reporting period and ranking.');
-  const days=Number(req.query.days || 30),sort=req.query.sort || 'bookings';
-  if(![7,30,90,365].includes(days) || !['bookings','rating'].includes(sort)) fail(400,'Choose a valid reporting period and ranking.');
-  res.json(await buildReport(db,days,sort,aliases));
+  if((req.query.days !== undefined && typeof req.query.days !== 'string') || (req.query.sort !== undefined && typeof req.query.sort !== 'string')
+   || (req.query.from !== undefined && typeof req.query.from !== 'string') || (req.query.to !== undefined && typeof req.query.to !== 'string')) fail(400,'Choose a valid reporting period and ranking.');
+  let days=Number(req.query.days || 30);
+  const sort=req.query.sort || 'bookings';
+  const hasFrom=req.query.from !== undefined,hasTo=req.query.to !== undefined;
+  const customRange=hasFrom && hasTo ? {from:req.query.from,to:req.query.to} : null;
+  if((hasFrom !== hasTo) || (!customRange && ![7,30,90,365].includes(days)) || !['bookings','rating'].includes(sort)) fail(400,'Choose a valid reporting period and ranking.');
+  if(customRange) {
+   const isDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0,10)===value;
+   const span=(Date.parse(`${customRange.to}T00:00:00Z`)-Date.parse(`${customRange.from}T00:00:00Z`))/86400000+1;
+   if(!isDate(customRange.from) || !isDate(customRange.to) || span < 1 || span > 3660) fail(400,'Choose a valid date range of up to 10 years.');
+   days=span;
+  }
+  res.json(await buildReport(db,days,sort,aliases,customRange));
  }).catch(next));
 }
 module.exports={registerAdminReports};

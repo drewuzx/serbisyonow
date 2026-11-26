@@ -37,6 +37,17 @@ function historyDate(value) {
     : date.toLocaleDateString('en-PH', { month: 'short', day: '2-digit', year: 'numeric' });
 }
 
+function historyDateKey(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const part = type => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function historyDateTime(booking) {
   return `${historyDate(booking.scheduled_date)}${booking.scheduled_time ? ` at ${SNTime.format(booking.scheduled_time)}` : ''}`;
 }
@@ -60,8 +71,12 @@ function historyAvatarClass(index) {
 
 function historyVisibleBookings() {
   const query = document.getElementById('history-search')?.value.trim().toLowerCase() || '';
+  const from = document.getElementById('history-date-from')?.value || '';
+  const to = document.getElementById('history-date-to')?.value || '';
   return historyBookings
     .filter((booking) => historyFilter === 'all' || historyStatus(booking.status) === historyFilter)
+    .filter(booking => (!from || historyDateKey(booking.scheduled_date) >= from)
+      && (!to || historyDateKey(booking.scheduled_date) <= to))
     .filter((booking) => {
       const haystack = `${booking.provider_name || ''} ${booking.service || ''} ${booking.address || ''} ${booking.status || ''}`.toLowerCase();
       return !query || haystack.includes(query);
@@ -317,6 +332,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   const filterToggle = document.getElementById('sn-history-filter-toggle');
   const filterPanel = document.getElementById('sn-history-filter-panel');
+  ['history-date-from', 'history-date-to'].forEach(id => document.getElementById(id)?.addEventListener('change', () => {
+    const from = document.getElementById('history-date-from')?.value || '';
+    const to = document.getElementById('history-date-to')?.value || '';
+    if (from && to && from > to) {
+      document.getElementById('history-date-to').setCustomValidity('Choose a date on or after the start date.');
+      document.getElementById('history-date-to').reportValidity();
+      document.getElementById('history-date-to').setCustomValidity('');
+      return;
+    }
+    updateHistoryFilterToggle();
+    renderHistoryList();
+  }));
   filterToggle?.addEventListener('click', () => {
     const open = filterPanel?.hidden ?? true;
     if (filterPanel) filterPanel.hidden = !open;
@@ -418,7 +445,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 function updateHistoryFilterToggle() {
   const button = document.getElementById('sn-history-filter-toggle');
   if (!button) return;
-  const active = historyFilter !== 'all' || historySortOrder !== 'desc';
+  const active = historyFilter !== 'all' || historySortOrder !== 'desc'
+    || Boolean(document.getElementById('history-date-from')?.value || document.getElementById('history-date-to')?.value);
   button.dataset.active = String(active);
   button.title = button.getAttribute('aria-expanded') === 'true' ? 'Hide filters' : active ? 'Filters active' : 'Show filters';
   button.setAttribute('aria-label', button.title);

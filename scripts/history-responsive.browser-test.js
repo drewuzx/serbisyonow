@@ -53,6 +53,11 @@ async function main() {
    await page.locator('.sn-history-item').first().waitFor();
    await page.locator('#sn-history-filter-toggle').click();
    await page.locator('[data-filter="completed"]').click();
+   await page.locator('#history-date-from').fill('2099-10-11');
+   assert.equal(await page.locator('.sn-history-item').count(),0,'date filter excludes earlier booking dates');
+   await page.locator('#history-date-from').fill('2099-10-10');
+   assert.equal(await page.locator('.sn-history-item').count(),1,'date filter includes matching booking dates');
+   await page.locator('#history-date-from').fill('');
    await page.locator('#detail-address').filter({hasText:'building identifier'}).waitFor();
    assert.equal(await page.locator('#sn-detail-empty').isVisible(),false);
    assert.equal(await page.locator('.sn-cust-actions').isVisible(),true);

@@ -17,7 +17,7 @@ async function main() {
   assert.equal((await f.request('/api/admin/reports','GET',undefined,null)).status,401);
   assert.equal((await f.request('/api/admin/reports','GET',undefined,f.customerToken)).status,403);
   assert.equal((await f.request('/api/admin/reports','GET',undefined,f.providerToken)).status,403);
-  for(const query of ['?days=0','?days=31','?sort=invalid','?days[]=7']) assert.equal((await read(query)).status,400);
+  for(const query of ['?days=0','?days=31','?sort=invalid','?days[]=7','?from=2026-02-30&to=2026-03-01','?from=2026-03-02&to=2026-03-01','?from=2026-03-01']) assert.equal((await read(query)).status,400);
   const empty=await read();
   assert.equal(empty.status,200,JSON.stringify(empty.data));
   assert.equal(empty.data.bookings.total,0);
@@ -59,6 +59,12 @@ async function main() {
   assert.equal(report.trend.reduce((sum,r)=>sum+r.bookings,0),6);
   assert.equal(report.trend.reduce((sum,r)=>sum+r.revenue_centavos,0),30000);
   assert.equal(report.plans.length,2);
+  const oneDay=report.trend.at(-1).date;
+  const custom=await read(`?from=${oneDay}&to=${oneDay}`);
+  assert.equal(custom.status,200,JSON.stringify(custom.data));
+  assert.equal(custom.data.trend.length,1);
+  assert.equal(custom.data.trend[0].date,oneDay);
+  assert.deepEqual(custom.data.customRange,{from:oneDay,to:oneDay});
   for(const days of [7,90,365]) assert.equal((await read(`?days=${days}`)).data.trend.length,days);
 
   browser=await chromium.launch({headless:true,channel:'msedge'});
@@ -88,6 +94,12 @@ async function main() {
    const expected=days==='90'?13:days==='365'?13:Number(days);
    assert.equal(await page.locator('#booking-chart button').count(),expected);
   }
+  await page.getByLabel('Period',{exact:true}).selectOption('custom');
+  const customDate=report.trend.at(-1).date;
+  await page.getByLabel('Report start date').fill(customDate);
+  await page.getByLabel('Report end date').fill(customDate);
+  await page.locator('#booking-chart button').waitFor({state:'visible'});
+  assert.equal(await page.locator('#booking-chart button').count(),1,'custom date range renders only its selected day');
   for(const width of [1440,390,320]) {
    await page.setViewportSize({width,height:1000});
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Page overflow at ${width}`);

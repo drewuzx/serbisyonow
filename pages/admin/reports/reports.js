@@ -20,7 +20,8 @@
  function buckets(data) {
   const rows=[];
   data.trend.forEach((day,index)=>{
-   const key=data.days===365 ? day.date.slice(0,7) : data.days===90 ? Math.floor(index/7) : index;
+   const key=data.days===365 || (data.customRange && data.days>180) ? day.date.slice(0,7)
+    : data.days===90 || (data.customRange && data.days>30) ? Math.floor(index/7) : index;
    let row=rows[rows.length-1];
    if(!row || row.key!==key) { row={key,start:day.date,end:day.date,bookings:0,completed:0,revenue_centavos:0}; rows.push(row); }
    row.end=day.date; row.bookings+=day.bookings; row.completed+=day.completed; row.revenue_centavos+=day.revenue_centavos;
@@ -35,7 +36,9 @@
   if(!axis) { axis=document.createElement('div'); axis.id=`${target}-axis`; axis.className='report-chart-axis'; el(target).after(axis); }
   axis.innerHTML=`<span>${date(rows[0].start)}</span><span>${date(rows[rows.length-1].end)}</span>`;
   const actualMax=Math.max(...rows.map(r=>revenue?r.revenue_centavos:r.bookings));
-  el(detail).textContent=actualMax ? `Peak: ${revenue?money(actualMax):`${count(actualMax)} bookings`} per ${latest.days===365?'month':latest.days===90?'7-day interval':'day'}` : revenue?'No verified payments in this period.':'No bookings in this period.';
+  const interval=latest.days===365 || (latest.customRange && latest.days>180) ? 'month'
+   : latest.days===90 || (latest.customRange && latest.days>30) ? '7-day interval' : 'day';
+  el(detail).textContent=actualMax ? `Peak: ${revenue?money(actualMax):`${count(actualMax)} bookings`} per ${interval}` : revenue?'No verified payments in this period.':'No bookings in this period.';
   const show=event=>{ const button=event.target.closest('[data-index]'); if(button) el(detail).textContent=label(rows[Number(button.dataset.index)]); };
   el(target).onpointerover=show; el(target).onclick=show;
   el(target).querySelectorAll('button').forEach(button=>{ button.onfocus=show; });
@@ -62,10 +65,21 @@
  }
  async function loadReports(options={}) {
   if(options.background && el('report-content').contains(document.activeElement)) return;
+  const custom=el('report-days').value==='custom';
+  const from=el('report-from').value,to=el('report-to').value;
+  if(custom && (!from || !to || from>to)) {
+   if(!options.background) {
+    el('report-message').className='report-error';
+    el('report-message').textContent=from && to ? 'The end date must be on or after the start date.' : 'Choose both a start and end date to view this report.';
+    el('report-content').hidden=true; el('export-report').disabled=true;
+   }
+   return;
+  }
   const request=++version;
   if(!options.background) { el('report-message').textContent='Loading analytics...'; el('report-content').hidden=true; latest=null; el('export-report').disabled=true; }
   try {
-   const data=await adminGet(`/api/admin/reports?days=${el('report-days').value}&sort=${el('provider-ranking').value}`);
+   const periodQuery=custom ? `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : `days=${el('report-days').value}`;
+   const data=await adminGet(`/api/admin/reports?${periodQuery}&sort=${el('provider-ranking').value}`);
    if(request!==version || (options.background && (!adminCanRefresh() || el('report-content').contains(document.activeElement)))) return;
    if(!adminDataChanged('reports',data,options) && !el('report-message').textContent) return;
    latest=data; render(data);
@@ -88,9 +102,15 @@
    ['Subscription / Promotion','Verified payments','Revenue'],...d.plans.map(p=>[p.plan_name,p.payments,money(p.revenue_centavos)])];
   const cell=value=>{ let text=String(value); if(/^[\s]*[=+@-]/.test(text)) text="'"+text; return '"'+text.replace(/"/g,'""')+'"'; };
   const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob),link=document.createElement('a'); link.href=url; link.download=`serbisyonow-report-${d.days}-days.csv`; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const url=URL.createObjectURL(blob),link=document.createElement('a'); link.href=url; link.download=`serbisyonow-report-${d.customRange?`${d.customRange.from}-to-${d.customRange.to}`:`${d.days}-days`}.csv`; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
- el('report-days').addEventListener('change',()=>loadReports());
+ el('report-days').addEventListener('change',()=>{
+  const custom=el('report-days').value==='custom';
+  el('report-date-range').hidden=!custom;
+  if(custom) { el('report-content').hidden=true; el('export-report').disabled=true; el('report-message').textContent='Choose a start and end date to view this report.'; }
+  else loadReports();
+ });
+ ['report-from','report-to'].forEach(id=>el(id).addEventListener('change',()=>loadReports()));
  el('provider-ranking').addEventListener('change',()=>loadReports());
  el('refresh-report').addEventListener('click',()=>loadReports());
  el('export-report').addEventListener('click',exportReport);

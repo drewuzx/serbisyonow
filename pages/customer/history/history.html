@@ -78,6 +78,10 @@
             <button class="sn-history-filter-btn" id="sn-history-filter-toggle" type="button" title="Show filters" aria-label="Show filters" aria-expanded="false" aria-controls="sn-history-filter-panel"></button>
           </div>
           <div class="sn-history-filter-panel" id="sn-history-filter-panel" hidden>
+            <div class="sn-history-date-range">
+              <label>From date<input type="date" id="history-date-from" aria-label="From date" /></label>
+              <label>To date<input type="date" id="history-date-to" aria-label="To date" /></label>
+            </div>
             <div class="sn-date-sort">
               <button class="sn-sort-btn" id="sort-asc" data-sort="asc" title="Oldest first">Ascending</button>
               <button class="sn-sort-btn active" id="sort-desc" data-sort="desc" title="Newest first">Descending</button>

@@ -214,6 +214,17 @@ function shortDate(value) {
   return new Date(value).toLocaleDateString('en-PH', { month: 'short', day: '2-digit', year: 'numeric' });
 }
 
+function providerHistoryDateKey(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const part = type => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function shortDateTime(value) {
   if (!value) return '';
   return new Date(value).toLocaleString('en-PH', {
@@ -2730,6 +2741,10 @@ function renderHistory(bookings) {
           <button class="sn-history-filter-btn" id="sn-provider-history-filter-toggle" type="button" title="Show filters" aria-label="Show filters" aria-expanded="false" aria-controls="sn-provider-history-filter-panel"></button>
         </div>
         <div class="sn-history-filter-panel" id="sn-provider-history-filter-panel" hidden>
+          <div class="sn-history-date-range">
+            <label>From date<input type="date" id="sn-provider-history-date-from" aria-label="From date" /></label>
+            <label>To date<input type="date" id="sn-provider-history-date-to" aria-label="To date" /></label>
+          </div>
           <div class="sn-filter-tabs" id="sn-provider-history-tabs">
             <button class="sn-filter-tab active" type="button" data-filter="all">All</button>
             <button class="sn-filter-tab" type="button" data-filter="completed">Completed</button>
@@ -2756,6 +2771,8 @@ function renderHistory(bookings) {
   const filterToggle = panel.querySelector('#sn-provider-history-filter-toggle');
   const filterPanel = panel.querySelector('#sn-provider-history-filter-panel');
   const tabs = panel.querySelectorAll('#sn-provider-history-tabs .sn-filter-tab');
+  const dateFrom = panel.querySelector('#sn-provider-history-date-from');
+  const dateTo = panel.querySelector('#sn-provider-history-date-to');
   let activeFilter = 'all';
   let selectedId = selected?.id;
   let activeSuggestion = -1;
@@ -2796,7 +2813,7 @@ function renderHistory(bookings) {
   }
 
   function updateFilterButton() {
-    const active = activeFilter !== 'all';
+    const active = activeFilter !== 'all' || Boolean(dateFrom?.value || dateTo?.value);
     filterToggle.dataset.active = String(active);
     filterToggle.title = filterPanel.hidden ? (active ? 'Filters active' : 'Show filters') : 'Hide filters';
     filterToggle.setAttribute('aria-label', filterToggle.title);
@@ -2811,7 +2828,9 @@ function renderHistory(bookings) {
         || status === activeFilter
         || (activeFilter === 'ongoing' && activeStatuses.includes(status));
       const haystack = `${booking.customer_name || ''} ${booking.service || ''} ${booking.address || ''} ${status}`.toLowerCase();
-      return matchesFilter && haystack.includes(query);
+      const date = providerHistoryDateKey(booking.scheduled_date);
+      const matchesDate = (!dateFrom?.value || date >= dateFrom.value) && (!dateTo?.value || date <= dateTo.value);
+      return matchesFilter && matchesDate && haystack.includes(query);
     });
   }
 
@@ -2883,6 +2902,16 @@ function renderHistory(bookings) {
       renderList();
     });
   });
+  [dateFrom, dateTo].forEach(input => input?.addEventListener('change', () => {
+    if (dateFrom?.value && dateTo?.value && dateFrom.value > dateTo.value) {
+      dateTo.setCustomValidity('Choose a date on or after the start date.');
+      dateTo.reportValidity();
+      dateTo.setCustomValidity('');
+      return;
+    }
+    updateFilterButton();
+    renderList();
+  }));
   renderHistory.update = rows => { normalizedBookings = rows; renderList(); };
 }
 
