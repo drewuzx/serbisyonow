@@ -1,0 +1,272 @@
+#admin-dashboard {
+  width: min(100%, 1480px);
+  gap: 14px;
+  padding: 18px 22px 24px;
+}
+
+#admin-dashboard .dashboard-header {
+  min-height: 88px;
+  padding: 16px 22px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+}
+
+#admin-dashboard .dashboard-header h1 {
+  font-size: 1.55rem;
+}
+
+#admin-dashboard .dashboard-header p {
+  margin-top: 3px;
+  font-size: 0.82rem;
+}
+
+#admin-dashboard .dashboard-header .admin-header-actions {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  width: auto;
+}
+
+#admin-dashboard .dashboard-header .btn {
+  min-height: 40px;
+  width: auto;
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: 10px;
+}
+
+#admin-dashboard .dashboard-nav {
+  gap: 6px;
+  padding: 8px;
+  border-width: 1px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+#admin-dashboard .dashboard-nav a {
+  padding: 8px 12px;
+  border-radius: 9px;
+}
+
+#admin-dashboard .dashboard-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#admin-dashboard .dashboard-metrics .metric-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-width: 1px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+#admin-dashboard .dashboard-metrics .metric-card:hover {
+  transform: none;
+  border-color: var(--blue-main);
+  box-shadow: var(--shadow-sm);
+}
+
+#admin-dashboard .dashboard-metrics .metric-card p {
+  min-width: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+#admin-dashboard .dashboard-metrics .metric-card h2 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#admin-dashboard .dashboard-grid {
+  grid-template-columns: minmax(0, 1.55fr) minmax(290px, 0.9fr);
+  grid-template-areas:
+    "activity review"
+    "activity trends";
+  align-items: start;
+  gap: 12px;
+}
+
+#admin-dashboard .dashboard-grid > .admin-card {
+  min-width: 0;
+  padding: 16px 18px;
+  border-width: 1px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+#admin-dashboard .dashboard-grid h3 {
+  margin-bottom: 4px;
+  font-size: 1rem;
+}
+
+#system-activity-card { grid-area: activity; }
+#quick-review-card { grid-area: review; align-self: start; }
+#service-trends-card { grid-area: trends; align-self: start; }
+
+#system-activity-card .admin-list {
+  gap: 0;
+  margin-top: 8px;
+}
+
+#system-activity-card .admin-list-item {
+  flex-direction: row;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+#system-activity-card .admin-list-item:last-child { border-bottom: 0; }
+
+#system-activity-card .admin-list-item > div {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 3px;
+}
+
+#system-activity-card .admin-list-item strong {
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+#system-activity-card .admin-list-item span {
+  font-size: 0.73rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+#quick-review-card > p {
+  line-height: 1.45;
+}
+
+#quick-review-card .admin-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#quick-review-card .admin-actions .btn {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-radius: 9px;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+#quick-review-card .admin-actions .btn:focus-visible,
+#admin-dashboard .dashboard-header .btn:focus-visible {
+  outline: 3px solid rgba(43, 85, 204, 0.35);
+  outline-offset: 2px;
+}
+
+#service-trends-card .admin-chart {
+  gap: 9px;
+  margin-top: 10px;
+}
+
+#service-trends-card .admin-chart-row {
+  grid-template-columns: minmax(0, 1.2fr) minmax(64px, 1fr) 28px;
+  gap: 9px;
+  font-size: 0.75rem;
+}
+
+#service-trends-card .admin-chart-row > span {
+  min-width: 0;
+  grid-column: auto;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+#service-trends-card .admin-chart-track { height: 8px; }
+
+#service-trends-card .admin-chart-row > strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 920px) {
+  #admin-dashboard .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "activity activity"
+      "review trends";
+  }
+}
+
+@media (max-width: 640px) {
+  #admin-dashboard {
+    gap: 12px;
+    padding: 12px 12px 20px;
+  }
+
+  #admin-dashboard .dashboard-header {
+    min-height: 0;
+    padding: 16px;
+    align-items: flex-start;
+  }
+
+  #admin-dashboard .dashboard-header h1 { font-size: 1.3rem; }
+  #admin-dashboard .dashboard-header p { max-width: 30ch; font-size: 0.75rem; }
+  #admin-dashboard .dashboard-header .btn { min-height: 38px; padding-inline: 10px; font-size: 0.75rem; }
+
+  #admin-dashboard .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #admin-dashboard .dashboard-metrics .metric-card {
+    min-height: 64px;
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  #admin-dashboard .dashboard-metrics .metric-card p { font-size: 0.64rem; }
+  #admin-dashboard .dashboard-metrics .metric-card h2 { font-size: 1.35rem; }
+
+  #admin-dashboard .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "activity"
+      "review"
+      "trends";
+    gap: 10px;
+  }
+
+  #admin-dashboard .dashboard-grid > .admin-card { padding: 14px; }
+
+  #system-activity-card .admin-list-item { align-items: flex-start; }
+  #system-activity-card .admin-list-item > .status-badge { flex: 0 0 auto; }
+
+  #service-trends-card .admin-chart-row {
+    grid-template-columns: minmax(0, 1fr) 36px;
+    gap: 4px 8px;
+  }
+
+  #service-trends-card .admin-chart-row > span { grid-column: 1 / -1; }
+  #service-trends-card .admin-chart-row > div { grid-column: 1; grid-row: 2; }
+  #service-trends-card .admin-chart-row > strong { grid-column: 2; grid-row: 2; }
+}
+
+@media (max-width: 370px) {
+  #admin-dashboard .dashboard-header { flex-wrap: wrap; gap: 10px; }
+  #admin-dashboard .dashboard-header .admin-header-actions { margin-left: auto; }
+  #quick-review-card .admin-actions { grid-template-columns: minmax(0, 1fr); }
+}
