@@ -1,0 +1,124 @@
+.sn-shell {
+  gap: 16px;
+  padding: 16px 18px 26px;
+}
+
+.sn-shell .sn-main { gap: 14px; }
+
+.sn-shell .sn-topbar,
+.sn-shell--provider .sn-topbar {
+  min-height: 72px;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 18px;
+}
+
+.sn-shell .sn-nav { gap: 6px; }
+.sn-shell .sn-nav-item { min-height: 44px; }
+
+.sn-shell :is(.sn-page-header, .sn-search-header) { padding: 15px 16px; }
+.sn-shell .sn-profile-hero { padding: 20px 22px; }
+
+.sn-shell:not(.sn-shell--provider) :is(
+  .sn-filter-panel,
+  .sn-category-panel,
+  .sn-detail-panel,
+  .sn-review-card,
+  .sn-fav-card,
+  .sn-history-card,
+  .sn-convo-list,
+  .sn-chat-panel,
+  .sn-card,
+  .sn-panel,
+  .sn-customer-panel,
+  .sn-customer-card,
+  .sn-booking-card,
+  .sn-result-card,
+  .sn-provider-card,
+  .sn-module-card,
+  .sn-customer-booking-card,
+  .sn-customer-row
+),
+.sn-shell--provider :is(
+  .sn-panel:not(.sn-provider-account-page),
+  .sn-provider-chart,
+  .sn-provider-mini-panel,
+  .sn-module-card,
+  .sn-booking-request-card
+) {
+  border-width: 1px;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sn-shell .sn-page-grid,
+.sn-shell--provider .stats-grid {
+  gap: 12px;
+}
+
+.sn-shell--provider .stat-card {
+  min-height: 80px;
+  gap: 10px;
+  padding: 14px;
+  border-width: 1px;
+}
+
+.sn-shell--provider .stat-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.sn-shell .sn-panel-list,
+.sn-shell .sn-panel .sn-panel-list {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sn-shell .sn-actions-row {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sn-shell :is(.sn-btn, .btn, .sn-filter-action) {
+  min-height: 40px;
+  padding: 8px 13px;
+  border-radius: 9px;
+}
+
+.sn-shell :is(.sn-btn, .btn):focus-visible,
+.sn-shell .sn-filter-action:focus-visible {
+  outline: 3px solid rgba(43, 85, 204, 0.3);
+  outline-offset: 2px;
+}
+
+.sn-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.sn-shell select,
+.sn-shell textarea {
+  border-radius: 9px;
+}
+
+.sn-shell :is(.sn-filter-tabs, .sn-filter-bar) { padding: 8px; }
+.sn-shell .sn-filter-tab { min-height: 40px; padding: 8px 12px; }
+
+.sn-shell .sn-booking-map-layout { gap: 14px; margin-top: 12px; }
+.sn-shell .sn-provider-credentials { margin-top: 22px; padding-top: 18px; }
+
+@media (max-width: 940px) {
+  .sn-shell { gap: 12px; padding: 12px 12px 20px; }
+  .sn-shell .sn-topbar,
+  .sn-shell--provider .sn-topbar { min-height: 60px; padding: 8px 12px; }
+}
+
+@media (max-width: 600px) {
+  .sn-shell { gap: 12px; }
+  .sn-shell .sn-main { gap: 12px; }
+  .sn-shell .sn-topbar,
+  .sn-shell--provider .sn-topbar { min-height: 56px; gap: 8px; padding: 7px 10px; border-radius: 14px; }
+  .sn-shell:not(.sn-shell--provider) :is(.sn-panel, .sn-card, .sn-customer-panel, .sn-customer-card),
+  .sn-shell--provider :is(.sn-panel:not(.sn-provider-account-page), .sn-provider-chart, .sn-provider-mini-panel) { padding: 12px; }
+  .sn-shell--provider .stats-grid { gap: 8px; }
+  .sn-shell--provider .stat-card { min-height: 68px; padding: 10px; }
+  .sn-shell--provider .stat-icon { width: 40px; height: 40px; }
+  .sn-shell :is(.sn-btn, .btn, .sn-filter-action) { min-height: 40px; }
+}
