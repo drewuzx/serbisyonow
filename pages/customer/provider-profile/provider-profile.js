@@ -42,7 +42,28 @@ function ppGetCleanAbout(provider) {
   return rawAbout || `Experienced and dependable service professional committed to quality workmanship, timely service, and customer satisfaction.`;
 }
 
-function ppRenderProvider(provider) {
+function ppSafeSocialLinks(provider) {
+  const allowed = {
+    Facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+    Instagram: ['instagram.com', 'www.instagram.com'],
+    TikTok: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
+    YouTube: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be'],
+  };
+  const links = provider.social_links || {};
+  return Object.entries(allowed).flatMap(([label, domains]) => {
+    try {
+      const url = new URL(links[label.toLowerCase()] || '');
+      return url.protocol === 'https:' && domains.includes(url.hostname.toLowerCase()) ? [{ label, href: url.href }] : [];
+    } catch { return []; }
+  }).concat((() => {
+    try {
+      const url = new URL(links.other || '');
+      return url.protocol === 'https:' && url.hostname.includes('.') && !url.username && !url.password ? [{ label: 'Other', href: url.href }] : [];
+    } catch { return []; }
+  })());
+}
+
+function ppRenderProvider(provider, publicDocuments = []) {
   const detail = document.querySelector('.sn-provider-detail');
   if (!detail) return;
 
@@ -63,6 +84,11 @@ function ppRenderProvider(provider) {
   const credentials = [
     provider.badge_details?.documents_approved ? `${provider.badge_details.document_count} supporting documents approved by the admin.` : 'No approved supporting credentials yet.',
   ];
+  const socialLinks = ppSafeSocialLinks(provider);
+  const documentItems = (Array.isArray(publicDocuments) ? publicDocuments : []).filter(item => item?.name && item?.url).map(item => ({
+    name: String(item.name),
+    url: new URL(item.url, PROVIDER_PROFILE_API).href,
+  }));
 
   detail.innerHTML = `
     <div class="sn-detail-panel">
@@ -105,6 +131,8 @@ function ppRenderProvider(provider) {
           <h3>RATINGS</h3>
           <p class="sn-rating-line">${reviewCount ? `${Number(rating).toFixed(1)} out of 5 from ${reviewCount} completed-service reviews.` : 'No completed-service reviews yet.'}</p>
         </section>
+        ${socialLinks.length ? `<section class="sn-profile-section"><h3>Social Profiles</h3><ul class="sn-social-links">${socialLinks.map(link => `<li><a href="${ppEsc(link.href)}" target="_blank" rel="noopener noreferrer">${ppEsc(link.label)}</a></li>`).join('')}</ul></section>` : ''}
+        ${documentItems.length ? `<section class="sn-profile-section"><h3>Shared Credentials &amp; Work Samples</h3><p class="sn-shared-documents-note">These supporting files were selected by the provider for their public profile.</p><ul class="sn-social-links">${documentItems.map(item => `<li><a href="${ppEsc(item.url)}" target="_blank" rel="noopener noreferrer">${ppEsc(item.name)}</a></li>`).join('')}</ul></section>` : ''}
 
       </div>
     </div>
@@ -139,18 +167,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let signature = '';
   const refreshProvider = async () => {
-    const { user } = await ppGet(`/api/auth/provider/status/${providerId}`);
+    const [{ user }, docs] = await Promise.all([
+      ppGet(`/api/auth/provider/status/${providerId}`),
+      ppGet(`/api/auth/providers/${providerId}/public-documents`).catch(() => ({ documents: [] })),
+    ]);
     if (!window.snLiveRefresh?.isIdle()) return;
-    const next = JSON.stringify(user);
+    const next = JSON.stringify([user, docs.documents]);
     if (next === signature) return;
     signature = next;
-    ppRenderProvider(user);
+    ppRenderProvider(user, docs.documents);
   };
   window.snStartLiveRefresh('provider-profile', refreshProvider);
   try {
-    const providerData = await ppGet(`/api/auth/provider/status/${providerId}`);
-    signature = JSON.stringify(providerData.user);
-    ppRenderProvider(providerData.user);
+    const [providerData, docs] = await Promise.all([
+      ppGet(`/api/auth/provider/status/${providerId}`),
+      ppGet(`/api/auth/providers/${providerId}/public-documents`).catch(() => ({ documents: [] })),
+    ]);
+    signature = JSON.stringify([providerData.user, docs.documents]);
+    ppRenderProvider(providerData.user, docs.documents);
   } catch (error) {
     if (detail) {
       detail.innerHTML = `

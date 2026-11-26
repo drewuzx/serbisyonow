@@ -162,6 +162,31 @@ aside.sn-detail-panel {
   color: var(--text-primary);
 }
 
+.sn-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sn-social-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--blue-main);
+  background: var(--blue-pale);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.sn-social-links a:hover { border-color: var(--blue-main); }
+.sn-shared-documents-note { margin: 0 0 8px; }
+
 .sn-actions-row {
   display: grid;
   gap: 12px;

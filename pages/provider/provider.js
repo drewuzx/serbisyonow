@@ -3135,7 +3135,8 @@ function providerProfileDate(value, display = false) {
 }
 
 function providerProfileFields(provider) {
-  return { 'full-name': provider.full_name, email: provider.email, contact: provider.contact, gender: provider.gender, dob: providerProfileDate(provider.dob), category: providerCategoryLabel(provider.category), service: provider.service, address: provider.address, description: provider.description };
+  const links = provider.social_links || {};
+  return { 'full-name': provider.full_name, email: provider.email, contact: provider.contact, gender: provider.gender, dob: providerProfileDate(provider.dob), category: providerCategoryLabel(provider.category), service: provider.service, address: provider.address, description: provider.description, 'facebook-url': links.facebook, 'instagram-url': links.instagram, 'tiktok-url': links.tiktok, 'youtube-url': links.youtube, 'other-social-url': links.other };
 }
 
 function updateProviderProfileSummary(provider) {
@@ -3143,6 +3144,8 @@ function updateProviderProfileSummary(provider) {
   const rows = values => values.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value || 'Not provided')}</dd></div>`).join('');
   const info = document.getElementById('sn-provider-profile-view');
   if (info) info.innerHTML = `<dl class="sn-provider-info-list">${rows([['Full Name', provider.full_name], ['Email', provider.email], ['Contact', provider.contact], ['Address', provider.address], ['Gender', provider.gender], ['Date of Birth', providerProfileDate(provider.dob, true)], ['Verification', verification]])}</dl><h3>Service Details</h3><dl class="sn-provider-info-list">${rows([['Primary Category', providerCategoryLabel(provider.category)], ['Main Service', provider.service], ['Experience', provider.experience_years]])}</dl><h3>Description</h3><p class="sn-provider-about">${esc(provider.description || 'No description added yet.')}</p>`;
+  const socialLinks = Object.entries({ Facebook: provider.social_links?.facebook, Instagram: provider.social_links?.instagram, TikTok: provider.social_links?.tiktok, YouTube: provider.social_links?.youtube, Other: provider.social_links?.other }).filter(([, url]) => url);
+  if (info && socialLinks.length) info.insertAdjacentHTML('beforeend', `<h3>Social Profiles</h3><ul class="sn-provider-social-links">${socialLinks.map(([label, url]) => `<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a></li>`).join('')}</ul>`);
   const account = document.getElementById('sn-provider-account-status');
   if (account) account.innerHTML = rows([['Member Since', providerProfileDate(provider.created_at, true)], ['Verification', verification], ['Account Type', 'Service Provider'], ['Skill Badge', provider.badge_status || 'Needs Reassessment']]);
 }
@@ -3252,6 +3255,11 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
         <div class="sn-form-field"><label for="sn-provider-category">Primary Category</label><input id="sn-provider-category" value="${esc(providerCategoryLabel(provider.category) || '')}" required /></div>
         <div class="sn-form-field"><label for="sn-provider-service">Main Service</label><input id="sn-provider-service" value="${esc(provider.service || '')}" required /></div>
         <div class="sn-form-field full"><label for="sn-provider-description">Description</label><textarea id="sn-provider-description" maxlength="2000" rows="4">${esc(provider.description || '')}</textarea></div>
+        <div class="sn-form-field"><label for="sn-provider-facebook-url">Facebook page (optional)</label><input id="sn-provider-facebook-url" type="url" inputmode="url" placeholder="https://facebook.com/yourpage" value="${esc(provider.social_links?.facebook || '')}" /></div>
+        <div class="sn-form-field"><label for="sn-provider-instagram-url">Instagram (optional)</label><input id="sn-provider-instagram-url" type="url" inputmode="url" placeholder="https://instagram.com/yourprofile" value="${esc(provider.social_links?.instagram || '')}" /></div>
+        <div class="sn-form-field"><label for="sn-provider-tiktok-url">TikTok (optional)</label><input id="sn-provider-tiktok-url" type="url" inputmode="url" placeholder="https://tiktok.com/@yourprofile" value="${esc(provider.social_links?.tiktok || '')}" /></div>
+        <div class="sn-form-field"><label for="sn-provider-youtube-url">YouTube (optional)</label><input id="sn-provider-youtube-url" type="url" inputmode="url" placeholder="https://youtube.com/@yourchannel" value="${esc(provider.social_links?.youtube || '')}" /></div>
+        <div class="sn-form-field full"><label for="sn-provider-other-social-url">Other social profile or website (optional)</label><input id="sn-provider-other-social-url" type="url" inputmode="url" placeholder="https://example.com/yourprofile" value="${esc(provider.social_links?.other || '')}" /></div>
         <div class="sn-form-field full"><label for="sn-provider-address">Address</label><textarea id="sn-provider-address" required>${esc(provider.address || '')}</textarea></div>
         <div class="sn-form-field"><label for="sn-provider-badge">Verification Badge</label><input id="sn-provider-badge" value="${esc(metrics?.badge_status || provider.verification_status || '')}" readonly /></div>
         <div class="sn-form-field"><label for="sn-provider-gps-label">GPS Service Location</label><input id="sn-provider-gps-label" value="${esc(locationLabel)}" readonly /></div>
@@ -3305,6 +3313,9 @@ function renderProfile(provider, metrics, assessment, preserveDraft = false) {
   document.getElementById('sn-provider-save-gps')?.addEventListener('click', saveProviderGpsLocation);
   document.getElementById('sn-provider-live-gps')?.addEventListener('click', toggleProviderLiveTracking);
   document.getElementById('sn-provider-credentials-form')?.addEventListener('submit', event => { event.preventDefault(); uploadProviderCredentials(); });
+  document.querySelector('.sn-provider-credentials')?.addEventListener('click', event => {
+    if (event.target.closest('#sn-provider-save-public-documents')) saveProviderPublicDocuments();
+  });
   document.getElementById('sn-provider-credentials-form')?.addEventListener('change', () => {
     renderProviderSelectedFiles();
     setProviderCredentialStatus('', 'info');
@@ -3445,14 +3456,39 @@ function providerUploadUrl(folder, filename) {
 
 function renderProviderCredentialLinks(provider) {
   const docs = Array.isArray(provider.documents_files) ? provider.documents_files : [];
+  const publicDocuments = new Set(Array.isArray(provider.public_documents) ? provider.public_documents : []);
   const links = [
-    ...docs.map((filename, index) => `<a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">${esc(String(filename).replace(/^\d+-(?:[a-f0-9]{24}|\d+)-/, '') || `Document ${index + 1}`)}</a>`),
-    provider.id_front_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_front_file)}" target="_blank" rel="noopener noreferrer">Front ID</a>` : '',
-    provider.id_back_file ? `<a href="${providerUploadUrl('customer-ids', provider.id_back_file)}" target="_blank" rel="noopener noreferrer">Back ID</a>` : '',
+    ...docs.map((filename, index) => `<label class="sn-provider-public-document"><input type="checkbox" data-public-document value="${esc(filename)}"${publicDocuments.has(filename) ? ' checked' : ''}><span><a href="${providerUploadUrl('provider-docs', filename)}" target="_blank" rel="noopener noreferrer">${esc(String(filename).replace(/^\d+-(?:[a-f0-9]{24}|\d+)-/, '') || `Document ${index + 1}`)}</a><small>Show this supporting document on your customer-facing profile</small></span></label>`),
+    provider.id_front_file ? `<a class="sn-provider-private-document" href="${providerUploadUrl('customer-ids', provider.id_front_file)}" target="_blank" rel="noopener noreferrer">Front ID (private; admin review only)</a>` : '',
+    provider.id_back_file ? `<a class="sn-provider-private-document" href="${providerUploadUrl('customer-ids', provider.id_back_file)}" target="_blank" rel="noopener noreferrer">Back ID (private; admin review only)</a>` : '',
   ].filter(Boolean);
   return links.length
-    ? `<strong>Uploaded Credentials</strong><div>${links.join('')}</div>`
+    ? `<strong>Uploaded Documents</strong><div class="sn-provider-document-list">${links.join('')}</div>${docs.length ? '<p class="sn-provider-public-docs-note">Only selected supporting documents are shown to customers after your account is verified. ID images always remain private.</p><button type="button" class="btn btn-outline" id="sn-provider-save-public-documents">Save customer-visible documents</button>' : ''}`
     : '<strong>Uploaded Credentials</strong><span>No credential files uploaded yet.</span>';
+}
+
+async function saveProviderPublicDocuments() {
+  const provider = getProviderUser();
+  const button = document.getElementById('sn-provider-save-public-documents');
+  if (!provider?.id || !button || providerProfileActions.has('public-documents')) return;
+  const documents = [...document.querySelectorAll('.sn-provider-documents [data-public-document]:checked')].map(input => input.value);
+  providerProfileActions.add('public-documents');
+  button.disabled = true;
+  button.textContent = 'Saving...';
+  try {
+    const data = await providerSend(`/api/provider/${provider.id}/public-documents`, 'PATCH', { documents });
+    const updated = { ...getProviderUser(), public_documents: data.user.public_documents || [] };
+    localStorage.setItem('sn_provider_user', JSON.stringify(updated));
+    const section = document.querySelector('.sn-provider-documents');
+    if (section) section.innerHTML = renderProviderCredentialLinks(updated);
+    setProviderCredentialStatus('Customer-visible documents saved. They appear after admin verification.', 'success');
+  } catch (error) {
+    setProviderCredentialStatus(error.message || 'Unable to save customer-visible documents.', 'error');
+    button.disabled = false;
+    button.textContent = 'Save customer-visible documents';
+  } finally {
+    providerProfileActions.delete('public-documents');
+  }
 }
 
 function setProviderCredentialStatus(message, type = 'info') {
@@ -3489,6 +3525,13 @@ async function saveProviderProfile() {
     service: document.getElementById('sn-provider-service')?.value.trim() || '',
     address: document.getElementById('sn-provider-address')?.value.trim() || '',
     description: document.getElementById('sn-provider-description')?.value.trim() || '',
+    social_links: {
+      facebook: document.getElementById('sn-provider-facebook-url')?.value.trim() || '',
+      instagram: document.getElementById('sn-provider-instagram-url')?.value.trim() || '',
+      tiktok: document.getElementById('sn-provider-tiktok-url')?.value.trim() || '',
+      youtube: document.getElementById('sn-provider-youtube-url')?.value.trim() || '',
+      other: document.getElementById('sn-provider-other-social-url')?.value.trim() || '',
+    },
     gender: document.getElementById('sn-provider-gender')?.value || '',
     dob: document.getElementById('sn-provider-dob')?.value || '',
   };
@@ -3509,13 +3552,16 @@ async function saveProviderProfile() {
     localStorage.setItem('sn_provider_user', JSON.stringify({ ...getProviderUser(), ...saved }));
     const userName = document.getElementById('sn-user-name');
     if (userName) userName.textContent = data.user.full_name || 'Service Provider';
-    const fields = { full_name: 'full-name', contact: 'contact', category: 'category', service: 'service', address: 'address', description: 'description', gender: 'gender', dob: 'dob' };
+    const fields = { full_name: 'full-name', contact: 'contact', category: 'category', service: 'service', address: 'address', description: 'description', gender: 'gender', dob: 'dob', 'social_links.facebook': 'facebook-url', 'social_links.instagram': 'instagram-url', 'social_links.tiktok': 'tiktok-url', 'social_links.youtube': 'youtube-url', 'social_links.other': 'other-social-url' };
     for (const [key, id] of Object.entries(fields)) {
       const field = document.getElementById(`sn-provider-${id}`);
       if (!field) continue;
       const current = field.value;
-      field.dataset.savedValue = key === 'dob' ? providerProfileDate(data.user[key]) : data.user[key] || '';
-      field.value = current.trim() === body[key] ? field.dataset.savedValue : current;
+      const [group, nested] = key.split('.');
+      const value = nested ? data.user[group]?.[nested] : data.user[key];
+      const submitted = nested ? body[group]?.[nested] : body[key];
+      field.dataset.savedValue = key === 'dob' ? providerProfileDate(value) : value || '';
+      field.value = current.trim() === submitted ? field.dataset.savedValue : current;
     }
     updateProviderProfileSummary(data.user);
     setProviderProfileStatus('Profile saved successfully.', 'success');

@@ -34,7 +34,7 @@ const scheduleWindow = require('../shared/js/schedule-window');
 const scheduleTime = require('../shared/js/time-format');
 const { ensureRepeats, stopRepeat } = require('./recurring-schedule');
 const { bookableSlot, unoccupiedSlot, updateSlot } = require('./availability');
-const { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
+const { profileDescription, providerSocialLinks, providerPublicDocuments, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, saveProviderCredentials } = require('./provider-profile');
 const { providerBadge, loadProviderBadgeData, gradeAssessment } = require('./provider-badges');
 
 const app = express();
@@ -1155,6 +1155,8 @@ function providerRow(row) {
     service: row.service,
     starting_price: row.starting_price == null ? null : Number(row.starting_price),
     description: row.description || '',
+    social_links: row.social_links || {},
+    public_documents: row.public_documents || [],
     experience: row.experience,
     experience_years: row.experience_years,
     experience_certification: row.experience_certification,
@@ -1351,6 +1353,8 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password',
       ADD COLUMN IF NOT EXISTS google_sub TEXT,
       ADD COLUMN IF NOT EXISTS verification_updated_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS social_links JSONB NOT NULL DEFAULT '{}'::jsonb,
+      ADD COLUMN IF NOT EXISTS public_documents TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS account_access_status TEXT NOT NULL DEFAULT 'active',
       ADD COLUMN IF NOT EXISTS access_suspension_until TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS access_moderation_reason TEXT NOT NULL DEFAULT '',
@@ -3080,7 +3084,49 @@ app.post('/api/auth/provider/login', asyncRoute(async (req, res) => {
 app.get('/api/auth/provider/status/:id', asyncRoute(async (req, res) => {
   const result = await db.query('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
-  res.json({ user: await providerView(result.rows[0]) });
+  const user = await providerView(result.rows[0]);
+  for (const field of ['documents_files', 'id_front_file', 'id_back_file', 'public_documents', 'experience_certification', 'account_access_status', 'access_suspension_until', 'access_moderation_reason', 'access_moderated_at']) delete user[field];
+  res.json({ user });
+}));
+
+app.get('/api/auth/providers/:id/public-documents', asyncRoute(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const result = await db.query(`SELECT id, is_verified, verification_status, account_access_status, public_documents
+    FROM providers WHERE id = $1`, [req.params.id]);
+  const provider = result.rows[0];
+  if (!provider || !provider.is_verified || provider.verification_status !== 'verified' || provider.account_access_status !== 'active') {
+    return res.json({ documents: [] });
+  }
+  const filenames = Array.isArray(provider.public_documents) ? provider.public_documents : [];
+  if (!filenames.length) return res.json({ documents: [] });
+  const files = await db.query(`SELECT filename, original_name, mime_type
+    FROM uploaded_files WHERE folder = 'provider-docs' AND owner_role = 'provider' AND owner_id = $1
+      AND filename = ANY($2::text[])`, [provider.id, filenames]);
+  const byName = new Map(files.rows.map(file => [file.filename, file]));
+  res.json({ documents: filenames.map(filename => byName.get(filename)).filter(Boolean).map(file => ({
+    name: String(file.original_name || 'Provider credential').split(/[\\/]/).pop().replace(/[\u0000-\u001f]/g, '').slice(0, 150) || 'Provider credential',
+    mime_type: file.mime_type || 'application/octet-stream',
+    url: `/api/auth/providers/${provider.id}/public-documents/${encodeURIComponent(file.filename)}`,
+  })) });
+}));
+
+app.get('/api/auth/providers/:id/public-documents/:filename', asyncRoute(async (req, res) => {
+  const filename = req.params.filename;
+  if (!filename || path.basename(filename) !== filename || filename.includes('\\')) return res.status(404).json({ message: 'Document not found.' });
+  const result = await db.query(`SELECT f.original_name, f.mime_type, f.content
+    FROM providers p JOIN uploaded_files f ON f.owner_role = 'provider' AND f.owner_id = p.id
+    WHERE p.id = $1 AND p.is_verified IS TRUE AND p.verification_status = 'verified'
+      AND p.account_access_status = 'active' AND f.folder = 'provider-docs'
+      AND f.filename = $2 AND $2 = ANY(p.public_documents)`, [req.params.id, filename]);
+  const file = result.rows[0];
+  if (!file) return res.status(404).json({ message: 'This document is not available on the public profile.' });
+  const mime = String(file.mime_type || 'application/octet-stream').toLowerCase();
+  const inline = mime === 'application/pdf' || ['image/jpeg', 'image/png', 'image/webp'].includes(mime);
+  const downloadName = String(file.original_name || filename).split(/[\\/]/).pop().replace(/["\r\n]/g, '').slice(0, 150) || 'provider-document';
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Cache-Control', 'private, no-store');
+  res.set('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${downloadName}"`);
+  res.type(mime).send(file.content);
 }));
 
 app.get('/api/provider/:id/payment-qr', asyncRoute(async (req, res) => {
@@ -3103,6 +3149,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
   requireFields(req.body, ['full_name', 'contact', 'address', 'category', 'service']);
   const contact = normalizeContactNumber(req.body.contact);
   const description = profileDescription(req.body.description);
+  const socialLinks = providerSocialLinks(req.body.social_links);
   const { gender, dob } = profilePersonalFields(req.body);
   const result = await db.query(`
     UPDATE providers
@@ -3114,6 +3161,7 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
         description = COALESCE($7, description),
         gender = COALESCE($8, gender),
         dob = COALESCE($9::date, dob),
+        social_links = COALESCE($10::jsonb, social_links),
         updated_at = NOW()
     WHERE id = $1
     RETURNING *
@@ -3127,9 +3175,19 @@ app.patch('/api/provider/:id/profile', asyncRoute(async (req, res) => {
     description,
     gender,
     dob,
+    socialLinks ? JSON.stringify(socialLinks) : null,
   ]);
   if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
   await ensureProviderProfileService(result.rows[0]);
+  res.json({ user: await providerView(result.rows[0]) });
+}));
+
+app.patch('/api/provider/:id/public-documents', asyncRoute(async (req, res) => {
+  await authenticateAccount(db, req, 'provider', req.params.id);
+  const current = await db.query('SELECT documents_files FROM providers WHERE id = $1', [req.params.id]);
+  if (!current.rowCount) return res.status(404).json({ message: 'Provider not found.' });
+  const selected = providerPublicDocuments(req.body.documents, current.rows[0].documents_files || []);
+  const result = await db.query('UPDATE providers SET public_documents = $2::text[], updated_at = NOW() WHERE id = $1 RETURNING *', [req.params.id, selected]);
   res.json({ user: await providerView(result.rows[0]) });
 }));
 

@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS providers (
   experience_years TEXT NOT NULL,
   experience_certification TEXT NOT NULL,
   documents_files TEXT[] NOT NULL DEFAULT '{}',
+  social_links JSONB NOT NULL DEFAULT '{}'::jsonb,
+  public_documents TEXT[] NOT NULL DEFAULT '{}',
   id_front_file TEXT,
   id_back_file TEXT,
   latitude NUMERIC(10,7),
@@ -58,7 +60,10 @@ CREATE TABLE IF NOT EXISTS providers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE providers ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+ALTER TABLE providers
+  ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS social_links JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS public_documents TEXT[] NOT NULL DEFAULT '{}';
 
 CREATE TABLE IF NOT EXISTS admins (
   id SERIAL PRIMARY KEY,

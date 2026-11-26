@@ -221,35 +221,6 @@
   border-radius: var(--radius-full);
 }
 
-/* ── Service Tags ── */
-.service-tags {
-  display: flex; flex-wrap: wrap;
-  gap: 14px;
-  justify-content: center;
-  max-width: 1120px;
-  margin-inline: auto;
-}
-
-.service-tag {
-  appearance: none;
-  font-family: var(--font-body);
-  min-height: 44px;
-  padding: 10px 18px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--white);
-  font-size: var(--text-sm); font-weight: 500;
-  color: var(--text-secondary); cursor: pointer;
-  line-height: 1.35;
-  text-decoration: none;
-  transition: all var(--transition-fast);
-}
-.service-tag:hover, .service-tag.active {
-  border-color: var(--blue-main);
-  background: var(--blue-pale);
-  color: var(--blue-main);
-}
-
 /* ── How It Works Steps ── */
 .how-steps {
   display: flex; align-items: flex-start;
@@ -422,6 +393,4 @@
     gap: 10px;
   }
   .service-cat-icon { width: 60px; height: 60px; }
-  .service-tags { gap: 10px; }
-  .service-tag { min-height: 42px; padding: 9px 14px; }
 }

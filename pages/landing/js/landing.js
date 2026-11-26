@@ -2,61 +2,6 @@
 
 const CUSTOMER_AFTER_LOGIN_KEY = 'sn_customer_after_login';
 
-const landingServicesByCategory = {
-  repairServices: [
-    'Plumbing services',
-    'Electrical repair',
-    'Appliance repair',
-    'Carpentry',
-    'Roof repair',
-    'Furniture repair',
-    'Painting services',
-    'Door and window repair',
-  ],
-  cleaning: [
-    'General house cleaning',
-    'Deep cleaning',
-    'Bathroom cleaning',
-    'Kitchen cleaning',
-    'Sofa and upholstery cleaning',
-    'Carpet cleaning',
-    'Window cleaning',
-    'Laundry Services',
-  ],
-  personalCare: [
-    'Massage therapy',
-    'Home spa services',
-    'Haircut',
-    'Nail Care',
-    'Eyelash Care',
-    'Grooming',
-  ],
-  applianceMaintenance: [
-    'Aircon',
-    'Refrigerator',
-    'Washing Machine',
-    'Microwave',
-    'TV / Electronics',
-    'Small Appliances',
-  ],
-  installationServices: [
-    'Furniture assembly',
-    'Cabinet installation',
-    'Curtain or blinds installation',
-    'Lighting installation',
-    'CCTV installation',
-    'Internet or router setup',
-    'Appliance Installation',
-  ],
-  outdoorMaintenance: [
-    'Gardening services',
-    'Lawn mowing',
-    'Landscape maintenance',
-    'Tree trimming',
-    'Fence repair',
-  ],
-};
-
 function getStoredCustomer() {
   try {
     return JSON.parse(localStorage.getItem('sn_customer_user') || 'null');
@@ -98,25 +43,6 @@ function redirectToLoginWithSearch({ query = '', category = '', from = 'search' 
   window.location.href = `../auth/loginChoice.html?${params}`;
 }
 
-function renderLandingServiceTags(category) {
-  const tags = document.getElementById('landing-service-tags');
-  if (!tags) return;
-
-  const services = landingServicesByCategory[category] || landingServicesByCategory.repairServices;
-  tags.innerHTML = services.map((service, index) => (
-    `<button class="service-tag${index === 0 ? ' active' : ''}" type="button" aria-pressed="${index === 0}">${service}</button>`
-  )).join('');
-  tags.querySelectorAll('.service-tag').forEach(tag => {
-    tag.addEventListener('click', () => {
-      tags.querySelectorAll('.service-tag').forEach(item => {
-        const active = item === tag;
-        item.classList.toggle('active', active);
-        item.setAttribute('aria-pressed', String(active));
-      });
-    });
-  });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   const categoryCards = document.querySelectorAll('.service-cat-card[data-category]');
   categoryCards.forEach(card => {
@@ -126,7 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
         item.classList.toggle('active', active);
         item.setAttribute('aria-pressed', String(active));
       });
-      renderLandingServiceTags(card.dataset.category);
     });
   });
 
@@ -150,6 +75,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  renderLandingServiceTags(document.querySelector('.service-cat-card.active')?.dataset.category || 'repairServices');
   categoryCards.forEach(card => card.setAttribute('aria-pressed', String(card.classList.contains('active'))));
 });

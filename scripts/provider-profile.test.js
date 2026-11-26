@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { profileDescription, profilePersonalFields, changeProviderPassword, validateCredential, saveProviderCredentials } = require('./provider-profile');
+const { profileDescription, providerSocialLinks, providerPublicDocuments, profilePersonalFields, changeProviderPassword, validateCredential, saveProviderCredentials } = require('./provider-profile');
 const bcrypt = require('bcryptjs');
 const { issueSession } = require('./account-sessions');
 const { startQrFixture } = require('./provider-qr-test-fixture');
@@ -13,6 +13,24 @@ test('description is optional, bounded and stored as plain text', () => {
   assert.equal(profileDescription(''), '');
   assert.equal(profileDescription('<script>text</script>'), '<script>text</script>');
   for (const input of [null, {}, 'a'.repeat(2001)]) assert.throws(() => profileDescription(input), { statusCode: 400 });
+});
+
+test('provider social links accept HTTPS platform URLs and reject unsafe or mismatched links', () => {
+  assert.equal(providerSocialLinks(undefined), null);
+  assert.deepEqual(providerSocialLinks({ facebook: 'facebook.com/serbisyo', instagram: 'https://www.instagram.com/serbisyo', tiktok: '', youtube: 'https://youtu.be/abc', other: 'https://example.org/profile' }), {
+    facebook: 'https://facebook.com/serbisyo', instagram: 'https://www.instagram.com/serbisyo', tiktok: '', youtube: 'https://youtu.be/abc', other: 'https://example.org/profile',
+  });
+  for (const links of [null, [], { facebook: 'https://facebook.com.attacker.example/page' }, { instagram: 'javascript:alert(1)' }, { tiktok: 'http://tiktok.com/@user' }, { other: 'javascript:alert(1)' }, { facebook: 'x'.repeat(501) }]) {
+    assert.throws(() => providerSocialLinks(links), { statusCode: 400 });
+  }
+});
+
+test('providers can publish only their own uploaded supporting documents', () => {
+  assert.deepEqual(providerPublicDocuments(['certificate.pdf', 'work.jpg'], ['certificate.pdf', 'work.jpg']), ['certificate.pdf', 'work.jpg']);
+  assert.deepEqual(providerPublicDocuments(['certificate.pdf', 'certificate.pdf'], ['certificate.pdf']), ['certificate.pdf']);
+  for (const selection of [null, 'certificate.pdf', ['../id-front.png'], ['another-provider.pdf'], ['a'.repeat(256)]]) {
+    assert.throws(() => providerPublicDocuments(selection, ['certificate.pdf']), { statusCode: 400 });
+  }
 });
 
 test('personal fields preserve omitted values and validate calendar dates', () => {
@@ -85,13 +103,15 @@ test('credential content must match an allowed extension', () => {
 test('profile and credentials API: ownership, persistence, review, validation and rollback', async () => {
   const f = await startQrFixture();
   try {
-    const body = { full_name: 'Profile Test Provider', contact: '09123456789', address: 'Test address', category: 'Cleaning Services', service: 'General House Cleaning', description: 'Detailed cleaning services.\nWork photos available.', gender: 'Prefer not to say', dob: '1995-06-15' };
+    const body = { full_name: 'Profile Test Provider', contact: '09123456789', address: 'Test address', category: 'Cleaning Services', service: 'General House Cleaning', description: 'Detailed cleaning services.\nWork photos available.', gender: 'Prefer not to say', dob: '1995-06-15', social_links: { facebook: 'https://facebook.com/profile-test', instagram: '', tiktok: '', youtube: '', other: '' } };
     const profile = (payload, token = f.providerToken) => f.request('/api/provider/81/profile', 'PATCH', payload, token);
     assert.equal((await profile(body, null)).status, 401);
     assert.equal((await profile(body, f.otherProviderToken)).status, 403);
     assert.equal((await profile(body, f.customerToken)).status, 403);
     assert.equal((await profile({ ...body, description: 'x'.repeat(2001) })).status, 400);
+    assert.equal((await profile({ ...body, social_links: { facebook: 'https://facebook.com.attacker.example/fake' } })).status, 400);
     assert.equal((await profile(body)).data.user.description, body.description);
+    assert.equal((await profile(body)).data.user.social_links.facebook, body.social_links.facebook);
     assert.equal((await profile({ ...body, dob: '1995-02-30' })).status, 400);
     assert.equal((await profile({ ...body, gender: 'invalid' })).status, 400);
     const ignoredChanges = await profile({ ...body, email: 'changed@fixture.invalid', is_verified: true, badge_status: 'Top-Rated', password_hash: 'fake' });
@@ -133,6 +153,22 @@ test('profile and credentials API: ownership, persistence, review, validation an
     assert.equal(first.data.user.verification_status, 'pending');
     assert.equal(first.data.user.description, body.description);
     const filename = first.data.user.documents_files[0];
+    const choosePublicDocs = documents => f.request('/api/provider/81/public-documents', 'PATCH', { documents }, f.providerToken);
+    assert.equal((await choosePublicDocs([filename, first.data.user.id_front_file])).status, 400, 'identity images cannot be shared as credentials');
+    assert.equal((await choosePublicDocs([filename])).status, 200);
+    assert.deepEqual((await f.request('/api/auth/providers/81/public-documents')).data.documents, [], 'pending provider documents stay hidden');
+    assert.equal((await f.request(`/api/auth/providers/81/public-documents/${filename}`)).status, 404, 'pending provider documents cannot be opened publicly');
+    await f.db.query("UPDATE providers SET is_verified=TRUE,verification_status='verified' WHERE id=81");
+    const publicDocs = await f.request('/api/auth/providers/81/public-documents');
+    assert.equal(publicDocs.data.documents.length, 1);
+    assert.equal(publicDocs.data.documents[0].name, 'work.png');
+    assert.deepEqual((await f.request(publicDocs.data.documents[0].url)).data, f.image);
+    assert.equal((await f.request(`/api/auth/providers/81/public-documents/${first.data.user.id_front_file}`)).status, 404, 'uploaded ID images never appear in the public-document route');
+    await f.db.query("UPDATE providers SET is_verified=FALSE,verification_status='pending' WHERE id=81");
+    const publicProfile = (await f.request('/api/auth/provider/status/81')).data.user;
+    assert.equal(publicProfile.documents_files, undefined, 'private credential filenames are not returned on the customer profile API');
+    assert.equal(publicProfile.id_front_file, undefined, 'ID image filenames are not returned on the customer profile API');
+    assert.equal(publicProfile.id_back_file, undefined, 'ID image filenames are not returned on the customer profile API');
     const stored = (await f.db.query('SELECT * FROM uploaded_files WHERE filename = $1', [filename])).rows[0];
     assert.equal(stored.owner_id, 81);
     assert.equal(stored.owner_role, 'provider');

@@ -2082,6 +2082,8 @@ body {
 .sn-provider-info-list dd { margin: 0; color: var(--text-main, #243047); font-weight: 600; font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; }
 .sn-provider-personal h3 { margin: 24px 0 8px; font-size: 16px; }
 .sn-provider-account-page .sn-provider-about { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.sn-provider-social-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.sn-provider-social-links a { color: var(--blue-main); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
 .sn-provider-password-section { border-top: 1px solid var(--border); margin-top: 26px; padding-top: 22px; }
 #sn-provider-password-form { display: grid; gap: 14px; }
 .sn-provider-show-password { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; }
@@ -2124,6 +2126,13 @@ body {
   flex-wrap: wrap;
   gap: 8px;
 }
+.sn-provider-documents .sn-provider-document-list { display: grid; gap: 8px; }
+.sn-provider-public-document { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); }
+.sn-provider-public-document > input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--blue-main); }
+.sn-provider-public-document > span { display: grid; gap: 3px; min-width: 0; }
+.sn-provider-public-document small { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.sn-provider-documents .sn-provider-private-document { border-color: #e5e7eb; color: var(--text-muted); font-weight: 600; }
+.sn-provider-public-docs-note { margin: 2px 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
 
 .sn-provider-documents a {
   display: inline-flex;

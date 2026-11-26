@@ -63,6 +63,48 @@ function profileDescription(value) {
   return value.trim();
 }
 
+function providerSocialLinks(value) {
+  if (value === undefined) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) fail(400, 'Social profile links must be provided as a list of links.');
+  const hosts = {
+    facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+    instagram: ['instagram.com', 'www.instagram.com'],
+    tiktok: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
+    youtube: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be'],
+  };
+  const result = {};
+  for (const [key, allowedHosts] of Object.entries(hosts)) {
+    const raw = value[key] == null ? '' : value[key];
+    if (typeof raw !== 'string' || raw.trim().length > 500) fail(400, 'Each social profile link must be 500 characters or fewer.');
+    const input = raw.trim();
+    if (!input) { result[key] = ''; continue; }
+    let url;
+    try { url = new URL(input.includes('://') ? input : `https://${input}`); } catch { fail(400, `Enter a valid ${key} profile URL.`); }
+    if (url.protocol !== 'https:' || !allowedHosts.includes(url.hostname.toLowerCase()) || url.username || url.password) fail(400, `Enter a valid ${key} profile URL.`);
+    result[key] = url.toString();
+  }
+  const rawOther = value.other == null ? '' : value.other;
+  if (typeof rawOther !== 'string' || rawOther.trim().length > 500) fail(400, 'The other social link must be 500 characters or fewer.');
+  const other = rawOther.trim();
+  if (!other) result.other = '';
+  else {
+    let url;
+    try { url = new URL(other.includes('://') ? other : `https://${other}`); } catch { fail(400, 'Enter a valid HTTPS social profile URL.'); }
+    if (url.protocol !== 'https:' || !url.hostname.includes('.') || url.username || url.password) fail(400, 'Enter a valid HTTPS social profile URL.');
+    result.other = url.toString();
+  }
+  return result;
+}
+
+function providerPublicDocuments(value, allowedDocuments = []) {
+  if (!Array.isArray(value) || value.length > 10 || value.some(name => typeof name !== 'string' || !name || name.length > 255 || path.basename(name) !== name || name.includes('\\'))) {
+    fail(400, 'Choose valid uploaded supporting documents to display.');
+  }
+  const selected = [...new Set(value)];
+  if (selected.some(name => !allowedDocuments.includes(name))) fail(400, 'You can only display supporting documents uploaded to this provider account.');
+  return selected;
+}
+
 function credentialType(file) {
   const extension = path.extname(file.originalname || '').toLowerCase();
   const types = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.pdf': 'application/pdf', '.doc': 'application/msword', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
@@ -113,4 +155,4 @@ async function saveProviderCredentials(db, providerId, files) {
   });
 }
 
-module.exports = { profileDescription, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, validateCredential, saveProviderCredentials };
+module.exports = { profileDescription, providerSocialLinks, providerPublicDocuments, profileBirthDate, profilePersonalFields, changeProviderPassword, credentialType, validateCredential, saveProviderCredentials };

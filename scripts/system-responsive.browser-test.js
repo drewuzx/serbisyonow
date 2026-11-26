@@ -104,13 +104,9 @@ async function main() {
   await landingPage.goto(`${f.base}/pages/landing/index.html`);
   await landingPage.locator('.service-cat-card[data-category="cleaning"]').click();
   assert.match(landingPage.url(),/\/pages\/landing\/index\.html$/,'choosing a service category stays on the landing page');
-  const cleaningTag=landingPage.locator('#landing-service-tags .service-tag').first();
-  const selectedService=(await cleaningTag.textContent()).trim();
-  await cleaningTag.click();
-  assert.match(landingPage.url(),/\/pages\/landing\/index\.html$/,'choosing a service stays on the landing page');
-  assert.equal(await cleaningTag.getAttribute('aria-pressed'),'true','selected service is accessible');
+  assert.equal(await landingPage.locator('#landing-service-tags').count(),0,'extra service buttons are removed');
+  assert.equal(await landingPage.locator('.service-cat-card[data-category="cleaning"]').getAttribute('aria-pressed'),'true','selected category remains accessible');
   assert.equal(await landingPage.locator('#landing-find-providers').count(),0,'service browsing has no extra Find Providers button');
-  assert.equal((await landingPage.locator('#landing-service-tags .service-tag.active').textContent()).trim(),selectedService,'selected service remains visible');
   await landingContext.close();
   console.log(JSON.stringify({views:results.length,issues:results.filter(r=>r.issues.length).length,errors}));
   if(!baseline) {
