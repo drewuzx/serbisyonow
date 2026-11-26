@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../../shared/css/variables.css" />
   <link rel="stylesheet" href="../../../shared/css/modals.css" />
   <link rel="stylesheet" href="../admin-module.css" />
-  <link rel="stylesheet" href="./user-management.css?v=20261110-smart-search" />
+  <link rel="stylesheet" href="./user-management.css?v=20261126-provider-access" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#1a3a8f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -119,9 +119,38 @@
     </div>
   </div>
 
+  <div id="provider-access-modal" class="sn-modal" hidden>
+    <div class="sn-modal-card" id="provider-access-form">
+      <button type="button" class="sn-modal-close" id="provider-access-close" aria-label="Close">✕</button>
+      <h3 class="sn-modal-title">Provider Account Access</h3>
+      <p class="sn-modal-body">Suspend access for a set period, deactivate until an admin restores it, or restore a restricted account. Account records and uploaded IDs are retained.</p>
+      <label class="access-field">Action
+        <select id="provider-access-action" class="form-control">
+          <option value="suspend">Temporarily suspend</option>
+          <option value="deactivate">Deactivate until restored</option>
+          <option value="restore">Restore access</option>
+        </select>
+      </label>
+      <label class="access-field" id="provider-access-duration-wrap">Suspension period
+        <select id="provider-access-duration" class="form-control">
+          <option value="24">24 hours</option>
+          <option value="168" selected>7 days</option>
+          <option value="720">30 days</option>
+        </select>
+      </label>
+      <label class="access-field">Reason (required)
+        <textarea id="provider-access-reason" class="form-control" rows="3" maxlength="500" placeholder="Briefly describe the reason for this decision."></textarea>
+      </label>
+      <div class="sn-modal-actions">
+        <button type="button" id="provider-access-cancel" class="btn btn-outline">Cancel</button>
+        <button type="button" id="provider-access-confirm" class="btn btn-primary">Confirm decision</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../../../shared/js/app.js"></script>
   <script src="../admin-data.js?v=20261110-smart-search-rank"></script>
-  <script src="user-management.js?v=20261110-smart-search"></script>
+  <script src="user-management.js?v=20261126-provider-access"></script>
   <script src="/shared/js/pwa-register.js"></script>
 </body>
 </html>

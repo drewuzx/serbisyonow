@@ -102,18 +102,18 @@ function renderRows(users) {
     if (status === 'verified') {
       actionContent = '<span class="status-badge verified">Verified</span>';
     } else if (status === 'rejected') {
-      actionContent = `
-        <div class="action-group">
-          <span class="status-badge rejected">Declined</span>
-          <button class="verify-btn" data-id="${user.id}" data-role="${role}" type="button">Verify</button>
-        </div>`;
+      actionContent = `<span class="status-badge rejected">Declined</span>
+          <button class="verify-btn" data-id="${user.id}" data-role="${role}" type="button">Verify</button>`;
     } else {
-      actionContent = `
-        <div class="action-group">
-          <button class="verify-btn" data-id="${user.id}" data-role="${role}" type="button">Verify</button>
-          <button class="decline-btn" data-id="${user.id}" data-role="${role}" type="button">Decline</button>
-        </div>`;
+      actionContent = `<button class="verify-btn" data-id="${user.id}" data-role="${role}" type="button">Verify</button>
+          <button class="decline-btn" data-id="${user.id}" data-role="${role}" type="button">Decline</button>`;
     }
+    if (role === 'provider') {
+      const accessStatus = user.account_access_status || 'active';
+      const accessLabel = accessStatus === 'suspended' ? 'Temporarily suspended' : accessStatus === 'deactivated' ? 'Deactivated' : 'Active';
+      actionContent += `<span class="access-status ${accessStatus}">${accessLabel}</span><button class="access-btn" data-id="${user.id}" data-access="${accessStatus}" type="button">Manage access</button>`;
+    }
+    actionContent = `<div class="action-group">${actionContent}</div>`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -292,6 +292,30 @@ async function rejectUser(userId, role, button) {
   }
 }
 
+async function updateProviderAccess(providerId) {
+  const modal = document.getElementById('provider-access-modal');
+  const action = document.getElementById('provider-access-action').value;
+  const reason = document.getElementById('provider-access-reason').value.trim();
+  const duration = Number(document.getElementById('provider-access-duration').value);
+  if (!reason) return SN.toast.error('Add a reason for this access decision.');
+  const confirm = document.getElementById('provider-access-confirm');
+  confirm.disabled = true;
+  confirm.textContent = 'Saving...';
+  try {
+    await adminSend(`/api/admin/providers/${providerId}/access`, {
+      method: 'PATCH', body: { action, reason, duration_hours: duration },
+    });
+    modal.hidden = true;
+    SN.toast.success(action === 'restore' ? 'Provider access restored.' : action === 'suspend' ? 'Provider suspended.' : 'Provider deactivated.');
+    await loadUsers();
+  } catch (error) {
+    SN.toast.error(error.message || 'Could not update provider access.');
+  } finally {
+    confirm.disabled = false;
+    confirm.textContent = 'Confirm decision';
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const tableBody = document.getElementById('pending-table-body');
   const refreshBtn = document.getElementById('refresh-btn');
@@ -299,12 +323,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusFilter = document.getElementById('status-filter');
   const roleFilter = document.getElementById('role-filter');
   const modal = document.getElementById('decline-modal');
+  const accessModal = document.getElementById('provider-access-modal');
   const cancelBtn = document.getElementById('decline-cancel-btn');
   const closeBtn = document.getElementById('decline-close-btn');
   const confirmBtn = document.getElementById('decline-confirm-btn');
   cancelBtn?.addEventListener('click', () => closeDeclineModal(false));
   closeBtn?.addEventListener('click', () => closeDeclineModal(false));
   confirmBtn?.addEventListener('click', () => closeDeclineModal(true));
+  document.getElementById('provider-access-action')?.addEventListener('change', event => {
+    document.getElementById('provider-access-duration-wrap').hidden = event.target.value !== 'suspend';
+  });
+  document.getElementById('provider-access-cancel')?.addEventListener('click', () => { accessModal.hidden = true; });
+  document.getElementById('provider-access-close')?.addEventListener('click', () => { accessModal.hidden = true; });
+  document.getElementById('provider-access-confirm')?.addEventListener('click', () => {
+    updateProviderAccess(document.getElementById('provider-access-form').dataset.providerId);
+  });
   modal?.addEventListener('click', (event) => {
     if (event.target === modal) closeDeclineModal(false);
   });
@@ -365,6 +398,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const declineBtn = event.target.closest('.decline-btn');
     if (declineBtn) {
       rejectUser(declineBtn.dataset.id, declineBtn.dataset.role, declineBtn);
+      return;
+    }
+    const accessBtn = event.target.closest('.access-btn');
+    if (accessBtn) {
+      const form = document.getElementById('provider-access-form');
+      form.dataset.providerId = accessBtn.dataset.id;
+      document.getElementById('provider-access-action').value = accessBtn.dataset.access === 'active' ? 'suspend' : 'restore';
+      document.getElementById('provider-access-duration-wrap').hidden = accessBtn.dataset.access !== 'active';
+      document.getElementById('provider-access-reason').value = '';
+      accessModal.hidden = false;
     }
   });
 });

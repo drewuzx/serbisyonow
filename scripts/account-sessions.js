@@ -22,6 +22,19 @@ function rememberSession(req, res, role, token) {
 }
 
 async function issueSession(db, role, accountId, { req, res } = {}) {
+ if (role === 'provider') {
+  await db.query(`UPDATE providers SET account_access_status = 'active', access_suspension_until = NULL, updated_at = NOW()
+   WHERE id = $1 AND account_access_status = 'suspended'
+     AND access_suspension_until IS NOT NULL AND access_suspension_until <= NOW()`, [accountId]);
+  const access = await db.query('SELECT account_access_status FROM providers WHERE id = $1', [accountId]);
+  if (!access.rows[0] || access.rows[0].account_access_status !== 'active') {
+   const error = new Error(access.rows[0]?.account_access_status === 'deactivated'
+    ? 'This provider account has been deactivated. Contact support for review.'
+    : 'This provider account is temporarily suspended.');
+   error.statusCode = 403;
+   throw error;
+  }
+ }
  const token = crypto.randomBytes(32).toString('hex');
  await db.query(`INSERT INTO account_sessions (token_hash, account_role, account_id, expires_at)
   VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')`, [hashToken(token), role, accountId]);
@@ -52,6 +65,21 @@ async function authenticateAccount(db, req, role, accountId) {
   const error = new Error('Please sign in again to continue.');
   error.statusCode = 401;
   throw error;
+ }
+ if (role === 'provider') {
+  await db.query(`UPDATE providers
+   SET account_access_status = 'active', access_suspension_until = NULL, updated_at = NOW()
+   WHERE id = $1 AND account_access_status = 'suspended'
+     AND access_suspension_until IS NOT NULL AND access_suspension_until <= NOW()`, [session.account_id]);
+  const access = await db.query('SELECT account_access_status, access_suspension_until FROM providers WHERE id = $1', [session.account_id]);
+  const state = access.rows[0];
+  if (!state || state.account_access_status !== 'active') {
+   const error = new Error(state?.account_access_status === 'deactivated'
+    ? 'This provider account has been deactivated. Contact support for review.'
+    : 'This provider account is temporarily suspended.');
+   error.statusCode = 403;
+   throw error;
+  }
  }
  return { role, id: Number(session.account_id) };
 }

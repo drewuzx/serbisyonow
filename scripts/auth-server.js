@@ -1177,6 +1177,10 @@ function providerRow(row) {
     is_verified: row.is_verified,
     verification_status: row.verification_status,
     verification_updated_at: row.verification_updated_at || null,
+    account_access_status: row.account_access_status || 'active',
+    access_suspension_until: row.access_suspension_until || null,
+    access_moderation_reason: row.access_moderation_reason || '',
+    access_moderated_at: row.access_moderated_at || null,
     updated_at: row.updated_at,
     created_at: row.created_at,
   };
@@ -1197,6 +1201,7 @@ async function providerViews(rows) {
 function isCustomerDiscoverableProvider(provider) {
   return provider.is_verified === true
     && provider.verification_status === 'verified'
+    && (provider.account_access_status || 'active') === 'active'
     && provider.verified_tier !== 'unqualified';
 }
 
@@ -1345,7 +1350,11 @@ async function ensureAdminSupportTables() {
       ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password',
       ADD COLUMN IF NOT EXISTS google_sub TEXT,
-      ADD COLUMN IF NOT EXISTS verification_updated_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS verification_updated_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS account_access_status TEXT NOT NULL DEFAULT 'active',
+      ADD COLUMN IF NOT EXISTS access_suspension_until TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS access_moderation_reason TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS access_moderated_at TIMESTAMPTZ;
 
     ALTER TABLE admin_feedback
       ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
@@ -1802,6 +1811,7 @@ async function getCollaborativeRecommendations(customerId, limit = 8) {
       SELECT COALESCE(NULLIF(substring(p.experience FROM 'Assessment score: ([0-9]{1,3})%'), '')::int, 0) AS score
     ) extract_score ON TRUE
     WHERE (lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)
+      AND p.account_access_status = 'active'
     ORDER BY recommendation_score DESC, ps.rating DESC, ps.completed_jobs DESC, p.created_at DESC
     LIMIT $2
   `, [customerId, limit]);
@@ -2601,7 +2611,7 @@ app.get('/api/customer/:id/location-map', asyncRoute(async (req, res) => {
     ? String(req.query.badge).trim().toLowerCase() : '';
   const availableOnly = ['true', '1', 'yes', 'available'].includes(String(req.query.available || '').toLowerCase());
   const params = [];
-  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
+  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, "p.account_access_status = 'active'", 's.id IS NOT NULL'];
   if (availableOnly) {
     where.push(`EXISTS (SELECT 1 FROM provider_availability availability
       WHERE availability.provider_id = p.id AND ${bookableSlot('availability')})`);
@@ -3205,7 +3215,7 @@ app.get('/api/providers/search', asyncRoute(async (req, res) => {
   const location = String(req.query.location || customer?.address || '').trim();
 
   const params = [];
-  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, 's.id IS NOT NULL'];
+  const where = [`(lower(COALESCE(p.verification_status, '')) = 'verified' OR p.is_verified IS TRUE)`, "p.account_access_status = 'active'", 's.id IS NOT NULL'];
   if (q) {
     params.push(`%${q.toLowerCase()}%`);
     where.push(`(
@@ -3359,7 +3369,7 @@ app.get('/api/providers/:id/availability', asyncRoute(async (req, res) => {
   const where = [
     'a.provider_id = $1',
     bookableSlot(),
-    `EXISTS (SELECT 1 FROM providers p WHERE p.id = a.provider_id AND p.is_verified IS TRUE AND lower(COALESCE(p.verification_status, '')) = 'verified')`,
+    `EXISTS (SELECT 1 FROM providers p WHERE p.id = a.provider_id AND p.is_verified IS TRUE AND lower(COALESCE(p.verification_status, '')) = 'verified' AND p.account_access_status = 'active')`,
   ];
   if (date) {
     params.push(date);
@@ -3558,6 +3568,7 @@ app.get('/api/providers/:id/services', asyncRoute(async (req, res) => {
     JOIN providers p ON p.id = s.provider_id
     WHERE s.provider_id = $1 AND s.is_active = TRUE
       AND p.is_verified IS TRUE AND lower(COALESCE(p.verification_status, '')) = 'verified'
+      AND p.account_access_status = 'active'
     ORDER BY s.created_at DESC
   `, [req.params.id]);
   res.json({ services: result.rows.map(providerServiceRow) });
@@ -4331,6 +4342,36 @@ app.patch('/api/admin/providers/:id/reject', asyncRoute(async (req, res) => {
   res.json({ provider: await providerView(result.rows[0]) });
 }));
 
+app.patch('/api/admin/providers/:id/access', asyncRoute(async (req, res) => {
+  const admin = await authenticateAccount(db, req, 'admin');
+  const action = String(req.body.action || '');
+  const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+  const hours = Number(req.body.duration_hours);
+  if (!['suspend', 'deactivate', 'restore'].includes(action)) paymentFail(400, 'Choose a valid provider access action.');
+  if (!reason || reason.length > 500) paymentFail(400, 'Enter a reason of 1 to 500 characters.');
+  if (action === 'suspend' && ![24, 168, 720].includes(hours)) paymentFail(400, 'Choose a suspension period of 24 hours, 7 days, or 30 days.');
+
+  const result = await db.query(`
+    UPDATE providers
+    SET account_access_status = CASE WHEN $2 = 'suspend' THEN 'suspended' WHEN $2 = 'deactivate' THEN 'deactivated' ELSE 'active' END,
+        access_suspension_until = CASE WHEN $2 = 'suspend' THEN NOW() + ($3::int * INTERVAL '1 hour') ELSE NULL END,
+        access_moderation_reason = $4,
+        access_moderated_at = NOW(),
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+  `, [req.params.id, action, action === 'suspend' ? hours : null, reason]);
+  if (!result.rowCount) return res.status(404).json({ message: 'Provider not found.' });
+  if (action !== 'restore') {
+    await db.query("DELETE FROM account_sessions WHERE account_role = 'provider' AND account_id = $1", [req.params.id]);
+  }
+  await recordAdminActivity(admin.id, `provider.access.${action}`, 'provider', Number(req.params.id), {
+    reason,
+    ...(action === 'suspend' ? { duration_hours: hours, suspension_until: result.rows[0].access_suspension_until } : {}),
+  });
+  res.json({ provider: await providerView(result.rows[0]) });
+}));
+
 app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError && /\/profile-photo$/.test(_req.path)) {
     return res.status(400).json({ message: error.code === 'LIMIT_FILE_SIZE' ? 'Each photo must be 5 MB or smaller.' : 'Upload one photo per field using JPG, PNG, or WebP.' });
@@ -4362,7 +4403,14 @@ ensureAdminSupportTables()
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'profile-photo-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'recurring-schedule-schema.sql'), 'utf8')))
   .then(() => db.query(fs.readFileSync(path.join(__dirname, 'booking-tracking-schema.sql'), 'utf8')))
-  .then(() => {
+  .then(async () => {
+    const reactivateExpiredSuspensions = () => db.query(`
+      UPDATE providers SET account_access_status = 'active', access_suspension_until = NULL, updated_at = NOW()
+      WHERE account_access_status = 'suspended' AND access_suspension_until <= NOW()
+    `).catch(error => console.error('Could not restore expired provider suspensions.', error));
+    await reactivateExpiredSuspensions();
+    const moderationTimer = setInterval(reactivateExpiredSuspensions, 60_000);
+    moderationTimer.unref?.();
     app.listen(PORT, () => {
       console.log(`SerbisyoNow auth API running on http://localhost:${PORT}`);
     });

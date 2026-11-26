@@ -34,6 +34,9 @@
       'account.declined': 'Declined account verification',
       'provider_photo.approved': 'Approved provider profile photo',
       'provider_photo.declined': 'Declined provider profile photo',
+      'provider.access.suspend': 'Temporarily suspended provider',
+      'provider.access.deactivate': 'Deactivated provider account',
+      'provider.access.restore': 'Restored provider access',
       'feedback.status_changed': 'Changed feedback status',
     };
     let activityItems = [];
@@ -92,7 +95,7 @@
       const query = document.getElementById('activity-search').value.trim().toLowerCase();
       const filter = document.getElementById('activity-filter').value;
       const entries = activityItems.filter(item => {
-        const decision = item.action_key.startsWith('account.') || item.action_key.startsWith('provider_photo.approved') || item.action_key.startsWith('provider_photo.declined');
+        const decision = item.action_key.startsWith('account.') || item.action_key.startsWith('provider.access.') || item.action_key.startsWith('provider_photo.approved') || item.action_key.startsWith('provider_photo.declined');
         const documentView = item.action_key === 'document.view' || item.action_key === 'provider_photo.image_view';
         const matchesFilter = filter === 'all' || (filter === 'document' && documentView) || (filter === 'decision' && decision) || (filter === 'other' && !documentView && !decision);
         const text = activitySearchText(item).toLowerCase();
@@ -100,7 +103,7 @@
       });
       document.getElementById('activity-list').innerHTML = entries.length ? entries.map(item => {
         const target = item.target_name ? `${item.target_role ? `${item.target_role} · ` : ''}${item.target_name}` : item.target_role ? `${item.target_role} #${item.target_id}` : item.metadata?.status ? `Feedback #${item.target_id} · ${item.metadata.status}` : `Record #${item.target_id || '-'}`;
-        const metadata = item.metadata?.document_type === 'identity_document' ? 'Identity document' : item.metadata?.document_type === 'provider_credential' ? 'Provider credential' : item.metadata?.image_type ? `${item.metadata.image_type} image` : '';
+        const metadata = item.metadata?.reason || (item.metadata?.document_type === 'identity_document' ? 'Identity document' : item.metadata?.document_type === 'provider_credential' ? 'Provider credential' : item.metadata?.image_type ? `${item.metadata.image_type} image` : '');
         return `<article class="admin-activity-item"><time datetime="${adminEscape(item.created_at)}">${adminEscape(new Date(item.created_at).toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'short'}))}</time><span><strong>${adminEscape(actionLabels[item.action_key] || item.action_key)}</strong><small>${adminEscape(item.admin_username || 'Admin account')} · ${adminEscape(target)}${metadata ? ` · ${adminEscape(metadata)}` : ''}</small></span></article>`;
       }).join('') : '<p class="admin-activity-empty">No activity matches these filters.</p>';
       document.getElementById('activity-message').textContent = `Showing ${entries.length} of ${activityItems.length} recent records (up to 200).`;

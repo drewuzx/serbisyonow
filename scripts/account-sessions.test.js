@@ -16,7 +16,7 @@ function fixtureDatabase() {
  const sessions = new Map();
  const accounts = {
   customer: { id: 61, full_name: 'Session Customer', email: 'customer@example.test', password_hash: bcrypt.hashSync('FixturePassword123', 4), is_verified: true, verification_status: 'verified' },
-  provider: { id: 81, full_name: 'Session Provider', email: 'provider@example.test', password_hash: bcrypt.hashSync('FixturePassword123', 4), is_verified: true, verification_status: 'verified', category: 'Cleaning' },
+  provider: { id: 81, full_name: 'Session Provider', email: 'provider@example.test', password_hash: bcrypt.hashSync('FixturePassword123', 4), is_verified: true, verification_status: 'verified', category: 'Cleaning', account_access_status: 'active', access_suspension_until: null },
  };
  let now = Date.now();
  let revokeDuringRenewal = false;
@@ -26,7 +26,16 @@ function fixtureDatabase() {
   async query(sql, params = []) {
    const q = sql.trim().replace(/\s+/g, ' ');
    let rows = [];
-   if (q.startsWith('INSERT INTO account_sessions')) {
+   if (q.startsWith("UPDATE providers SET account_access_status = 'active'")) {
+    const provider = accounts.provider;
+    if (Number(params[0]) === provider.id && provider.account_access_status === 'suspended' && provider.access_suspension_until && provider.access_suspension_until <= now) {
+     provider.account_access_status = 'active'; provider.access_suspension_until = null;
+    }
+   } else if (q.startsWith('SELECT account_access_status FROM providers')) {
+    if (Number(params[0]) === accounts.provider.id) rows = [{ account_access_status: accounts.provider.account_access_status }];
+   } else if (q.startsWith('SELECT account_access_status, access_suspension_until FROM providers')) {
+    if (Number(params[0]) === accounts.provider.id) rows = [{ account_access_status: accounts.provider.account_access_status, access_suspension_until: accounts.provider.access_suspension_until }];
+   } else if (q.startsWith('INSERT INTO account_sessions')) {
     assert.ok(q.includes("INTERVAL '30 days'"));
     sessions.set(params[0], { account_role: params[1], account_id: params[2], expires_at: now + 30 * DAY });
    } else if (q.startsWith('SELECT account_role')) {
@@ -117,6 +126,31 @@ test('expired or concurrently revoked sessions cannot be renewed', async () => {
  const fresh = await issueSession(database, 'provider', 81);
  database.revokeDuringRenewal();
  await assert.rejects(authenticateAccount(database, { headers: { authorization: `Bearer ${fresh}` } }, 'provider', 81), { statusCode: 401 });
+});
+
+test('suspended and deactivated providers cannot receive or use sessions', async () => {
+ const database = fixtureDatabase();
+ const token = await issueSession(database, 'provider', 81);
+ const req = { headers: { authorization: `Bearer ${token}` } };
+ database.accounts.provider.account_access_status = 'suspended';
+ database.accounts.provider.access_suspension_until = Date.now() + DAY;
+ await assert.rejects(issueSession(database, 'provider', 81), { statusCode: 403, message: 'This provider account is temporarily suspended.' });
+ await assert.rejects(authenticateAccount(database, req, 'provider', 81), { statusCode: 403, message: 'This provider account is temporarily suspended.' });
+ database.accounts.provider.account_access_status = 'deactivated';
+ database.accounts.provider.access_suspension_until = null;
+ await assert.rejects(issueSession(database, 'provider', 81), { statusCode: 403, message: 'This provider account has been deactivated. Contact support for review.' });
+});
+
+test('temporary provider suspensions restore access after their expiry', async () => {
+ const database = fixtureDatabase();
+ const token = await issueSession(database, 'provider', 81);
+ const req = { headers: { authorization: `Bearer ${token}` } };
+ database.accounts.provider.account_access_status = 'suspended';
+ database.accounts.provider.access_suspension_until = Date.now() + DAY;
+ await assert.rejects(authenticateAccount(database, req, 'provider', 81), { statusCode: 403 });
+ database.advance(2);
+ assert.deepEqual(await authenticateAccount(database, req, 'provider', 81), { role: 'provider', id: 81 });
+ assert.equal(database.accounts.provider.account_access_status, 'active');
 });
 
 test('HTTP login cookies survive a server restart, recover profiles, and logout revokes only that browser', { timeout: 20000 }, async t => {
